@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 
-export default function HomeScreen() {
+// 👇 navigation prop 사용을 위해 파라미터로 받음
+export default function HomeScreen({ navigation }) {
   const handleKakaoLogin = () => {
     Alert.alert('카카오 로그인 버튼 클릭');
   };
@@ -10,32 +11,31 @@ export default function HomeScreen() {
     Alert.alert('구글 로그인 버튼 클릭');
   };
 
+  // 👇 메인화면으로 이동하는 함수
+  const handleGoToMain = () => {
+    navigation.navigate('Main'); // Stack.Screen의 name이 "Main"이어야 함
+  };
+
   return (
     <View style={styles.container}>
-      {/* 로고 텍스트 */}
       <Text style={styles.logo}>jupging</Text>
 
-      {/* 삽화 이미지
-      <Image
-        source={require('../assets/illustration.png')} // 주의: 실제 파일 필요
-        style={styles.image}
-        resizeMode="contain"
-      /> */}
-
-      {/* 설명 텍스트 */}
       <Text style={styles.mainText}>봉사하는 플로깅앱, 줍깅</Text>
       <Text style={styles.description}>
         <Text style={styles.highlight}>줍깅은</Text> 조깅을 하면서 길가의 쓰레기를 수거하는 플로깅의 한국말입니다.
       </Text>
 
-      {/* 카카오 로그인 버튼 */}
       <TouchableOpacity style={styles.kakaoButton} onPress={handleKakaoLogin}>
         <Text style={styles.kakaoText}>카카오로 계속하기</Text>
       </TouchableOpacity>
 
-      {/* 구글 로그인 버튼 */}
       <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
         <Text style={styles.googleText}>Google로 계속하기</Text>
+      </TouchableOpacity>
+
+      {/* 👇 메인으로 이동하는 네비게이션 버튼 추가 */}
+      <TouchableOpacity style={styles.mainButton} onPress={handleGoToMain}>
+        <Text style={styles.mainTextButton}>메인 화면으로 이동</Text>
       </TouchableOpacity>
     </View>
   );
@@ -54,11 +54,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#333',
-  },
-  image: {
-    width: '80%',
-    height: 180,
-    marginBottom: 32,
   },
   mainText: {
     fontSize: 20,
@@ -105,6 +100,17 @@ const styles = StyleSheet.create({
   },
   googleText: {
     color: '#000',
+    fontWeight: 'bold',
+  },
+  mainButton: {
+    marginTop: 20,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  mainTextButton: {
+    color: '#fff',
     fontWeight: 'bold',
   },
 });
