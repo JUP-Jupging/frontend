@@ -1,226 +1,268 @@
+// 📁 MainScreen.js
 import React from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Icon from 'react-native-vector-icons/Ionicons';
-import Svg, { Image as SvgImage } from 'react-native-svg';
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 
-function HomeScreen({ navigation }) {
+export default function MainScreen({ navigation }) {
+  const goToRealtimePlogging = () => navigation.navigate('RealtimePlogging');
+const goToRecommend = () => navigation.navigate('추천 코스');
+const goToReport = () => navigation.navigate('쓰레기 제보');
+const goToPlogging = () => navigation.navigate('PloggingStart');
+  const goToTrashBin = () => navigation.navigate('TrashCan');
+  const goToMyPage = () => navigation.navigate('나의 활동');
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Image source={require('../assets/logo.png')} style={styles.logo} />
-        <Text style={styles.menuIcon}>\u2630</Text>
-      </View>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 20 }}  // ✅ 탭바 공간 확보
+    >
+      {/* 상단 로고 및 마이페이지 아이콘 */}
 
-      <Image source={require('../assets/401cde5a-fe42-439b-be32-5a16d31fe7e3.png')} style={styles.banner} />
-
-      <View style={styles.boxRow}>
-        <View style={styles.box}>
-          <Text style={styles.boxTitle}>진행중인 플로깅</Text>
-          <TouchableOpacity>
-            <Text style={styles.link}>실시간 플로깅 ></Text>
-          </TouchableOpacity>
+      <View style={styles.headerRow}>
+        <View style={styles.logoBox}>
+          <Text style={styles.logo}>Jupging</Text>
         </View>
 
-        <View style={styles.box}>
-          <Text style={styles.boxTitle}>오늘의 플로깅</Text>
-          <Text style={styles.subText}>0 / 1시간</Text>
-          <Text style={styles.subText}>0.0 / 3km</Text>
-          <Text style={styles.subText}>주운 쓰레기 수: 0개</Text>
-        </View>
+<TouchableOpacity style={styles.searchBar} onPress={() => navigation.navigate('코스 검색')}>
+  <Text style={styles.searchPlaceholder}>🔍 산책로 검색</Text>
+</TouchableOpacity>
+
+
+        <TouchableOpacity style={styles.userBox} onPress={goToMyPage}>
+          <Image source={require('../assets/user.png')} style={styles.userIcon} />
+        </TouchableOpacity>
       </View>
 
-      {/* 🔄 SVG 아이콘 버튼으로 교체된 네비게이션 버튼 */}
+
+      {/* 오른쪽: 두 개 카드 세로 정렬 */}
+<View style={styles.topRow}>
+  {/* 좌측 배너 */}
+  <View style={styles.leftBanner}>
+    <Text style={styles.bannerText}>주변 산책로를{'\n'}정리하고 싶다면</Text>
+  </View>
+
+  {/* 우측 카드 두 개 */}
+  <View style={styles.rightCards}>
+    <TouchableOpacity style={styles.ploggingCard} onPress={goToRealtimePlogging}>
+      <Text style={styles.cardTitle}>진행중인 플로깅</Text>
+      <Text style={styles.cardLink}>실시간 플로깅 </Text>
+    </TouchableOpacity>
+
+    <View style={styles.ploggingCard}>
+      <Text style={styles.cardTitle}>오늘의 플로깅</Text>
+      <Text style={styles.cardDetail}>0 / 1시간</Text>
+      <Text style={styles.cardDetail}>0.0 / 3km</Text>
+      <Text style={styles.cardDetail}>주운 쓰레기 수: 0개</Text>
+    </View>
+  </View>
+</View>
+
+      {/* 기능 아이콘 4개 */}
       <View style={styles.iconRow}>
-        <TouchableOpacity onPress={() => navigation.navigate('추천 코스')} style={styles.iconWrapper}>
-          <Image source={require('../assets/course-recommend-icon.png')} style={styles.svgIcon} />
+        <TouchableOpacity onPress={goToRecommend}>
+          <Image source={require('../assets/recommend.png')} style={styles.icon} />
           <Text style={styles.iconLabel}>추천 코스</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => navigation.navigate('코스 검색')} style={styles.iconWrapper}>
-          <Image source={require('../assets/course-search-icon.png')} style={styles.svgIcon} />
-          <Text style={styles.iconLabel}>코스 검색</Text>
+        <TouchableOpacity onPress={goToPlogging}>
+          <Image source={require('../assets/search.png')} style={styles.icon} />
+          <Text style={styles.iconLabel}>플로깅 시작</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => navigation.navigate('쓰레기 제보')} style={styles.iconWrapper}>
-          <Image source={require('../assets/trash-report-icon.png')} style={styles.svgIcon} />
+        <TouchableOpacity onPress={goToReport}>
+          <Image source={require('../assets/report.png')} style={styles.icon} />
           <Text style={styles.iconLabel}>쓰레기 제보</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.iconWrapper}>
-          <Image source={require('../assets/trash-bin-icon.png')} style={styles.svgIcon} />
+        <TouchableOpacity onPress={goToTrashBin}>
+          <Image source={require('../assets/trashcan.png')} style={styles.icon} />
           <Text style={styles.iconLabel}>쓰레기통</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.promoBanner}>
-        <Text style={styles.promoText}>산책로를 깨끗하게 만드는데 동참하세요.</Text>
+      {/* 문장 배너 */}
+      <View style={styles.missionBanner}>
+        <Text style={styles.missionText}>산책로를 깨끗하게 만드는데 동참하세요.</Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>줍깅 PICK 추천코스 🎉</Text>
-        <View style={styles.tags}>
-          <Text style={styles.tag}># 가까운 곳</Text>
-          <Text style={styles.tag}># 쓰레기 많은 곳</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <Image source={require('../assets/course1.png')} style={styles.courseImage} />
-          <Image source={require('../assets/course2.png')} style={styles.courseImage} />
+      {/* 추천 PICK 영역 */}
+      <View>
+        <Text style={styles.pickTitle}>줍깅 PICK 추천코스 🎉</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+          <View style={styles.pickCard}>
+            <Image source={require('../assets/course1.jpg')} style={styles.pickImage} />
+            <Text style={styles.pickCourseName}>국립 중앙 박물관</Text>
+            <Text style={styles.pickDistance}>7.1km  |  1시간30분</Text>
+          </View>
+          <View style={styles.pickCard}>
+            <Image source={require('../assets/course2.jpg')} style={styles.pickImage} />
+            <Text style={styles.pickCourseName}>국립 중앙 박물관</Text>
+            <Text style={styles.pickDistance}>7.1km  |  1시간30분</Text>
+          </View>
         </ScrollView>
       </View>
-    </ScrollView>
+    </ScrollView >
   );
 }
-
-function CourseRecommendScreen() {
-  return <View style={styles.screen}><Text>추천 코스</Text></View>;
-}
-
-function CourseSearchScreen() {
-  return <View style={styles.screen}><Text>코스 검색</Text></View>;
-}
-
-function TrashReportScreen() {
-  return <View style={styles.screen}><Text>쓰레기 제보</Text></View>;
-}
-
-function MyActivityScreen() {
-  return <View style={styles.screen}><Text>나의 활동</Text></View>;
-}
-
-const Tab = createBottomTabNavigator();
-
-export default function MainScreen() {
-  return (
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ color, size }) => {
-            let iconName;
-            if (route.name === '홈') iconName = 'home';
-            else if (route.name === '추천 코스') iconName = 'flag-outline';
-            else if (route.name === '코스 검색') iconName = 'map-outline';
-            else if (route.name === '쓰레기 제보') iconName = 'trash-outline';
-            else if (route.name === '나의 활동') iconName = 'person-outline';
-            return <Icon name={iconName} size={size} color={color} />;
-          },
-          tabBarActiveTintColor: '#2E7D32',
-          tabBarInactiveTintColor: 'gray',
-        })}
-      >
-        <Tab.Screen name="홈" component={HomeScreen} />
-        <Tab.Screen name="추천 코스" component={CourseRecommendScreen} />
-        <Tab.Screen name="코스 검색" component={CourseSearchScreen} />
-        <Tab.Screen name="쓰레기 제보" component={TrashReportScreen} />
-        <Tab.Screen name="나의 활동" component={MyActivityScreen} />
-      </Tab.Navigator>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     backgroundColor: '#fff',
-    padding: 16,
+    paddingHorizontal: 16,
   },
-  header: {
+
+  // 🔼 헤더 (로고 + 유저 아이콘)
+  headerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginTop: 32,
+    marginBottom: 12,
   },
+
   logo: {
-    width: 120,
-    height: 40,
-    resizeMode: 'contain',
-  },
-  menuIcon: {
     fontSize: 24,
-  },
-  banner: {
-    width: '100%',
-    height: 180,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  boxRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  box: {
-    width: '48%',
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderRadius: 8,
-  },
-  boxTitle: {
     fontWeight: 'bold',
-    marginBottom: 8,
+    color: '#4CAF50',
+    width: 100,
   },
-  subText: {
-    fontSize: 12,
-    color: '#555',
+
+
+  searchBar: {
+    flex: 4,
+    backgroundColor: '#F1F1F1',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginHorizontal: 8,
   },
-  link: {
-    color: '#007AFF',
-    fontWeight: 'bold',
+
+  searchPlaceholder: {
+    color: '#888',
+    fontSize: 14,
   },
+
+  userBox: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+
+  userIcon: {
+    width: 28,
+    height: 28,
+  },
+
+  // 🆕 상단 좌-우 레이아웃 (배너 + 카드)
+topRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'stretch',       // 🔥 높이 맞추기
+  gap: 8,
+  marginBottom: 24,
+},
+
+leftBanner: {
+  width: '45%',
+  borderRadius: 12,
+  overflow: 'hidden',
+  position: 'relative',
+},
+
+bannerImage: {
+  width: '100%',
+  aspectRatio: 3 / 4,
+  resizeMode: 'cover',
+},
+
+bannerText: {
+  position: 'absolute',
+  top: 16,
+  left: 12,
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: 'bold',
+  lineHeight: 22,
+},
+
+rightCards: {
+  width: '50%',
+  justifyContent: 'space-between',
+},
+
+ploggingCard: {
+  flex: 1,
+  backgroundColor: '#F5F5F5',
+  borderRadius: 10,
+  padding: 12,
+  marginBottom: 8,
+},
+
+cardTitle: {
+  fontSize: 14,
+  fontWeight: 'bold',
+  marginBottom: 4,
+},
+
+cardLink: {
+  fontSize: 13,
+  color: '#4CAF50',
+},
+
+cardDetail: {
+  fontSize: 13,
+  color: '#555',
+},
+
+
+  // 🔽 아이콘 영역
   iconRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 24,
   },
-  iconWrapper: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  svgIcon: {
-    width: 32,
-    height: 32,
-    marginBottom: 4,
+  icon: {
+    width: 48,
+    height: 48,
+    marginBottom: 6,
   },
   iconLabel: {
     fontSize: 12,
-    color: '#333',
-  },
-  promoBanner: {
-    backgroundColor: '#cceedd',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 24,
-  },
-  promoText: {
     textAlign: 'center',
-    fontWeight: 'bold',
   },
-  section: {
-    marginBottom: 32,
+
+  // ✅ 문장 배너
+  missionBanner: {
+    backgroundColor: '#C8E6C9',
+    padding: 50,
+    borderRadius: 10,
+    marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
+  missionText: {
+    fontSize: 14,
+    textAlign: 'center',
+    fontWeight: '600',
+    color: '#2E7D32',
   },
-  tags: {
-    flexDirection: 'row',
-    marginBottom: 8,
+
+  // ✅ PICK 추천코스
+  pickTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    paddingLeft: 8,
+    marginBottom: 10
+
   },
-  tag: {
-    marginRight: 8,
-    backgroundColor: '#eee',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    fontSize: 12,
-  },
-  courseImage: {
-    width: 200,
-    height: 120,
-    borderRadius: 8,
+  pickCard: {
+    marginLeft: 8,
     marginRight: 12,
   },
-  screen: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  pickImage: {
+    width: 150,
+    height: 100,
+    borderRadius: 8,
+  },
+  pickCourseName: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  pickDistance: {
+    fontSize: 12,
+    color: '#666',
   },
 });
