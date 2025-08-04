@@ -1,6 +1,7 @@
 // 파일: MainScreen.js
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Dimensions } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -63,7 +64,6 @@ export default function MainScreen({ navigation }) {
           <Text style={styles.iconLabel}>쓰레기통</Text>
         </TouchableOpacity>
       </View>
-
       <View style={styles.missionBanner}>
         <Image source={require('../assets/road.png')} style={styles.missionImage} />
         <Text style={styles.missionText}>산책로를 깨끗하게 만드는데 동참하세요.</Text>
@@ -204,16 +204,16 @@ const styles = StyleSheet.create({
   missionImage: {
     width: '100%',
     aspectRatio: 3,
+    height: 150,
     resizeMode: 'cover',
   },
   missionText: {
     position: 'absolute',
-    top: '30%',
+    top: '35%',
     fontSize: 20,
     fontWeight: '700',
     fontFamily: 'Pridi',
     color: '#FFFFFF',
-    backgroundColor: 'rgba(0,0,0,0.4)',
     padding: 10,
     borderRadius: 10,
   },
@@ -268,5 +268,19 @@ const styles = StyleSheet.create({
   pickDistance: {
     fontSize: 9,
     color: '#797982',
+  },
+    iconRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 20,
+    backgroundColor: '#fff',
+  },
+  iconBox: {
+    alignItems: 'center',
+  },
+  iconLabel: {
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
