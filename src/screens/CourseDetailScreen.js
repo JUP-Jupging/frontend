@@ -154,7 +154,7 @@ export default function CourseDetailScreen({ navigation, route }) {
           <Icon name="account" size={screenWidth * 0.06} color="#333" />
         </TouchableOpacity>
       </View>
- 
+
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Course Images */}
         <View style={styles.imageContainer}>

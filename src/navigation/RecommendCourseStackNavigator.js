@@ -12,22 +12,7 @@ export default function RecommendCourseStackNavigator() {
   name="RecommendCourse"
   component={RecommendCourseScreen}
   // ① options 함수 매개변수에서 headerShown 제거
-  options={({ navigation }) => ({
-    // ② 반환값에 headerShown:false 로 헤더 숨김
-    headerShown: false,
-    title: '추천 코스',
-    headerRight: () => (
-      <TouchableOpacity
-        onPress={() => navigation.navigate('내 플로깅 기록')}
-        style={{ marginRight: 16 }}
-      >
-        <Image
-          source={require('../assets/user.png')}
-          style={{ width: 24, height: 24 }}
-        />
-      </TouchableOpacity>
-    ),
-  })}
+options={{ headerShown: false }}
 />
 
 

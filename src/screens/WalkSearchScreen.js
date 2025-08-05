@@ -185,6 +185,8 @@ export default function WalkSearchScreen({ navigation }) {
         return "#666"
     }
   }
+  const goBack = () => navigation.goBack()
+  const goToProfile = () => navigation.navigate("내 플로깅 기록")
 
   return (
     <View style={styles.container}>
@@ -206,7 +208,11 @@ export default function WalkSearchScreen({ navigation }) {
               <Icon name="close-circle" size={screenWidth * 0.05} color="#888" />
             </TouchableOpacity>
           )}
+          <TouchableOpacity style={styles.headerButton} onPress={goToProfile}>
+            <Icon name="account" size={screenWidth * 0.06} color="#333" />
+          </TouchableOpacity>
         </View>
+
       </View>
 
       {/* 검색 결과 또는 인기 검색어 */}
@@ -239,10 +245,7 @@ export default function WalkSearchScreen({ navigation }) {
         </View>
       ) : (
         <View style={styles.popularContainer}>
-          <Text style={styles.popularTitle}>인기 검색어</Text>
-          <View style={styles.keywordsContainer}>
-            {POPULAR_KEYWORDS.map((keyword, index) => renderPopularKeyword(keyword, index))}
-          </View>
+
 
           <Text style={styles.recentTitle}>최근 검색한 산책로</Text>
           <FlatList

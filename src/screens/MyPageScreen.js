@@ -1,140 +1,206 @@
-// 📁 screens/MyPageScreen.js
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import CommonModal from '../components/CommonModal'; // ✅ 모달 컴포넌트 임포트
+"use client"
 
+import { useState } from "react"
+import { View, Text, TouchableOpacity, StyleSheet, Image, SafeAreaView, ScrollView, Dimensions } from "react-native"
+import Icon from "react-native-vector-icons/MaterialIcons"
+import CommonModal from "../components/CommonModal"
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 export default function MyPageScreen({ navigation }) {
-  const [modalVisible, setModalVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false)
 
-  // ✅ 추후 DB에서 받아올 유저 데이터
+  // 추후 DB에서 받아올 유저 데이터
   const user = {
-    nickname: '쓰레기 줍기 장인',
-    email: 'trasxh@kakao.com',
-    region: '서울 특별시',
-  };
+    nickname: "쓰레기줍기장인",
+    email: "trasxh@kakao.com",
+    region: "서울특별시",
+  }
 
-  // ✅ 확인 버튼 누르면 삭제 실행
+  // 확인 버튼 누르면 삭제 실행
   const handleDeleteAccount = () => {
     // 여기에서 실제 삭제 API 호출
-    console.log('계정 삭제 처리됨');
-
-    setModalVisible(false); // 모달 닫기
-navigation.reset({
-  index: 0,
-  routes: [{ name: 'Login' }],
-});
-  };
+    console.log("계정 삭제 처리됨")
+    setModalVisible(false) // 모달 닫기
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "Login" }],
+    })
+  }
 
   return (
-    <View style={styles.container}>
-      {/* 상단 타이틀 */}
-      <Text style={styles.title}>프로필</Text>
-
-      {/* ✅ 프로필 이미지 */}
-<View style={styles.profileImageContainer}>
-  <TouchableOpacity>
-    <Text style={styles.changePhotoText}>프로필 사진 바꾸기</Text>
-  </TouchableOpacity>
-</View>
-      {/* 사용자 정보 표시 */}
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>닉네임</Text>
-        <Text>{user.nickname}</Text>
-      </View>
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>이메일</Text>
-        <Text>{user.email}</Text>
-      </View>
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>활동 지역</Text>
-        <Text>{user.region}</Text>
+    <SafeAreaView style={styles.container}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Icon name="arrow-back" size={24} color="rgba(19, 18, 20, 0.5)" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>프로필</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
-      {/* 설정 변경 */}
-    <TouchableOpacity
-      style={styles.settingRow}
-      onPress={() => navigation.navigate('ChangeNickname')}
-    >
-      <Text style={styles.infoLabel}>닉네임 변경</Text>
-      <Text>{'>'}</Text>
-    </TouchableOpacity>
-<TouchableOpacity
-  style={styles.settingRow}
-  onPress={() => navigation.navigate('ChangePassword')}
->
-  <Text style={styles.infoLabel}>비밀번호 변경</Text>
-  <Text>{'>'}</Text>
-</TouchableOpacity>
-    <View style={styles.container}>
-      {/* ✅ 계정 삭제 버튼 */}
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => setModalVisible(true)}
-      >
-        <Text style={styles.deleteText}>계정 삭제</Text>
-      </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* 프로필 이미지 섹션 */}
+        <View style={styles.profileSection}>
+          <Image source={require("../assets/profile.png")} style={styles.profileImage} />
+          <TouchableOpacity style={styles.changePhotoButton}>
+            <Text style={styles.changePhotoText}>프로필 사진 바꾸기</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* ✅ 모달 컴포넌트 */}
+        {/* 사용자 정보 섹션 */}
+        <View style={styles.infoSection}>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>닉네임</Text>
+            <Text style={styles.infoValue}>{user.nickname}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>이메일</Text>
+            <Text style={styles.infoValue}>{user.email}</Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>활동 지역</Text>
+            <Text style={styles.infoValue}>{user.region}</Text>
+          </View>
+        </View>
+
+        {/* 설정 변경 섹션 */}
+        <View style={styles.settingsSection}>
+          <TouchableOpacity style={styles.settingRow} onPress={() => navigation.navigate("ChangeNickname")}>
+            <Text style={styles.settingLabel}>닉네임 변경</Text>
+            <Icon name="chevron-right" size={24} color="#131214" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.settingRow} onPress={() => navigation.navigate("ChangePassword")}>
+            <Text style={styles.settingLabel}>비밀번호 변경</Text>
+            <Icon name="chevron-right" size={24} color="#131214" />
+          </TouchableOpacity>
+        </View>
+
+        {/* 계정 삭제 버튼 */}
+        <View style={styles.deleteSection}>
+          <TouchableOpacity style={styles.deleteButton} onPress={() => setModalVisible(true)}>
+            <Text style={styles.deleteText}>계정 삭제</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* 모달 컴포넌트 */}
       <CommonModal
         visible={modalVisible}
         message="정말 계정을 삭제하시겠습니까?"
         onCancel={() => setModalVisible(false)} // 취소
-        onConfirm={handleDeleteAccount}         // 확인
+        onConfirm={handleDeleteAccount} // 확인
       />
-    </View>
-    </View>
-  );
+    </SafeAreaView>
+  )
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 24,
-    backgroundColor: '#fff',
     flex: 1,
+    backgroundColor: "#FFFFFF",
   },
-  title: {
+  header: {
+    paddingTop: screenHeight * 0.06,
+
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: "#FFFFFF",
+  },
+  backButton: {
+    padding: 5,
+  },
+  headerTitle: {
     fontSize: 18,
-    textAlign: 'center',
-    fontWeight: 'bold',
-    marginBottom: 12,
+    fontWeight: "600",
+    color: "#333333",
+    letterSpacing: -0.1,
   },
-  profileImageContainer: {
-    alignItems: 'center',
-    marginVertical: 24,
+  headerSpacer: {
+    width: 34, // backButton과 같은 크기로 중앙 정렬
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+  },
+  profileSection: {
+    alignItems: "center",
+    marginTop: 30,
+    marginBottom: 40,
   },
   profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginBottom: 20,
+  },
+  changePhotoButton: {
+    paddingVertical: 5,
   },
   changePhotoText: {
-    color: '#4CAF50',
-    marginTop: 8,
+    fontSize: 16,
+    fontWeight: "400",
+    color: "#418663",
+    letterSpacing: -0.1,
+  },
+  infoSection: {
+    marginBottom: 40,
   },
   infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 12,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderColor: '#eee',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F5F5F5",
   },
   infoLabel: {
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#333333",
+    letterSpacing: -0.1,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: "400",
+    color: "#333333",
+    letterSpacing: -0.1,
+  },
+  settingsSection: {
+    marginBottom: 60,
+  },
+  settingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F5F5F5",
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#333333",
+    letterSpacing: -0.1,
+  },
+  deleteSection: {
+    alignItems: "center",
+    marginTop: 100,
   },
   deleteButton: {
-    marginTop: 60,
-    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
   },
   deleteText: {
-    color: '#999',
     fontSize: 16,
+    fontWeight: "400",
+    color: "rgba(51, 51, 51, 0.5)",
+    letterSpacing: -0.1,
   },
-});
+})

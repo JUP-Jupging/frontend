@@ -18,7 +18,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 // Responsive size constants
 const PADDING_H = screenWidth * 0.04
 const ICON_SIZE = screenWidth * 0.15
-const BANNER_HEIGHT = screenHeight * 0.22
+const BANNER_HEIGHT = screenHeight * 0.15
 const PICK_CARD_WIDTH = screenWidth * 0.45
 const PICK_IMAGE_HEIGHT = PICK_CARD_WIDTH * 0.7
 
@@ -312,7 +312,6 @@ export default function MainScreen({ navigation }) {
           <TouchableOpacity style={styles.realtimePloggingCard} onPress={goToRealtimePlogging}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>진행중인 플로깅</Text>
-              <Text style={styles.participantsText}>{realtimeData.participants}명 참여중</Text>
             </View>
             <Text style={styles.cardLink}>실시간 플로깅 {">"}</Text>
 
@@ -506,10 +505,11 @@ const styles = StyleSheet.create({
 
   // Header Styles
   headerRow: {
+
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: PADDING_H,
-    paddingTop: screenHeight * 0.06,
+    paddingTop: screenHeight * 0.1,
     paddingBottom: PADDING_H / 2,
   },
   logoImage: {

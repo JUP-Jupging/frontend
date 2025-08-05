@@ -48,7 +48,7 @@ export default function BottomTabNavigator() {
         component={WalkSearchScreen}
         options={{ headerShown: false }} 
       />
-      <Tab.Screen name="쓰레기 제보" component={ReportTrashScreen} />
+      <Tab.Screen name="쓰레기 제보" component={ReportTrashScreen} options={{ headerShown: false }}/>
       <Tab.Screen name="내 플로깅 기록" component={MyPageStackNavigator} options={{ headerShown: false }} />
     </Tab.Navigator>
   );

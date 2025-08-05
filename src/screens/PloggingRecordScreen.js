@@ -8,14 +8,14 @@ export default function PloggingRecordScreen({ navigation }) {
   const goToPloggingAgain = () => {
     console.log('플로깅 더하기 클릭');
   };
-const goToNearbyTrash = () => {
-  navigation.navigate('TrashCanInfo'); // ✅ 정확한 name으로
-};
+  const goToNearbyTrash = () => {
+    navigation.navigate('TrashCanInfo'); // ✅ 정확한 name으로
+  };
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {/* ✅ 상단 유저 & 이미지 (추후 실제 사진 연동 필요) */}
       <View style={styles.headerBox}>
-        
+
         <Image source={require('../assets/course2.jpg')} style={styles.courseImage} />
       </View>
 

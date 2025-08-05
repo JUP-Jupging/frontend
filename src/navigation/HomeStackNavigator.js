@@ -17,20 +17,7 @@ export default function HomeStackNavigator() {
       <Stack.Screen
         name="PloggingStart"
         component={PloggingStartScreen}
-        options={({ navigation }) => ({
-          title: '플로깅 시작',
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('내 플로깅 기록')} // ✅ 이름 일치해야 함!
-              style={{ marginRight: 16 }}
-            >
-              <Image
-                source={require('../assets/user.png')}
-                style={{ width: 24, height: 24 }}
-              />
-            </TouchableOpacity>
-          ),
-        })}
+options={{ headerShown: false }}
       />
 
 

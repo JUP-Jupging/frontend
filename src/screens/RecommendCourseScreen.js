@@ -1,16 +1,21 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, Dimensions, ActivityIndicator } from "react-native"
-import Icon from "react-native-vector-icons/MaterialCommunityIcons"
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  Image,
+  Dimensions,
+  ActivityIndicator,
+  SafeAreaView,
+} from "react-native"
+import Icon from "react-native-vector-icons/MaterialIcons"
 import DropDownPicker from "react-native-dropdown-picker"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
-
-// Responsive size constants
-const PADDING_H = screenWidth * 0.04
-const CARD_HEIGHT = screenHeight * 0.12
-const ITEM_IMAGE_SIZE = screenHeight * 0.08
 
 // 더미 코스 데이터
 const DUMMY_COURSES = [
@@ -20,7 +25,7 @@ const DUMMY_COURSES = [
     address: "서울 용산구 서빙고로 137 국립중앙박물관",
     difficulty: "쉬움",
     region: "서울",
-    image: "../assets/course1.jpg",
+    image: "/placeholder.svg?height=50&width=50",
     distance: "7.1km",
     duration: "1시간30분",
     trashLevel: "보통",
@@ -31,7 +36,7 @@ const DUMMY_COURSES = [
     address: "서울 중구 회현동1가",
     difficulty: "어려움",
     region: "서울",
-    image: "../assets/course2.jpg",
+    image: "/placeholder.svg?height=50&width=50",
     distance: "5.2km",
     duration: "2시간",
     trashLevel: "적음",
@@ -42,7 +47,7 @@ const DUMMY_COURSES = [
     address: "서울 영등포구 여의동로 330",
     difficulty: "쉬움",
     region: "서울",
-    image: "../assets/course3.jpg",
+    image: "/placeholder.svg?height=50&width=50",
     distance: "8.5km",
     duration: "2시간30분",
     trashLevel: "많음",
@@ -53,60 +58,16 @@ const DUMMY_COURSES = [
     address: "서울 중구 청계천로 1",
     difficulty: "쉬움",
     region: "서울",
-    image: "../assets/course4.jpg",
+    image: "/placeholder.svg?height=50&width=50",
     distance: "6.3km",
     duration: "1시간45분",
     trashLevel: "보통",
-  },
-  {
-    id: "5",
-    name: "올림픽공원",
-    address: "서울 송파구 올림픽로 424",
-    difficulty: "보통",
-    region: "서울",
-    image: "../assets/course5.jpg",
-    distance: "9.2km",
-    duration: "2시간30분",
-    trashLevel: "많음",
-  },
-  {
-    id: "6",
-    name: "북한산 둘레길",
-    address: "서울 성북구 정릉동",
-    difficulty: "어려움",
-    region: "서울",
-    image: "../assets/course6.jpg",
-    distance: "12.1km",
-    duration: "3시간",
-    trashLevel: "적음",
-  },
-  {
-    id: "7",
-    name: "부산 해운대 해변",
-    address: "부산 해운대구 우동",
-    difficulty: "쉬움",
-    region: "부산",
-    image: "../assets/course7.jpg",
-    distance: "4.5km",
-    duration: "1시간",
-    trashLevel: "많음",
-  },
-  {
-    id: "8",
-    name: "제주 올레길 1코스",
-    address: "제주 서귀포시 성산읍",
-    difficulty: "보통",
-    region: "제주",
-    image: "../assets/course8.jpg",
-    distance: "15.1km",
-    duration: "4시간",
-    trashLevel: "적음",
   },
 ]
 
 // 지역 옵션
 const REGION_OPTIONS = [
-  { label: "전체 지역", value: null },
+  { label: "지역", value: null },
   { label: "서울", value: "서울" },
   { label: "부산", value: "부산" },
   { label: "대구", value: "대구" },
@@ -121,7 +82,7 @@ const REGION_OPTIONS = [
 
 // 난이도 옵션
 const DIFFICULTY_OPTIONS = [
-  { label: "전체 난이도", value: null },
+  { label: "난이도", value: null },
   { label: "쉬움", value: "쉬움" },
   { label: "보통", value: "보통" },
   { label: "어려움", value: "어려움" },
@@ -146,30 +107,35 @@ export default function RecommendCourseScreen({ navigation }) {
   const fetchCourses = async () => {
     try {
       setLoading(true)
+      console.log("데이터 로딩 시작...")
 
       // 실제 API 호출 (예시)
       // const response = await fetch('https://your-api.com/api/courses');
       // const data = await response.json();
 
-      // 시뮬레이션: 90% 확률로 DB 데이터 존재
-      const hasDataInDB = Math.random() > 0.1
+      // 시뮬레이션: 항상 더미 데이터 사용 (테스트용)
+      const hasDataInDB = true // Math.random() > 0.2
 
       // 1초 로딩 시뮬레이션
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
       if (hasDataInDB) {
+        console.log("더미 데이터 설정:", DUMMY_COURSES.length, "개")
         setCourses(DUMMY_COURSES)
         setFilteredCourses(DUMMY_COURSES)
       } else {
+        console.log("빈 데이터 설정")
         setCourses([])
         setFilteredCourses([])
       }
     } catch (error) {
       console.error("Failed to fetch courses:", error)
+      console.log("에러 발생, 더미 데이터로 폴백")
       setCourses(DUMMY_COURSES)
       setFilteredCourses(DUMMY_COURSES)
     } finally {
       setLoading(false)
+      console.log("로딩 완료")
     }
   }
 
@@ -198,91 +164,85 @@ export default function RecommendCourseScreen({ navigation }) {
   }, [])
 
   const goBack = () => navigation.goBack()
+  const goToProfile = () => navigation.navigate("MyPloggingScreen")
   const goToSearch = () => navigation.navigate("코스 검색")
-  const goToProfile = () => navigation.navigate("내 플로깅 기록")
 
   // 난이도별 색상 반환
   const getDifficultyColor = (difficulty) => {
     switch (difficulty) {
       case "쉬움":
-        return "#4CAF50"
+        return "#418663"
       case "보통":
-        return "#FF9800"
+        return "#418663"
       case "어려움":
-        return "#F44336"
+        return "#418663"
       default:
-        return "#666"
-    }
-  }
-
-  // 쓰레기 레벨별 색상 반환
-  const getTrashLevelColor = (level) => {
-    switch (level) {
-      case "많음":
-        return "#F44336"
-      case "보통":
-        return "#FF9800"
-      case "적음":
-        return "#4CAF50"
-      default:
-        return "#666"
+        return "#418663"
     }
   }
 
   // 상단 탭 렌더링
   const renderTabs = () => (
     <View style={styles.tabContainer}>
-      <TouchableOpacity style={[styles.tabButton, tab === "전체" && styles.activeTab]} onPress={() => setTab("전체")}>
-        <Text style={[styles.tabText, tab === "전체" && styles.activeTabText]}>전체</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={[styles.tabButton, tab === "AI" && styles.activeTab]} onPress={() => setTab("AI")}>
-        <Text style={[styles.tabText, tab === "AI" && styles.activeTabText]}>AI 기반 추천</Text>
-      </TouchableOpacity>
+      <View style={styles.tabRow}>
+        <TouchableOpacity style={styles.tabButton} onPress={() => setTab("전체")}>
+          <Text style={[styles.tabText, tab === "전체" && styles.activeTabText]}>전체</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.tabButton} onPress={() => setTab("AI")}>
+          <Text style={[styles.tabText, tab === "AI" && styles.activeTabText]}>AI 기반 추천</Text>
+        </TouchableOpacity>
+      </View>
+      {/* 탭 인디케이터 */}
+      <View style={styles.tabIndicatorContainer}>
+        <View style={styles.tabUnderline} />
+        <View style={[styles.tabIndicator, { left: tab === "전체" ? 0 : screenWidth * 0.5 }]} />
+      </View>
     </View>
   )
 
-  // 코스 아이템 렌더링 (리스트 형태로 변경)
+  // 코스 아이템 렌더링
   const renderCourseItem = ({ item }) => (
     <TouchableOpacity
       style={styles.courseItem}
       onPress={() => navigation.navigate("CourseDetail", { courseId: item.id })}
     >
-      {/* <Image source={require(item.image)} style={styles.courseImage} /> */}
+      <Image source={{ uri: item.image }} style={styles.courseImage} />
       <View style={styles.courseContent}>
         <Text style={styles.courseName}>{item.name}</Text>
         <Text style={styles.courseAddress}>{item.address}</Text>
-        <View style={styles.courseInfo}>
-          <View style={styles.courseInfoItem}>
-            <Icon name="map-marker" size={screenWidth * 0.035} color="#666" />
-            <Text style={styles.courseInfoText}>{item.distance}</Text>
-          </View>
-          <View style={styles.courseInfoItem}>
-            <Icon name="clock-outline" size={screenWidth * 0.035} color="#666" />
-            <Text style={styles.courseInfoText}>{item.duration}</Text>
-          </View>
-        </View>
         <View style={styles.tagContainer}>
-          
-            
+          <View style={[styles.difficultyTag, { backgroundColor: "#C8DECB" }]}>
+            <Text style={[styles.tagText, { color: getDifficultyColor(item.difficulty) }]}># {item.difficulty}</Text>
           </View>
         </View>
+      </View>
     </TouchableOpacity>
   )
 
+  // useEffect 추가 (디버깅용)
+  useEffect(() => {
+    console.log("현재 상태:", {
+      loading,
+      coursesLength: courses.length,
+      filteredCoursesLength: filteredCourses.length,
+      tab,
+    })
+  }, [loading, courses, filteredCourses, tab])
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerButton} onPress={goBack}>
-          <Icon name="arrow-left" size={screenWidth * 0.06} color="#333" />
+          <Icon name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>산책로 추천</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.headerButton} onPress={goToSearch}>
-            <Icon name="magnify" size={screenWidth * 0.06} color="#333" />
+            <Icon name="search" size={24} color="#333" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={goToProfile}>
-            <Icon name="account" size={screenWidth * 0.06} color="#333" />
+            <Icon name="person" size={24} color="#333" />
           </TouchableOpacity>
         </View>
       </View>
@@ -336,7 +296,7 @@ export default function RecommendCourseScreen({ navigation }) {
           {/* Course List */}
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#4CAF50" />
+              <ActivityIndicator size="large" color="#418663" />
               <Text style={styles.loadingText}>코스 정보 로딩중...</Text>
             </View>
           ) : (
@@ -346,9 +306,10 @@ export default function RecommendCourseScreen({ navigation }) {
               renderItem={renderCourseItem}
               contentContainerStyle={styles.listContainer}
               showsVerticalScrollIndicator={false}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Icon name="map-search" size={screenWidth * 0.15} color="#CCC" />
+                  <Icon name="search" size={screenWidth * 0.15} color="#CCC" />
                   <Text style={styles.emptyText}>조건에 맞는 산책로가 없습니다.</Text>
                   <Text style={styles.emptySubText}>다른 조건으로 검색해보세요.</Text>
                 </View>
@@ -359,302 +320,296 @@ export default function RecommendCourseScreen({ navigation }) {
       ) : (
         /* AI Tab Content */
         <View style={styles.aiContainer}>
-          <Text style={styles.aiTitle}>AI에게 산책로를 추천 받아보세요.</Text>
-          <Text style={styles.aiQuestion}>나에게 맞는 산책로는?</Text>
+          <Text style={styles.aiSubtitle}>AI에게 산책로를 추천 받아보세요.</Text>
+          <Text style={styles.aiTitle}>나에게 맞는 산책로는?</Text>
 
-          <View style={styles.aiImageContainer}>
-            <Icon name="robot" size={screenWidth * 0.3} color="#4CAF50" />
+          {/* AI 카드 컨테이너 */}
+          <View style={styles.aiCard}>
+            <View style={styles.aiImageContainer}>
+              <Image
+                source={require("../assets/ai-assistant2.png")}
+                style={styles.aiRobotImage}
+                resizeMode="contain"
+              />
+            </View>
+
+            {/* 분석 버튼 */}
+            <TouchableOpacity style={styles.aiAnalysisButton}>
+              <Text style={styles.aiAnalysisButtonText}>나에게 맞는 산책로 분석</Text>
+            </TouchableOpacity>
           </View>
 
-          <Text style={styles.aiSubtitle}>나의 플로깅 기록, 선호도를 바탕으로{"\n"}산책로를 추천 받아 보세요.</Text>
+          <Text style={styles.aiDescription}>나의 플로깅 기록, 선호도를 바탕으로{"\n"}산책로를 추천 받아 보세요.</Text>
 
           <TouchableOpacity style={styles.aiButton}>
-            <Icon name="brain" size={screenWidth * 0.05} color="#fff" />
             <Text style={styles.aiButtonText}>AI 분석하기</Text>
           </TouchableOpacity>
-
-          <View style={styles.aiFeatures}>
-            <View style={styles.aiFeature}>
-              <Icon name="chart-line" size={screenWidth * 0.06} color="#4CAF50" />
-              <Text style={styles.aiFeatureText}>개인 맞춤 분석</Text>
-            </View>
-            <View style={styles.aiFeature}>
-              <Icon name="map-marker-path" size={screenWidth * 0.06} color="#4CAF50" />
-              <Text style={styles.aiFeatureText}>최적 경로 추천</Text>
-            </View>
-            <View style={styles.aiFeature}>
-              <Icon name="weather-sunny" size={screenWidth * 0.06} color="#4CAF50" />
-              <Text style={styles.aiFeatureText}>날씨 기반 추천</Text>
-            </View>
-          </View>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FFFFFF",
   },
-
-  // Header Styles
   header: {
+    paddingTop: screenHeight * 0.05,
+
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: PADDING_H,
-    paddingTop: screenHeight * 0.06,
-    paddingBottom: PADDING_H / 2,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    paddingHorizontal: screenWidth * 0.078, // 28px at 360px width
+    paddingVertical: 15,
+    backgroundColor: "#FFFFFF",
   },
   headerButton: {
-    width: screenWidth * 0.1,
-    height: screenWidth * 0.1,
-    justifyContent: "center",
-    alignItems: "center",
+    padding: 5,
   },
   headerTitle: {
-    fontSize: screenWidth * 0.045,
+    fontSize: 20,
     fontWeight: "600",
-    color: "#333",
+    color: "#333333",
+    textAlign: "center",
   },
   headerRight: {
     flexDirection: "row",
+    alignItems: "center",
   },
-
-  // Tab Styles
   tabContainer: {
+    backgroundColor: "#FFFFFF",
+  },
+  tabRow: {
     flexDirection: "row",
-    backgroundColor: "#fff",
-    paddingHorizontal: PADDING_H,
+    justifyContent: "space-around",
+    paddingVertical: 15,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: PADDING_H / 2,
     alignItems: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-  activeTab: {
-    borderBottomColor: "#4CAF50",
   },
   tabText: {
-    fontSize: screenWidth * 0.04,
+    fontSize: 16,
     fontWeight: "600",
-    color: "#888",
+    color: "#333333",
   },
   activeTabText: {
-    color: "#4CAF50",
+    color: "#333333",
   },
-
-  // Content Styles
+  tabIndicatorContainer: {
+    position: "relative",
+    height: 4,
+  },
+  tabUnderline: {
+    position: "absolute",
+    width: "100%",
+    height: 4,
+    backgroundColor: "rgba(170, 178, 200, 0.2)",
+  },
+  tabIndicator: {
+    position: "absolute",
+    width: screenWidth * 0.5,
+    height: 4,
+    backgroundColor: "#418663",
+  },
   contentContainer: {
     flex: 1,
-    paddingHorizontal: PADDING_H,
+    paddingHorizontal: screenWidth * 0.075, // 27px at 360px width
   },
-
-  // Filter Styles
   filterContainer: {
     flexDirection: "row",
-    gap: PADDING_H / 2,
-    marginVertical: PADDING_H,
+    paddingVertical: 15,
+    gap: 20,
   },
   filterItem: {
     flex: 1,
   },
   dropdown: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#999999",
     borderWidth: 1,
-    borderColor: "#DDD",
-    borderRadius: 20,
-    backgroundColor: "#fff",
-    paddingHorizontal: PADDING_H / 2,
-    minHeight: screenHeight * 0.05,
+    borderRadius: 10,
+    minHeight: 25,
+    paddingHorizontal: 8,
   },
   dropdownContainer: {
-    borderWidth: 1,
-    borderColor: "#DDD",
-    borderRadius: 8,
-    backgroundColor: "#fff",
+    backgroundColor: "#FFFFFF",
+    borderColor: "#999999",
+    borderRadius: 10,
   },
   dropdownText: {
-    fontSize: screenWidth * 0.035,
-    color: "#333",
+    fontSize: 12,
+    color: "#333333",
+    fontWeight: "500",
   },
   dropdownPlaceholder: {
-    fontSize: screenWidth * 0.035,
-    color: "#888",
+    fontSize: 12,
+    color: "#333333",
+    fontWeight: "500",
   },
-
-  // Count Styles
   countText: {
-    fontSize: screenWidth * 0.04,
+    fontSize: 16,
     fontWeight: "600",
-    color: "#333",
-    marginBottom: PADDING_H,
+    color: "#333333",
+    marginBottom: 15,
   },
-
-  // Loading Styles
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    fontSize: screenWidth * 0.035,
-    color: "#666",
-    marginTop: PADDING_H / 2,
-  },
-
-  // List Styles
   listContainer: {
-    paddingBottom: PADDING_H * 2,
+    paddingBottom: 20,
   },
-
-  // Course Item Styles (리스트 형태로 변경)
   courseItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: PADDING_H,
-    paddingHorizontal: PADDING_H,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-    backgroundColor: "#fff",
+    paddingVertical: 15,
   },
   courseImage: {
-    width: ITEM_IMAGE_SIZE,
-    height: ITEM_IMAGE_SIZE,
-    borderRadius: 8,
-    marginRight: PADDING_H,
-    resizeMode: "cover",
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+    marginRight: 15,
   },
   courseContent: {
     flex: 1,
   },
   courseName: {
-    fontSize: screenWidth * 0.04,
+    fontSize: 14,
     fontWeight: "600",
-    color: "#333",
-    marginBottom: 4,
+    color: "#333333",
+    marginBottom: 5,
   },
   courseAddress: {
-    fontSize: screenWidth * 0.032,
-    color: "#666",
-    marginBottom: PADDING_H / 3,
-  },
-  courseInfo: {
-    flexDirection: "row",
-    gap: PADDING_H / 2,
-    marginBottom: PADDING_H / 3,
-  },
-  courseInfoItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  courseInfoText: {
-    fontSize: screenWidth * 0.03,
-    color: "#666",
+    fontSize: 12,
+    fontWeight: "500",
+    color: "rgba(51, 51, 51, 0.6)",
+    marginBottom: 8,
   },
   tagContainer: {
     flexDirection: "row",
-    gap: PADDING_H / 3,
-    flexWrap: "wrap",
   },
   difficultyTag: {
-    paddingHorizontal: PADDING_H / 3,
+    paddingHorizontal: 12,
     paddingVertical: 2,
-    borderRadius: 12,
-  },
-  trashTag: {
-    paddingHorizontal: PADDING_H / 3,
-    paddingVertical: 2,
-    borderRadius: 12,
+    borderRadius: 20,
   },
   tagText: {
-    fontSize: screenWidth * 0.028,
-    fontWeight: "500",
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
   },
-
-  // Empty State Styles
+  separator: {
+    height: 1,
+    backgroundColor: "rgba(217, 217, 217, 0.4)",
+    marginVertical: 5,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 50,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: "#666",
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: screenHeight * 0.1,
+    paddingTop: 100,
   },
   emptyText: {
-    fontSize: screenWidth * 0.04,
-    color: "#666",
-    marginTop: PADDING_H,
-    textAlign: "center",
+    fontSize: 16,
+    color: "#999",
+    marginTop: 20,
   },
   emptySubText: {
-    fontSize: screenWidth * 0.035,
-    color: "#999",
-    marginTop: PADDING_H / 2,
-    textAlign: "center",
+    fontSize: 14,
+    color: "#CCC",
+    marginTop: 5,
   },
-
   // AI Tab Styles
   aiContainer: {
     flex: 1,
-    paddingHorizontal: PADDING_H,
-    paddingTop: PADDING_H * 2,
+    paddingHorizontal: screenWidth * 0.067, // 24px at 360px width
+    paddingTop: 20,
     alignItems: "center",
-  },
-  aiTitle: {
-    fontSize: screenWidth * 0.035,
-    color: "#777",
-    marginBottom: PADDING_H / 2,
-  },
-  aiQuestion: {
-    fontSize: screenWidth * 0.05,
-    fontWeight: "700",
-    color: "#333",
-    marginBottom: PADDING_H * 2,
-  },
-  aiImageContainer: {
-    marginBottom: PADDING_H * 2,
   },
   aiSubtitle: {
-    fontSize: screenWidth * 0.035,
-    color: "#666",
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#999999",
+    marginBottom: 10,
     textAlign: "center",
-    lineHeight: screenWidth * 0.05,
-    marginBottom: PADDING_H * 2,
+  },
+  aiTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333333",
+    marginBottom: 30,
+    textAlign: "center",
+  },
+  aiCard: {
+    width: screenWidth * 0.867, // 312px at 360px width
+    height: screenHeight * 0.386, // 301px at 780px height
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    shadowColor: "#BEBEBE",
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
+    marginBottom: 30,
+  },
+  aiImageContainer: {
+    width: 200,
+    height: 200,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  aiRobotImage: {
+    width: 200,
+    height: 200,
+  },
+  aiAnalysisButton: {
+    backgroundColor: "#C8DECB",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  aiAnalysisButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#418663",
+  },
+  aiDescription: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#999999",
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 40,
   },
   aiButton: {
-    flexDirection: "row",
+    backgroundColor: "#418663",
+    borderRadius: 10,
+    paddingVertical: 15,
+    paddingHorizontal: 40,
     alignItems: "center",
-    backgroundColor: "#4CAF50",
-    paddingHorizontal: PADDING_H * 2,
-    paddingVertical: PADDING_H,
-    borderRadius: 25,
-    gap: PADDING_H / 2,
-    marginBottom: PADDING_H * 2,
+    width: screenWidth * 0.889, // 320px at 360px width
   },
   aiButtonText: {
-    color: "#fff",
-    fontSize: screenWidth * 0.04,
+    fontSize: 18,
     fontWeight: "600",
-  },
-  aiFeatures: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    paddingHorizontal: PADDING_H,
-  },
-  aiFeature: {
-    alignItems: "center",
-    gap: PADDING_H / 3,
-  },
-  aiFeatureText: {
-    fontSize: screenWidth * 0.03,
-    color: "#666",
-    textAlign: "center",
+    color: "#FFFFFF",
   },
 })

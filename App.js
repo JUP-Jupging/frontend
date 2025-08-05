@@ -20,7 +20,7 @@ function App() {
         <Stack.Screen
           name="Login"
           component={LoginScreen}
-          options={{ title: '로그인 화면' }}
+          options={{ headerShown: false }}
         />
 
         {/* ✅ 메인 진입 시 탭 네비게이터로 이동 */}
@@ -30,25 +30,6 @@ function App() {
           options={{ headerShown: false }} // 탭에 헤더 필요 없으면 숨김
         />
 
-
-        <Stack.Screen
-          name="PloggingRecord"
-          component={PloggingRecordScreen}
-          options={({ navigation }) => ({
-            title: '플로깅 기록',
-            headerRight: () => (
-              <TouchableOpacity
-                onPress={() => navigation.navigate('내 플로깅 기록')} // ✅ 이름 일치해야 함!
-                style={{ marginRight: 16 }}
-              >
-                <Image
-                  source={require('./src/assets/user.png')}
-                  style={{ width: 24, height: 24 }}
-                />
-              </TouchableOpacity>
-            ),
-          })}
-        />
         <Stack.Screen
           name="TrashCanInfo"
           component={TrashCanInfoScreen}

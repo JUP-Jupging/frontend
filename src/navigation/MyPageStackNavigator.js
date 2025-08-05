@@ -14,14 +14,14 @@ export default function MyPageStackNavigator() {
       <Stack.Screen
         name="내 플로깅 기록"
         component={MyPloggingScreen}
-        options={{ title: '내 플로깅 기록' }}
+        options={{ title: '내 플로깅 기록', headerShown: false }}
       />
 
       {/* 👇 MyPageScreen을 이 안에서 navigate 해서 접근 */}
       <Stack.Screen
         name="MyPageMain"
         component={MyPageScreen}
-        options={{ title: '나의 활동' }}
+        options={{ title: '나의 활동', headerShown: false }}
       />
 
       <Stack.Screen

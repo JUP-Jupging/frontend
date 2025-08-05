@@ -52,14 +52,14 @@ export default function PloggingStartScreen({ navigation }) {
                 <Text style={styles.resumeText}>계속하기 ▶</Text>
               </TouchableOpacity>
               <TouchableOpacity
-  style={styles.endBtn}
-  onPress={() => {
-    setStatus('ended'); // 상태 업데이트는 유지
-    navigation.navigate('PloggingRecord'); // 👉 PloggingRecordScreen으로 이동
-  }}
->
-  <Text style={styles.endText}>종료 ⏹</Text>
-</TouchableOpacity>
+                style={styles.endBtn}
+                onPress={() => {
+                  setStatus('ended'); // 상태 업데이트는 유지
+                  navigation.navigate('PloggingRecord'); // 👉 PloggingRecordScreen으로 이동
+                }}
+              >
+                <Text style={styles.endText}>종료 ⏹</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
