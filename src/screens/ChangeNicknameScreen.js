@@ -38,9 +38,6 @@ export default function ChangeNicknameScreen() {
   {/* ✅ 닉네임 입력 등 다른 내용 */}
   {/* ... */}
 
-
-
-
             {/* ✅ 입력창 */}
             <Text style={styles.label}>닉네임</Text>
             <TextInput
@@ -92,7 +89,7 @@ const styles = StyleSheet.create({
     },
     header: {
         position: 'absolute',
-        top: 0,
+        top: 30,
         height: 60,
         width: '100%',
         paddingHorizontal: 16,
@@ -103,7 +100,9 @@ const styles = StyleSheet.create({
         borderColor: '#eee',
     },
     submitText: {
-        fontSize: 16,
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginLeft: 60,
         color: '#4CAF50',
     },
     backText: {
@@ -117,7 +116,7 @@ const styles = StyleSheet.create({
     doneText: {
         fontSize: 16,
         color: '#4CAF50',
-        marginRight: 0,
+        marginLeft: 30,
     },
     label: {
         fontSize: 14,

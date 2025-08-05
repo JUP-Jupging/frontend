@@ -6,8 +6,6 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import MainScreen from '../screens/MainScreen';
 import PloggingStartScreen from '../screens/PloggingStartScreen';
-import MyPageScreen from '../screens/MyPageScreen'; // ✅ 추가
-import WalkSearchScreen from '../screens/WalkSearchScreen';
 
 const Stack = createNativeStackNavigator();
 

@@ -1,15 +1,14 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import HomeStackNavigator from './HomeStackNavigator';
-import RecommendCourseScreen from '../screens/RecommendCourseScreen';
 import WalkSearchScreen from '../screens/WalkSearchScreen';
 import ReportTrashScreen from '../screens/ReportTrashScreen';
-import PloggingStartScreen from '../screens/PloggingStartScreen';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { TouchableOpacity, Image } from 'react-native';
 import MyPageStackNavigator from './MyPageStackNavigator';
-
+import RecommendCourseStackNavigator from './RecommendCourseStackNavigator' // 추천 코스 스택 네비게이터
 const Tab = createBottomTabNavigator();
+
 
 export default function BottomTabNavigator() {
   return (
@@ -43,54 +42,11 @@ export default function BottomTabNavigator() {
     >
       {/* 홈은 Stack Navigator */}
       <Tab.Screen name="홈" component={HomeStackNavigator} options={{ headerShown: false }} />
-      <Tab.Screen name="추천 코스" component={RecommendCourseScreen} options={({ navigation }) => ({
-        title: '추천 코스',
-        headerLeft: () => (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('홈')} // 또는 navigation.goBack()
-            style={{ marginLeft: 16 }}
-          >
-            <Icon name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-        ),
-        headerRight: () => (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('내 플로깅 기록')}
-            style={{ marginRight: 16 }}
-          >
-            <Image
-              source={require('../assets/user.png')}
-              style={{ width: 24, height: 24 }}
-            />
-          </TouchableOpacity>
-        ),
-      })}
-      />
+      <Tab.Screen name="추천 코스" component={RecommendCourseStackNavigator} options={{ headerShown: false }} />
       <Tab.Screen
         name="코스 검색"
         component={WalkSearchScreen}
-        options={({ navigation }) => ({
-          title: '코스 검색',
-          headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('홈')} // 또는 navigation.goBack()
-              style={{ marginLeft: 16 }}
-            >
-              <Icon name="arrow-back" size={24} color="#333" />
-            </TouchableOpacity>
-          ),
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('내 플로깅 기록')}
-              style={{ marginRight: 16 }}
-            >
-              <Image
-                source={require('../assets/user.png')}
-                style={{ width: 24, height: 24 }}
-              />
-            </TouchableOpacity>
-          ),
-        })}
+        options={{ headerShown: false }} 
       />
       <Tab.Screen name="쓰레기 제보" component={ReportTrashScreen} />
       <Tab.Screen name="내 플로깅 기록" component={MyPageStackNavigator} options={{ headerShown: false }} />
