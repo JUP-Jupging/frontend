@@ -6,6 +6,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import MainScreen from '../screens/MainScreen';
 import PloggingStartScreen from '../screens/PloggingStartScreen';
+import PloggingRecordScreen from '../screens/PloggingRecordScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -19,7 +20,11 @@ export default function HomeStackNavigator() {
         component={PloggingStartScreen}
 options={{ headerShown: false }}
       />
-
+<Stack.Screen
+  name="PloggingRecordScreen"
+  component={PloggingRecordScreen}
+  options={{ headerShown: false }}
+/>
 
     </Stack.Navigator>
   );

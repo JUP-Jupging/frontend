@@ -1,7 +1,6 @@
 "use client"
-
 import { useState, useEffect } from "react"
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Dimensions } from "react-native"
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Dimensions, Image } from "react-native"
 import { useNavigation, useRoute } from "@react-navigation/native"
 import MapView, { Polyline, Marker } from "react-native-maps"
 import Icon from "react-native-vector-icons/MaterialIcons"
@@ -31,37 +30,90 @@ const DUMMY_DETAIL_DATA = {
   ]
 }
 
-export default function PloggingRecordDetailScreen() {
+// 더미 쓰레기 목록 데이터
+const DUMMY_TRASH_LIST = [
+  {
+    id: 1,
+    title: "풀속 쓰레기",
+    description: "플라스틱 병 외 7개",
+    amount: "많음",
+    image: "/placeholder.svg?height=75&width=75",
+    number: 1
+  },
+  {
+    id: 2,
+    title: "나무 옆 쓰레기",
+    description: "유리병 외 7개",
+    amount: "적음",
+    image: "/placeholder.svg?height=75&width=75",
+    number: 2
+  }
+]
+
+export default function PloggingRecordScreen() {
   const navigation = useNavigation()
   const route = useRoute()
   const [recordData, setRecordData] = useState(null)
+  const [trashList, setTrashList] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     loadRecordData()
+    loadTrashList()
   }, [])
 
   const loadRecordData = async () => {
     try {
       setIsLoading(true)
       
-      // 실제 API 호출 시뮬레이션
-      const hasRealData = Math.random() > 0.3 // 70% 확률로 더미 데이터 사용
-      
-      if (hasRealData) {
-        console.log("Using dummy record data")
-        setRecordData(DUMMY_DETAIL_DATA)
+      // route.params에서 전달받은 데이터가 있는지 확인
+      if (route.params?.record) {
+        console.log("Using passed record data:", route.params.record)
+        setRecordData(route.params.record)
       } else {
-        // 실제 API 호출
-        // const response = await fetch(`/api/plogging-records/${route.params?.recordId}`)
-        // const data = await response.json()
-        setRecordData(DUMMY_DETAIL_DATA)
+        // 실제 API 호출 시뮬레이션
+        const hasRealData = Math.random() > 0.3 // 70% 확률로 더미 데이터 사용
+        
+        if (hasRealData) {
+          console.log("Using dummy record data")
+          setRecordData(DUMMY_DETAIL_DATA)
+        } else {
+          // 실제 API 호출
+          // const response = await fetch(`/api/plogging-records/${route.params?.recordId}`)
+          // const data = await response.json()
+          setRecordData(DUMMY_DETAIL_DATA)
+        }
       }
     } catch (error) {
       console.error("Failed to load record data:", error)
       setRecordData(DUMMY_DETAIL_DATA)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadTrashList = async () => {
+    try {
+      // DB에서 쓰레기 목록 데이터 로드 시도
+      const hasDbData = Math.random() > 0.5 // 50% 확률로 DB 데이터 시뮬레이션
+      
+      if (hasDbData) {
+        // 실제 API 호출
+        // const response = await fetch(`/api/trash-records/${route.params?.recordId}`)
+        // const data = await response.json()
+        // setTrashList(data)
+        
+        // DB 데이터가 없는 경우 더미 데이터 사용
+        console.log("Using dummy trash list data")
+        setTrashList(DUMMY_TRASH_LIST)
+      } else {
+        console.log("No DB data, using dummy trash list")
+        setTrashList(DUMMY_TRASH_LIST)
+      }
+    } catch (error) {
+      console.error("Failed to load trash list:", error)
+      // 에러 발생 시 더미 데이터 사용
+      setTrashList(DUMMY_TRASH_LIST)
     }
   }
 
@@ -156,6 +208,38 @@ export default function PloggingRecordDetailScreen() {
             </View>
           </View>
         </View>
+
+        {/* 구분선 */}
+        <View style={styles.separator} />
+
+        {/* 주운 쓰레기 섹션 */}
+        <View style={styles.trashSection}>
+          <View style={styles.trashSectionHeader}>
+            <Text style={styles.trashSectionTitle}>주운 쓰레기</Text>
+            <Text style={styles.trashSectionSubtitle}>플로깅중 주운 쓰레기 기록입니다</Text>
+          </View>
+
+          {/* 쓰레기 목록 */}
+          {trashList.map((trash, index) => (
+            <View key={trash.id} style={styles.trashCard}>
+              <View style={styles.trashCardLeft}>
+                <View style={styles.trashNumber}>
+                  <Text style={styles.trashNumberText}>{trash.number}</Text>
+                </View>
+                <View style={styles.trashInfo}>
+                  <Text style={styles.trashTitle}>{trash.title}</Text>
+                  <Text style={styles.trashDescription}>{trash.description}</Text>
+                  <View style={styles.trashAmountContainer}>
+                    <Text style={styles.trashAmountText}>#{trash.amount}</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.trashImageContainer}>
+                <Image source={{ uri: trash.image }} style={styles.trashImage} />
+              </View>
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </SafeAreaView>
   )
@@ -172,6 +256,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   header: {
+    paddingTop: screenHeight * 0.05,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -270,5 +355,103 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: "#333333",
+  },
+  separator: {
+    height: 4,
+    backgroundColor: "rgba(170, 178, 200, 0.2)",
+    marginVertical: 20,
+  },
+  trashSection: {
+    paddingHorizontal: 20,
+  },
+  trashSectionHeader: {
+    marginBottom: 20,
+  },
+  trashSectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#333333",
+    marginBottom: 4,
+  },
+  trashSectionSubtitle: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: "#333333",
+    lineHeight: 25,
+  },
+  trashCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 1,
+    elevation: 2,
+  },
+  trashCardLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  trashNumber: {
+    width: 20,
+    height: 20,
+    backgroundColor: "#418663",
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 15,
+  },
+  trashNumberText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "400",
+  },
+  trashInfo: {
+    flex: 1,
+  },
+  trashTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#333333",
+    marginBottom: 4,
+  },
+  trashDescription: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "rgba(51, 51, 51, 0.6)",
+    marginBottom: 8,
+  },
+  trashAmountContainer: {
+    alignSelf: "flex-start",
+  },
+  trashAmountText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#418663",
+    backgroundColor: "#C8DECB",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    textAlign: "center",
+  },
+  trashImageContainer: {
+    width: 75,
+    height: 75,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  trashImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
   },
 })

@@ -164,8 +164,7 @@ export default function RecommendCourseScreen({ navigation }) {
   }, [])
 
   const goBack = () => navigation.goBack()
-  const goToProfile = () => navigation.navigate("MyPloggingScreen")
-  const goToSearch = () => navigation.navigate("코스 검색")
+  const goToProfile = () => navigation.navigate("내 플로깅 기록")
 
   // 난이도별 색상 반환
   const getDifficultyColor = (difficulty) => {
@@ -238,9 +237,7 @@ export default function RecommendCourseScreen({ navigation }) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>산책로 추천</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerButton} onPress={goToSearch}>
-            <Icon name="search" size={24} color="#333" />
-          </TouchableOpacity>
+
           <TouchableOpacity style={styles.headerButton} onPress={goToProfile}>
             <Icon name="person" size={24} color="#333" />
           </TouchableOpacity>

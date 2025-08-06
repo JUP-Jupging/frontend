@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: PADDING_H,
-    paddingTop: screenHeight * 0.1,
+    paddingTop: screenHeight * 0.05,
     paddingBottom: PADDING_H / 2,
   },
   logoImage: {

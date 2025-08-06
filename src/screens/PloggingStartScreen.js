@@ -1,5 +1,4 @@
 "use client"
-
 import React, { useState, useEffect } from "react"
 import {
   View,
@@ -12,10 +11,13 @@ import {
   Image,
   Modal,
   ScrollView,
+  PermissionsAndroid,
 } from "react-native"
-import MapView, { Marker } from "react-native-maps"
+import MapView, { Marker, Polyline } from "react-native-maps"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
+import Config from "react-native-config"
+import Geolocation from 'react-native-geolocation-service';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -38,7 +40,6 @@ const DUMMY_TRASH_LOCATIONS = [
       { type: "유리병", count: 3, color: "#797982" },
       { type: "플라스틱", count: 4, color: "#007AFF" },
     ],
-    // image: require("../assets/trash-background.png"),
   },
   {
     id: 2,
@@ -50,7 +51,6 @@ const DUMMY_TRASH_LOCATIONS = [
       { type: "캔", count: 2, color: "#797982" },
       { type: "종이", count: 1, color: "#34C759" },
     ],
-    // image: require("../assets/trash-background.png"),
   },
 ]
 
@@ -65,6 +65,138 @@ export default function PloggingStartScreen({ navigation }) {
   const [selectedTrash, setSelectedTrash] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [mapReady, setMapReady] = useState(false)
+  
+  // 경로 추적 관련 상태
+  const [routeCoordinates, setRouteCoordinates] = useState([])
+  const [totalDistance, setTotalDistance] = useState(0)
+  const [watchId, setWatchId] = useState(null)
+
+  const key = Config.REACT_APP_GOOGLE_MAPS_API_KEY
+
+  // 안드로이드 위치 권한 요청
+  const requestLocationPermission = async () => {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: '위치 권한이 필요합니다',
+          message: '플로깅 경로를 추적하고 기록하기 위해 위치 권한이 필요합니다.\n\n권한을 허용해주세요.',
+          buttonNeutral: '나중에 묻기',
+          buttonNegative: '거부',
+          buttonPositive: '허용',
+        }
+      )
+      
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        console.log('위치 권한이 허용되었습니다.')
+        return true
+      } else if (granted === PermissionsAndroid.RESULTS.DENIED) {
+        Alert.alert(
+          '권한 거부됨', 
+          '위치 권한이 거부되어 플로깅을 시작할 수 없습니다.\n\n설정에서 위치 권한을 허용해주세요.',
+          [{ text: '확인' }]
+        )
+        return false
+      } else if (granted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+        Alert.alert(
+          '권한 설정 필요', 
+          '위치 권한이 영구적으로 거부되었습니다.\n\n설정 > 앱 > 권한에서 위치 권한을 허용해주세요.',
+          [{ text: '확인' }]
+        )
+        return false
+      }
+      return false
+    } catch (err) {
+      console.warn('권한 요청 오류:', err)
+      Alert.alert('오류', '권한 요청 중 오류가 발생했습니다.')
+      return false
+    }
+  }
+
+  // 두 좌표 간의 거리 계산 (미터 단위)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3 // 지구 반지름 (미터)
+    const φ1 = (lat1 * Math.PI) / 180
+    const φ2 = (lat2 * Math.PI) / 180
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+    return R * c
+  }
+
+  // 거리 포맷팅
+  const formatDistance = (meters) => {
+    if (meters < 1000) {
+      return `${Math.round(meters)}m`
+    } else {
+      return `${(meters / 1000).toFixed(2)}km`
+    }
+  }
+
+  // 위치 추적 시작
+  const startLocationTracking = () => {
+    const id = Geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        const newCoordinate = { latitude, longitude }
+
+        setCurrentLocation(prev => ({
+          ...prev,
+          latitude,
+          longitude
+        }))
+
+        setRouteCoordinates(prevRoute => {
+          const newRoute = [...prevRoute, newCoordinate]
+          
+          // 거리 계산 (첫 번째 좌표가 아닌 경우에만)
+          if (prevRoute.length > 0) {
+            const lastCoordinate = prevRoute[prevRoute.length - 1]
+            const distance = calculateDistance(
+              lastCoordinate.latitude,
+              lastCoordinate.longitude,
+              latitude,
+              longitude
+            )
+            // 5미터 이상 이동했을 때만 거리 추가 (GPS 오차 방지)
+            if (distance >= 5) {
+              setTotalDistance(prev => prev + distance)
+            }
+          }
+          
+          return newRoute
+        })
+      },
+      (error) => {
+        console.error('위치 추적 오류:', error)
+        Alert.alert('위치 오류', '위치를 가져올 수 없습니다. GPS가 켜져있는지 확인해주세요.')
+      },
+      {
+        enableHighAccuracy: true,
+        distanceFilter: 5, // 5미터마다 업데이트
+        interval: 2000, // 2초마다 체크
+        fastestInterval: 1000, // 최소 1초 간격
+        timeout: 15000,
+        maximumAge: 10000,
+      }
+    )
+
+    setWatchId(id)
+  }
+
+  // 위치 추적 중지
+  const stopLocationTracking = () => {
+    if (watchId !== null) {
+      Geolocation.clearWatch(watchId)
+      setWatchId(null)
+      console.log('위치 추적이 중지되었습니다.')
+    }
+  }
 
   // 타이머 관리
   useEffect(() => {
@@ -79,81 +211,39 @@ export default function PloggingStartScreen({ navigation }) {
     return () => clearInterval(interval)
   }, [status])
 
-  // 데이터 로딩
+  // 컴포넌트 마운트 시 초기 데이터 로드
   useEffect(() => {
-    const initializeMap = async () => {
-      try {
-        await loadData()
-        // 맵 데이터 로딩 후 맵 준비 상태로 설정
-        setTimeout(() => {
-          setMapReady(true)
-        }, 100)
-      } catch (error) {
-        console.error("맵 초기화 오류:", error)
-        setMapReady(true) // 오류가 있어도 맵을 표시
-      }
+    const initializeApp = async () => {
+      await loadData()
+      setTimeout(() => {
+        setMapReady(true)
+      }, 100)
     }
     
-    initializeMap()
+    initializeApp()
+
+    // 컴포넌트 언마운트 시 위치 추적 중지
+    return () => {
+      stopLocationTracking()
+    }
   }, [])
 
   const loadData = async () => {
     try {
       setIsLoading(true)
       console.log("데이터 로딩 시작...")
-
-      // 실제 API 호출 시뮬레이션
+      
       await new Promise(resolve => setTimeout(resolve, 500))
       
-      // 안전한 데이터 설정
-      const safeLocation = {
-        latitude: 37.5665,
-        longitude: 126.978,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }
-      
-      const safeTrashLocations = [
-        {
-          id: 1,
-          coordinate: { latitude: 37.5665, longitude: 126.978 },
-          title: "마로니에 공원 쓰레기",
-          location: "마로니에 공원",
-          amount: "많음",
-          photos: [
-            { type: "유리병", count: 3, color: "#797982" },
-            { type: "플라스틱", count: 4, color: "#007AFF" },
-          ],
-          // image: require("../assets/trash-background.png"),
-        },
-        {
-          id: 2,
-          coordinate: { latitude: 37.5675, longitude: 126.979 },
-          title: "벤치 근처 쓰레기",
-          location: "마로니에 공원",
-          amount: "보통",
-          photos: [
-            { type: "캔", count: 2, color: "#797982" },
-            { type: "종이", count: 1, color: "#34C759" },
-          ],
-          // image: require("../assets/trash-background.png"),
-        },
-      ]
-
-      setCurrentLocation(safeLocation)
-      setTrashLocations(safeTrashLocations)
+      // 더미 데이터 설정
+      setCurrentLocation(DUMMY_LOCATION)
+      setTrashLocations(DUMMY_TRASH_LOCATIONS)
       setTrashCount(0)
       
       console.log("데이터 로딩 완료")
     } catch (error) {
       console.error("데이터 로딩 실패:", error)
-      // 기본값 설정
-      setCurrentLocation({
-        latitude: 37.5665,
-        longitude: 126.978,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      })
+      setCurrentLocation(DUMMY_LOCATION)
       setTrashLocations([])
       setTrashCount(0)
     } finally {
@@ -171,24 +261,84 @@ export default function PloggingStartScreen({ navigation }) {
       .padStart(2, "0")}`
   }
 
-  const handleStart = () => {
-    setStatus("running")
-    setTime(0)
-    setTrashCount(0)
+  // 플로깅 시작 - 위치 권한 체크 포함
+  const handleStart = async () => {
+    try {
+      console.log('플로깅 시작 시도...')
+      
+      // 위치 권한 요청
+      const hasPermission = await requestLocationPermission()
+      
+      if (!hasPermission) {
+        console.log('위치 권한이 거부되어 플로깅 시작이 취소되었습니다.')
+        return // 권한이 거부되면 시작 취소
+      }
+
+      console.log('위치 권한 허용됨. 플로깅을 시작합니다.')
+      
+      // 현재 위치 가져오기
+      Geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          const startLocation = { latitude, longitude }
+          
+          setCurrentLocation({
+            latitude,
+            longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          })
+          
+          // 플로깅 시작
+          setStatus("running")
+          setTime(0)
+          setTrashCount(0)
+          setTotalDistance(0)
+          setRouteCoordinates([startLocation]) // 시작점 추가
+          startLocationTracking()
+          
+          console.log('플로깅이 시작되었습니다.')
+        },
+        (error) => {
+          console.error('현재 위치 가져오기 실패:', error)
+          Alert.alert(
+            '위치 오류', 
+            'GPS 위치를 가져올 수 없습니다.\n\nGPS가 켜져있는지 확인하고 다시 시도해주세요.',
+            [{ text: '확인' }]
+          )
+        },
+        { 
+          enableHighAccuracy: true, 
+          timeout: 15000, 
+          maximumAge: 10000 
+        }
+      )
+      
+    } catch (error) {
+      console.error('플로깅 시작 오류:', error)
+      Alert.alert('오류', '플로깅 시작 중 오류가 발생했습니다.')
+    }
   }
 
   const handlePause = () => {
+    console.log('플로깅 일시정지')
     setStatus("paused")
+    stopLocationTracking()
   }
 
   const handleResume = () => {
+    console.log('플로깅 재시작')
     setStatus("running")
+    startLocationTracking()
   }
 
   const handleEnd = () => {
     try {
       setModalVisible(false)
-      
+      stopLocationTracking()
+
+      console.log('플로깅 종료')
+
       // 플로깅 결과 데이터 생성
       const ploggingResult = {
         id: Date.now(),
@@ -196,14 +346,10 @@ export default function PloggingStartScreen({ navigation }) {
         date: new Date().toLocaleDateString('ko-KR'),
         location: "마로니에 공원",
         duration: formatTime(time),
-        distance: "3.2km",
+        distance: formatDistance(totalDistance),
         trashCount: trashCount,
         calories: Math.max(Math.floor(time * 0.1), 10),
-        route: [
-          { latitude: 37.5665, longitude: 126.978 },
-          { latitude: 37.5675, longitude: 126.979 },
-          { latitude: 37.5685, longitude: 126.980 },
-        ],
+        route: routeCoordinates, // 실제 추적된 경로
         trashLocations: trashLocations.map(trash => ({
           latitude: trash.coordinate.latitude,
           longitude: trash.coordinate.longitude,
@@ -212,10 +358,17 @@ export default function PloggingStartScreen({ navigation }) {
       }
 
       console.log("플로깅 결과:", ploggingResult)
+      
+      // 상태 초기화
+      setStatus("idle")
+      setTime(0)
+      setTrashCount(0)
+      setTotalDistance(0)
+      setRouteCoordinates([])
 
       // 네비게이션 이동
       if (navigation && navigation.navigate) {
-        navigation.navigate("PloggingRecordDetail", {
+        navigation.navigate("PloggingRecordScreen", {
           recordId: ploggingResult.id,
           record: ploggingResult
         })
@@ -250,8 +403,34 @@ export default function PloggingStartScreen({ navigation }) {
 
   const goBack = () => {
     try {
-      if (navigation && navigation.goBack) {
-        navigation.goBack()
+      // 진행 중인 추적이 있으면 중지
+      if (status !== "idle") {
+        Alert.alert(
+          '플로깅 진행 중',
+          '플로깅이 진행 중입니다. 종료하고 나가시겠습니까?',
+          [
+            { text: '취소', style: 'cancel' },
+            { 
+              text: '종료하고 나가기', 
+              style: 'destructive',
+              onPress: () => {
+                stopLocationTracking()
+                setStatus("idle")
+                setTime(0)
+                setTrashCount(0)
+                setTotalDistance(0)
+                setRouteCoordinates([])
+                if (navigation && navigation.goBack) {
+                  navigation.goBack()
+                }
+              }
+            }
+          ]
+        )
+      } else {
+        if (navigation && navigation.goBack) {
+          navigation.goBack()
+        }
       }
     } catch (error) {
       console.error("뒤로가기 오류:", error)
@@ -292,9 +471,6 @@ export default function PloggingStartScreen({ navigation }) {
           {status === "idle" && (
             <>
               <TouchableOpacity style={styles.headerButton}>
-                <Icon name="search" size={24} color="#333" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.headerButton}>
                 <Icon name="person" size={24} color="#333" />
               </TouchableOpacity>
             </>
@@ -306,13 +482,27 @@ export default function PloggingStartScreen({ navigation }) {
       <View style={styles.mapContainer}>
         {currentLocation && mapReady ? (
           <MapView 
-            style={styles.map} 
-            initialRegion={currentLocation} 
+            style={styles.map}
+            initialRegion={currentLocation}
             showsUserLocation={true}
+            followsUserLocation={status === "running"}
             onMapReady={() => console.log("Map is ready")}
             onError={(error) => console.error("Map error:", error)}
           >
+            {/* 현재 위치 마커 */}
             <Marker coordinate={currentLocation} title="현재 위치" />
+            
+            {/* 경로 표시 */}
+            {routeCoordinates.length > 1 && (
+              <Polyline
+                coordinates={routeCoordinates}
+                strokeColor="#418663"
+                strokeWidth={4}
+                lineDashPattern={[0]}
+              />
+            )}
+            
+            {/* 쓰레기 위치 마커 */}
             {trashLocations && trashLocations.length > 0 && trashLocations.map((trash) => (
               <Marker
                 key={`trash-${trash.id}`}
@@ -355,6 +545,7 @@ export default function PloggingStartScreen({ navigation }) {
           <View style={styles.runningControls}>
             <Text style={styles.timeLabel}>플로깅 시간</Text>
             <Text style={styles.timer}>{formatTime(time)}</Text>
+            <Text style={styles.distanceLabel}>거리: {formatDistance(totalDistance)}</Text>
             <TouchableOpacity style={styles.stopButton} onPress={handlePause}>
               <Text style={styles.stopButtonText}>정지</Text>
               <Image source={require("../assets/tablet.png")} style={styles.tabletIcon} />
@@ -367,6 +558,7 @@ export default function PloggingStartScreen({ navigation }) {
           <View style={styles.pausedControls}>
             <Text style={styles.timeLabel}>플로깅 시간</Text>
             <Text style={[styles.timer, styles.pausedTimer]}>{formatTime(time)}</Text>
+            <Text style={styles.distanceLabel}>거리: {formatDistance(totalDistance)}</Text>
             <View style={styles.trashInfo}>
               <Text style={styles.trashLabel}>현재 주운 쓰레기</Text>
               <Text style={styles.trashCount}>{trashCount}개</Text>
@@ -386,30 +578,6 @@ export default function PloggingStartScreen({ navigation }) {
         )}
       </View>
 
-      {/* 하단 네비게이션 */}
-      <View style={styles.bottomNavigation}>
-        <TouchableOpacity style={styles.navItem}>
-          <Icon name="home" size={24} color="#418663" />
-          <Text style={[styles.navText, styles.activeNavText]}>홈</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Icon name="route" size={22} color="#797982" />
-          <Text style={styles.navText}>추천 코스</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Icon name="search" size={24} color="#797982" />
-          <Text style={styles.navText}>코스 검색</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Icon name="report" size={24} color="#797982" />
-          <Text style={styles.navText}>쓰레기 제보</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Icon name="person" size={24} color="#797982" />
-          <Text style={styles.navText}>나의 활동</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* 쓰레기 정보 바텀 시트 */}
       <Modal
         animationType="slide"
@@ -424,16 +592,11 @@ export default function PloggingStartScreen({ navigation }) {
             onPress={() => setTrashInfoModalVisible(false)}
           />
           <View style={styles.bottomSheetContainer}>
-            {/* 드래그 핸들 */}
             <View style={styles.dragHandle} />
-
-            {/* 쓰레기 정보 섹션 */}
             <ScrollView style={styles.bottomSheetContent} showsVerticalScrollIndicator={false}>
               <View style={styles.trashInfoHeader}>
                 <Text style={styles.trashInfoTitle}>{selectedTrash?.title || "쓰레기 정보"}</Text>
-                {/* <Image source={selectedTrash?.image || require("../assets/trash-background.png")} style={styles.trashInfoImage} /> */}
               </View>
-
               <View style={styles.trashInfoDetails}>
                 <View style={styles.trashInfoRow}>
                   <Text style={styles.trashInfoLabel}>위치</Text>
@@ -460,15 +623,12 @@ export default function PloggingStartScreen({ navigation }) {
                   </View>
                 </View>
               </View>
-
               <View style={styles.currentTrashInfo}>
                 <Icon name="menu" size={24} color="#418663" />
                 <Text style={styles.currentTrashLabel}>현재 주운 쓰레기</Text>
                 <Text style={styles.currentTrashCount}>{trashCount}개</Text>
               </View>
-
               <View style={styles.trashModalSeparator} />
-
               <TouchableOpacity style={styles.pickButton} onPress={handlePickTrash}>
                 <Text style={styles.pickButtonText}>줍기</Text>
               </TouchableOpacity>
@@ -480,7 +640,7 @@ export default function PloggingStartScreen({ navigation }) {
       {/* 종료 확인 모달 */}
       <CommonModal
         visible={modalVisible}
-        message={`플로깅을 종료하시겠습니까?\n주운 쓰레기: ${trashCount}개`}
+        message={`플로깅을 종료하시겠습니까?\n주운 쓰레기: ${trashCount}개\n총 거리: ${formatDistance(totalDistance)}`}
         onCancel={() => setModalVisible(false)}
         onConfirm={handleEnd}
         cancelText="계속하기"
@@ -505,6 +665,7 @@ const styles = StyleSheet.create({
     color: "#666666",
   },
   header: {
+    paddingTop: screenHeight * 0.05,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -617,10 +778,17 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: "600",
     color: "#333333",
-    marginBottom: 20,
+    marginBottom: 10,
   },
   pausedTimer: {
     color: "#D9D9D9",
+  },
+  distanceLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#418663",
+    marginBottom: 20,
+    textAlign: "center",
   },
   stopButton: {
     flexDirection: "row",
@@ -709,32 +877,6 @@ const styles = StyleSheet.create({
     height: 20,
     tintColor: "#FFFFFF",
   },
-  // 하단 네비게이션
-  bottomNavigation: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: 33,
-    paddingVertical: 7,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "rgba(0, 0, 0, 0.1)",
-  },
-  navItem: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 5,
-  },
-  navText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#797982",
-    marginTop: 5,
-    letterSpacing: -0.24,
-    textAlign: "center",
-  },
-  activeNavText: {
-    color: "#418663",
-  },
   // 바텀 시트 스타일
   bottomSheetOverlay: {
     flex: 1,
@@ -774,11 +916,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#333333",
     flex: 1,
-  },
-  trashInfoImage: {
-    width: 65,
-    height: 50,
-    borderRadius: 5,
   },
   trashInfoDetails: {
     marginBottom: 30,
