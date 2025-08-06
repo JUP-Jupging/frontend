@@ -11,8 +11,8 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native"
-import Icon from "react-native-vector-icons/MaterialCommunityIcons"
-
+import Icon from "react-native-vector-icons/MaterialIcons"
+import DropDownPicker from "react-native-dropdown-picker"
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 // Responsive size constants
@@ -291,8 +291,9 @@ export default function MainScreen({ navigation }) {
           <Icon name="magnify" size={screenWidth * 0.04} color="#888" />
           <Text style={styles.searchPlaceholder}>산책로 검색</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.userBox} onPress={goToMyPloggingRecords}>
-          <Image source={require("../assets/user.png")} style={styles.userIcon} />
+
+        <TouchableOpacity style={styles.headerButton} onPress={goToMyPloggingRecords}>
+          <Icon name="person" size={24} color="#333" />
         </TouchableOpacity>
       </View>
 
@@ -533,11 +534,8 @@ const styles = StyleSheet.create({
     color: "#888",
     marginLeft: PADDING_H / 3,
   },
-  userBox: {
-    width: screenWidth * 0.08,
-    height: screenWidth * 0.08,
-    justifyContent: "center",
-    alignItems: "center",
+  headerButton: {
+    padding: 5,
   },
   userIcon: {
     width: "100%",
