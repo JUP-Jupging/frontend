@@ -17,7 +17,7 @@ import MapView, { Marker, Polyline } from "react-native-maps"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
 import Config from "react-native-config"
-import Geolocation from 'react-native-geolocation-service';
+import Geolocation from '@react-native-community/geolocation';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -72,46 +72,25 @@ export default function PloggingStartScreen({ navigation }) {
   const [watchId, setWatchId] = useState(null)
 
   const key = Config.REACT_APP_GOOGLE_MAPS_API_KEY
-
-  // 안드로이드 위치 권한 요청
-  const requestLocationPermission = async () => {
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: '위치 권한이 필요합니다',
-          message: '플로깅 경로를 추적하고 기록하기 위해 위치 권한이 필요합니다.\n\n권한을 허용해주세요.',
-          buttonNeutral: '나중에 묻기',
-          buttonNegative: '거부',
-          buttonPositive: '허용',
+    // 위치 권한 요청 (안드로이드 전용)
+    const requestLocationPermission = async () => {
+        if (Platform.OS === 'android') {
+            const granted = await PermissionsAndroid.request(
+                PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+                {
+                    title: '위치 권한 요청',
+                    message: '현재 위치를 사용하려면 위치 접근 권한이 필요합니다.',
+                    buttonNeutral: '나중에',
+                    buttonNegative: '취소',
+                    buttonPositive: '확인',
+                }
+            );
+            return granted === PermissionsAndroid.RESULTS.GRANTED;
         }
-      )
-      
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        console.log('위치 권한이 허용되었습니다.')
-        return true
-      } else if (granted === PermissionsAndroid.RESULTS.DENIED) {
-        Alert.alert(
-          '권한 거부됨', 
-          '위치 권한이 거부되어 플로깅을 시작할 수 없습니다.\n\n설정에서 위치 권한을 허용해주세요.',
-          [{ text: '확인' }]
-        )
-        return false
-      } else if (granted === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
-        Alert.alert(
-          '권한 설정 필요', 
-          '위치 권한이 영구적으로 거부되었습니다.\n\n설정 > 앱 > 권한에서 위치 권한을 허용해주세요.',
-          [{ text: '확인' }]
-        )
-        return false
-      }
-      return false
-    } catch (err) {
-      console.warn('권한 요청 오류:', err)
-      Alert.alert('오류', '권한 요청 중 오류가 발생했습니다.')
-      return false
-    }
-  }
+        return true;
+    };
+
+
 
   // 두 좌표 간의 거리 계산 (미터 단위)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -137,7 +116,27 @@ export default function PloggingStartScreen({ navigation }) {
       return `${(meters / 1000).toFixed(2)}km`
     }
   }
+    useEffect(() => {
+        const getCurrentLocation = async () => {
+            const hasPermission = await requestLocationPermission();
+            if (!hasPermission) return;
 
+            Geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    setLocation({
+                        ...location,
+                        latitude,
+                        longitude,
+                    });
+                },
+                (error) => console.log(error),
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+            );
+        };
+
+        getCurrentLocation();
+    }, []);
   // 위치 추적 시작
   const startLocationTracking = () => {
     const id = Geolocation.watchPosition(
