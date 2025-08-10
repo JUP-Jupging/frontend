@@ -53,6 +53,10 @@ export default function MyPageScreen({ navigation }) {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>닉네임</Text>
             <Text style={styles.infoValue}>{user.nickname}</Text>
+            <TouchableOpacity onPress={() => navigation.navigate("ChangeNickname")}>
+          <Icon name="chevron-right" size={24} color="#131214" />
+        </TouchableOpacity>
+
           </View>
 
           <View style={styles.infoRow}>
@@ -66,18 +70,6 @@ export default function MyPageScreen({ navigation }) {
           </View>
         </View>
 
-        {/* 설정 변경 섹션 */}
-        <View style={styles.settingsSection}>
-          <TouchableOpacity style={styles.settingRow} onPress={() => navigation.navigate("ChangeNickname")}>
-            <Text style={styles.settingLabel}>닉네임 변경</Text>
-            <Icon name="chevron-right" size={24} color="#131214" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.settingRow} onPress={() => navigation.navigate("ChangePassword")}>
-            <Text style={styles.settingLabel}>비밀번호 변경</Text>
-            <Icon name="chevron-right" size={24} color="#131214" />
-          </TouchableOpacity>
-        </View>
 
         {/* 계정 삭제 버튼 */}
         <View style={styles.deleteSection}>
@@ -162,6 +154,7 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 16,
+    marginRight: 180,
     fontWeight: "700",
     color: "#333333",
     letterSpacing: -0.1,

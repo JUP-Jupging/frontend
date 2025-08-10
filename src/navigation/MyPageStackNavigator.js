@@ -3,7 +3,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MyPageScreen from '../screens/MyPageScreen';
 import MyPloggingScreen from '../screens/MyPloggingScreen';
 import ChangeNicknameScreen from '../screens/ChangeNicknameScreen';
-import ChangePasswordScreen from '../screens/ChangePasswordScreen'; // 👈 임포트 추가
 
 const Stack = createNativeStackNavigator();
 
@@ -30,11 +29,6 @@ export default function MyPageStackNavigator() {
         options={{ title: '닉네임 변경', headerShown: false }}
       />
 
-      <Stack.Screen
-        name="ChangePassword" // 👈 추가!
-        component={ChangePasswordScreen}
-        options={{ title: '비밀번호 변경', headerShown: false }}
-      />
 
     </Stack.Navigator>
   );
