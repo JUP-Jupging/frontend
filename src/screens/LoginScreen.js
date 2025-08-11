@@ -1,13 +1,41 @@
 "use client"
 
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Dimensions, SafeAreaView } from "react-native"
-
+import KakaoLogins from "@react-native-seoul/kakao-login";
+import useStore from "../store";                 // ✅ zustand 루트
+import { kakaoLogin } from "../api/auth";        // ✅ /oauth/kakao/callback 호출 함수
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 export default function HomeScreen({ navigation }) {
-  const handleKakaoLogin = () => {
-    Alert.alert("카카오 로그인", "카카오 로그인 기능을 구현해주세요.")
-  }
+  const setTokens = useStore(s => s.setTokens);
+  const setUserFromLoginResponse = useStore(s => s.setUserFromLoginResponse);
+
+  const handleKakaoLogin = useCallback(async () => {
+    try {
+      // 1) 카카오 SDK → 카카오 accessToken 획득
+      const { accessToken: kakaoAccessToken } = await KakaoLogins.login();
+
+      // 2) 우리 백엔드로 교환 (회원가입/로그인 자동처리)
+      const data = await kakaoLogin(kakaoAccessToken);
+
+      // 3) 응답에서 유저 / 토큰 분리 (명세서 둘 다 대비: 객체/배열)
+      const user = data.user ?? data[0];
+      const access = data.accessToken ?? data.tokens?.accessToken ?? data[1]?.accessToken;
+      const refresh = data.refreshToken ?? data.tokens?.refreshToken ?? data[1]?.refreshToken ?? null;
+
+      if (!access) throw new Error("서버에서 accessToken을 받지 못했습니다.");
+
+      // 4) 상태 저장 (토큰 + 유저)
+      await setTokens(access, refresh);
+      setUserFromLoginResponse(user);
+
+      // 5) 메인으로 이동
+      navigation.navigate("Main");
+    } catch (e) {
+      console.warn("Kakao login failed:", e?.response?.data || e?.message);
+      Alert.alert("로그인 실패", "카카오 로그인에 실패했어요. 잠시 후 다시 시도해주세요.");
+    }
+  }, [navigation, setTokens, setUserFromLoginResponse]);
 
   const handleGoogleLogin = () => {
     Alert.alert("구글 로그인", "구글 로그인 기능을 구현해주세요.")
