@@ -19,3 +19,24 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// ✅ (안전장치) 어떤 서브모듈이 예전 GMS를 끌어와도 v21+로 강제.
+subprojects { sub ->
+    sub.configurations.all { cfg ->
+        cfg.resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'com.google.android.gms'
+                    && details.requested.name == 'play-services-location') {
+                details.useVersion '21.3.0'   // FusedLocationProviderClient가 interface인 v21+로 고정
+            }
+            // 필요 시 주변 코어 모듈도 통일 (보통 BOM으로 충분하지만 안전하게)
+            if (details.requested.group == 'com.google.android.gms'
+                    && details.requested.name == 'play-services-basement') {
+                details.useVersion '18.5.0'
+            }
+            if (details.requested.group == 'com.google.android.gms'
+                    && details.requested.name == 'play-services-tasks') {
+                details.useVersion '18.2.0'
+            }
+        }
+    }
+}

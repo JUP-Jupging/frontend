@@ -1,90 +1,87 @@
-// 📁 App.js
-import React from 'react';
-import { StatusBar, useColorScheme, TouchableOpacity, Image } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+// App.js (지도 없음, 좌표만 표기)
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, PermissionsAndroid, Platform, ActivityIndicator, AppState } from 'react-native';
+import Geolocation from 'react-native-geolocation-service';
 
-import WalkSearchScreen from './src/screens/WalkSearchScreen';
-import PloggingRecordScreen from './src/screens/PloggingRecordScreen'; // ✅ 플로깅 기록
-import TrashCanInfoScreen from './src/screens/TrashCanInfoScreen';     // ✅ 쓰레기통 정보
-import MyPageScreen from './src/screens/MyPageScreen';
-import LoginScreen from './src/screens/LoginScreen';
-import BottomTabNavigator from './src/navigation/BottomTabNavigator';  // ✅ 하단 탭 네비게이터
-import CourseDetailScreen from './src/screens/CourseDetailScreen';     // ✅ 산책로 상세
+export default function App() {
+  const [coords, setCoords] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
 
-const Stack = createNativeStackNavigator();
+  const requestLocationPermission = async () => {
+    if (Platform.OS !== 'android') return true;
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      {
+        title: '위치 권한 요청',
+        message: '현재 위치를 확인하려면 위치 권한이 필요합니다.',
+        buttonPositive: '확인',
+        buttonNegative: '취소',
+      }
+    );
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  };
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+  const getCurrentLocation = async () => {
+    const ok = await requestLocationPermission();
+    if (!ok) {
+      setErr('위치 권한 거부됨');
+      setLoading(false);
+      return;
+    }
+    Geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          timestamp: pos.timestamp,
+        });
+        setLoading(false);
+      },
+      (e) => {
+        setErr(e?.message ?? '위치 조회 실패');
+        setLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+  };
+
+  useEffect(() => {
+    // 앱이 활성화된 뒤에 한 번만 실행
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && loading) getCurrentLocation();
+    });
+    // 첫 렌더 후 짧은 지연 뒤 시도 (일부 기기 안정화)
+    const t = setTimeout(() => loading && getCurrentLocation(), 300);
+    return () => {
+      sub.remove();
+      clearTimeout(t);
+    };
+  }, [loading]);
 
   return (
-    <NavigationContainer>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-
-      <Stack.Navigator initialRouteName="Login">
-        {/* ✅ 로그인 화면 */}
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ title: '로그인 화면' }}
-        />
-
-        {/* ✅ 로그인 성공 후 진입하는 메인 탭 네비게이터 */}
-        <Stack.Screen
-          name="Main"
-          component={BottomTabNavigator}
-          options={{ headerShown: false }}
-        />
-
-        {/* ✅ 플로깅 기록 상세 */}
-        <Stack.Screen
-          name="PloggingRecord"
-          component={PloggingRecordScreen}
-          options={({ navigation }) => ({
-            title: '플로깅 기록',
-            headerRight: () => (
-              <TouchableOpacity
-                onPress={() => navigation.navigate('내 플로깅 기록')}
-                style={{ marginRight: 16 }}
-              >
-                <Image
-                  source={require('./src/assets/user.png')}
-                  style={{ width: 24, height: 24 }}
-                />
-              </TouchableOpacity>
-            ),
-          })}
-        />
-
-        {/* ✅ 근처 쓰레기통 정보 */}
-        <Stack.Screen
-          name="TrashCanInfo"
-          component={TrashCanInfoScreen}
-          options={({ navigation }) => ({
-            title: '쓰레기통 정보',
-            headerRight: () => (
-              <TouchableOpacity
-                onPress={() => navigation.navigate('내 플로깅 기록')}
-                style={{ marginRight: 16 }}
-              >
-                <Image
-                  source={require('./src/assets/user.png')}
-                  style={{ width: 24, height: 24 }}
-                />
-              </TouchableOpacity>
-            ),
-          })}
-        />
-
-        {/* ✅ 산책로 상세 페이지 */}
-        <Stack.Screen
-          name="CourseDetail"
-          component={CourseDetailScreen}
-          options={{ title: '산책로 정보' }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <View style={styles.container}>
+      {loading ? (
+        <ActivityIndicator size="large" />
+      ) : err ? (
+        <Text style={styles.err}>{err}</Text>
+      ) : coords ? (
+        <>
+          <Text style={styles.title}>현재 좌표</Text>
+          <Text>lat: {coords.latitude}</Text>
+          <Text>lng: {coords.longitude}</Text>
+          {coords.accuracy != null && <Text>accuracy: {Math.round(coords.accuracy)} m</Text>}
+        </>
+      ) : (
+        <Text>좌표 없음</Text>
+      )}
+    </View>
   );
 }
 
-export default App;
+const styles = StyleSheet.create({
+  container: { flex: 1, paddingTop: 80, paddingHorizontal: 24 },
+  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 12 },
+  err: { color: '#c00' },
+});
