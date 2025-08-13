@@ -1,6 +1,7 @@
+// 예: src/screens/WalkSearchScreen.js
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   View,
   Text,
@@ -8,156 +9,139 @@ import {
   FlatList,
   TouchableOpacity,
   TextInput,
-  Image,
   Dimensions,
   ActivityIndicator,
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
 
+// ✅ API 모듈 임포트 (경로는 프로젝트 구조에 맞춰 조정하세요)
+// 현재 파일이 src/screens에 있고, trails.js가 src/api에 있다면 아래 경로가 맞습니다.
+import { getTrails, searchTrails } from "../api/trails"
+
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
-// Responsive size constants
+// Responsive size constants (기존 UI 유지)
 const PADDING_H = screenWidth * 0.04
 const SEARCH_HEIGHT = screenHeight * 0.06
 const ITEM_HEIGHT = screenHeight * 0.1
 const IMAGE_SIZE = ITEM_HEIGHT * 0.8
 
-// 더미 검색 데이터
-const DUMMY_SEARCH_RESULTS = [
-  {
-    id: "1",
-    name: "국립 중앙 박물관",
-    address: "서울 용산구 서빙고로 137 국립중앙박물관",
-    image: "../assets/course1.jpg",
-    region: "서울",
-    difficulty: "쉬움",
-    distance: "7.1km",
-    duration: "1시간30분",
-  },
-  {
-    id: "2",
-    name: "남산",
-    address: "서울 중구 회현동1가",
-    image: "../assets/course2.jpg",
-    region: "서울",
-    difficulty: "어려움",
-    distance: "5.2km",
-    duration: "2시간",
-  },
-  {
-    id: "3",
-    name: "한강공원 여의도",
-    address: "서울 영등포구 여의동로 330",
-    image: "../assets/course3.jpg",
-    region: "서울",
-    difficulty: "쉬움",
-    distance: "8.5km",
-    duration: "2시간30분",
-  },
-  {
-    id: "4",
-    name: "청계천 산책로",
-    address: "서울 중구 청계천로 1",
-    image: "../assets/course4.jpg",
-    region: "서울",
-    difficulty: "쉬움",
-    distance: "6.3km",
-    duration: "1시간45분",
-  },
-  {
-    id: "5",
-    name: "올림픽공원",
-    address: "서울 송파구 올림픽로 424",
-    image: "../assets/course5.jpg",
-    region: "서울",
-    difficulty: "보통",
-    distance: "9.2km",
-    duration: "2시간30분",
-  },
-  {
-    id: "6",
-    name: "북한산 둘레길",
-    address: "서울 성북구 정릉동",
-    image: "../assets/course6.jpg",
-    region: "서울",
-    difficulty: "어려움",
-    distance: "12.1km",
-    duration: "3시간",
-  },
-]
-
-// 인기 검색어
-const POPULAR_KEYWORDS = ["남산", "한강", "청계천", "올림픽공원", "북한산", "국립중앙박물관"]
-
 export default function WalkSearchScreen({ navigation }) {
+  // 🔹 검색어 상태
   const [searchQuery, setSearchQuery] = useState("")
+  // 🔹 검색 결과 목록 (검색 시에만 사용)
   const [searchResults, setSearchResults] = useState([])
-  const [allCourses, setAllCourses] = useState(DUMMY_SEARCH_RESULTS)
+  // 🔹 전체 코스 목록 (초기 표시 및 "최근 검색한 산책로" 영역)
+  const [allCourses, setAllCourses] = useState([])
+  // 🔹 로딩/보여주기 상태
   const [loading, setLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
 
-  // 검색 실행
-  const performSearch = (query) => {
-    if (!query.trim()) {
+  // 내부적으로 디바운스를 제어하기 위한 ref (중복 타이머 방지)
+  const debounceRef = useRef(null)
+
+  /**
+   * 👉 컴포넌트 마운트 시점에 전체 산책로 목록을 1회 로드합니다.
+   * - UI: 최근 목록 영역에 사용
+   * - 실패 시 콘솔에만 남기고 빈 목록 유지(화면은 기존 Empty UI가 처리)
+   */
+  useEffect(() => {
+    let isMounted = true
+    ;(async () => {
+      try {
+        setLoading(true)
+        const data = await getTrails() // 필터 없이 전체
+        if (isMounted) {
+          setAllCourses(Array.isArray(data) ? data : [])
+        }
+      } catch (e) {
+        // 콘솔 로깅만 하고 UI 붕괴 방지
+        console.error("초기 산책로 로드 실패:", e?.response?.data || e?.message)
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    })()
+    return () => {
+      isMounted = false
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [])
+
+  /**
+   * 👉 검색 실행 함수
+   * - 입력이 공백이면 검색 결과 영역을 닫고 목록 초기화
+   * - 검색어가 있으면 API 호출
+   * - 로딩/에러는 기존 UI 흐름을 유지
+   */
+  const performSearch = async (query) => {
+    const q = query.trim()
+    if (!q) {
       setSearchResults([])
       setShowResults(false)
       return
     }
 
-    setLoading(true)
-    setShowResults(true)
-
-    // 검색 시뮬레이션 (실제로는 API 호출)
-    setTimeout(() => {
-      const filtered = allCourses.filter(
-        (course) =>
-          course.name.toLowerCase().includes(query.toLowerCase()) ||
-          course.address.toLowerCase().includes(query.toLowerCase()) ||
-          course.region.toLowerCase().includes(query.toLowerCase()),
-      )
-      setSearchResults(filtered)
+    try {
+      setLoading(true)
+      setShowResults(true)
+      const data = await searchTrails(q)
+      setSearchResults(Array.isArray(data) ? data : [])
+    } catch (e) {
+      console.error("검색 실패:", e?.response?.data || e?.message)
+      setSearchResults([]) // 실패 시 빈 배열
+    } finally {
       setLoading(false)
-    }, 500)
+    }
   }
 
-  // 검색어 변경 시 자동 검색
+  /**
+   * 👉 검색어 변경 시 디바운스로 performSearch 호출
+   * - 300ms 지연 후 최신 검색어로 API 호출
+   * - 타이핑 중 과도한 네트워크 호출 방지
+   */
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
+    // 기존 타이머 제거
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    // 새 타이머 설정
+    debounceRef.current = setTimeout(() => {
       performSearch(searchQuery)
-    }, 300) // 300ms 디바운스
-
-    return () => clearTimeout(timeoutId)
+    }, 300)
+    // 언마운트 혹은 검색어 재변경 시 클린업
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
   }, [searchQuery])
 
-  // 인기 검색어 클릭
-  const handlePopularKeyword = (keyword) => {
-    setSearchQuery(keyword)
-  }
-
-  // 검색 결과 아이템 클릭
+  // 검색 결과 아이템 클릭 → 상세 화면으로 이동 (기존 흐름 유지)
   const handleResultPress = (item) => {
+    // 백엔드에서 내려오는 키 이름에 맞춰 id/uuid 등으로 조정하세요.
     navigation.navigate("CourseDetail", { courseId: item.id })
   }
 
-  // 검색 결과 아이템 렌더링
+  // 🔹 검색 결과 아이템 렌더링 (UI 원형 유지, 이미지 주석은 그대로)
   const renderSearchItem = ({ item }) => (
     <TouchableOpacity style={styles.searchItem} onPress={() => handleResultPress(item)}>
-      {/* <Image source={require(item.image)} style={styles.itemImage} /> */}
+      {/* 
+        이미지 경로/URL이 백엔드에서 내려온다면 아래처럼 사용:
+        <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
+        현재는 디자인 보존을 위해 주석 유지 
+      */}
       <View style={styles.itemContent}>
-        <Text style={styles.itemName}>{item.name}</Text>
-        <Text style={styles.itemAddress}>{item.address}</Text>
+        {/* 백엔드 응답 키에 맞춰 필드명 매핑 필요 (예: trailName/address/difficulty/distance/duration 등) */}
+        <Text style={styles.itemName}>{item.trailName || item.name}</Text>
+        <Text style={styles.itemAddress}>{item.address || item.cityName}</Text>
         <View style={styles.itemInfo}>
           <View style={styles.infoItem}>
             <Icon name="map-marker" size={screenWidth * 0.03} color="#666" />
-            <Text style={styles.infoText}>{item.distance}</Text>
+            <Text style={styles.infoText}>{item.distance || item.distanceText || "-"}</Text>
           </View>
           <View style={styles.infoItem}>
             <Icon name="clock-outline" size={screenWidth * 0.03} color="#666" />
-            <Text style={styles.infoText}>{item.duration}</Text>
+            <Text style={styles.infoText}>{item.duration || item.durationText || "-"}</Text>
           </View>
           <View style={styles.infoItem}>
-            <Text style={[styles.difficultyText, { color: getDifficultyColor(item.difficulty) }]}>
-              {item.difficulty}
+            <Text style={[styles.difficultyText, { color: getDifficultyColor(item.difficulty || item.difficultyLevel) }]}>
+              {item.difficulty || item.difficultyLevel || "정보없음"}
             </Text>
           </View>
         </View>
@@ -165,14 +149,7 @@ export default function WalkSearchScreen({ navigation }) {
     </TouchableOpacity>
   )
 
-  // 인기 검색어 아이템 렌더링
-  const renderPopularKeyword = (keyword, index) => (
-    <TouchableOpacity key={index} style={styles.keywordChip} onPress={() => handlePopularKeyword(keyword)}>
-      <Text style={styles.keywordText}>{keyword}</Text>
-    </TouchableOpacity>
-  )
-
-  // 난이도별 색상 반환
+  // 난이도별 색상 반환 (기존 로직 유지)
   const getDifficultyColor = (difficulty) => {
     switch (difficulty) {
       case "쉬움":
@@ -185,12 +162,13 @@ export default function WalkSearchScreen({ navigation }) {
         return "#666"
     }
   }
+
   const goBack = () => navigation.goBack()
   const goToProfile = () => navigation.navigate("내 플로깅 기록")
 
   return (
     <View style={styles.container}>
-      {/* 검색바 */}
+      {/* 검색바 (UI 원형 유지) */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
           <Icon name="magnify" size={screenWidth * 0.05} color="#888" style={styles.searchIcon} />
@@ -212,15 +190,14 @@ export default function WalkSearchScreen({ navigation }) {
             <Icon name="account" size={screenWidth * 0.06} color="#333" />
           </TouchableOpacity>
         </View>
-
       </View>
 
-      {/* 검색 결과 또는 인기 검색어 */}
+      {/* 검색 결과 또는 초기 목록(최근) */}
       {showResults ? (
         <View style={styles.resultsContainer}>
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#4CAF50" />
+              <ActivityIndicator size="large" />
               <Text style={styles.loadingText}>검색 중...</Text>
             </View>
           ) : (
@@ -228,7 +205,7 @@ export default function WalkSearchScreen({ navigation }) {
               <Text style={styles.resultsCount}>검색 결과 {searchResults.length}개</Text>
               <FlatList
                 data={searchResults}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item, idx) => String(item.id ?? item.trailId ?? idx)}
                 renderItem={renderSearchItem}
                 contentContainerStyle={styles.listContainer}
                 showsVerticalScrollIndicator={false}
@@ -245,22 +222,36 @@ export default function WalkSearchScreen({ navigation }) {
         </View>
       ) : (
         <View style={styles.popularContainer}>
-
-
+          {/* ✅ "최근 검색한 산책로" 자리는 초기 로딩 목록 3개로 대체 표시 */}
           <Text style={styles.recentTitle}>최근 검색한 산책로</Text>
-          <FlatList
-            data={allCourses.slice(0, 3)} // 최근 3개만 표시
-            keyExtractor={(item) => item.id}
-            renderItem={renderSearchItem}
-            contentContainerStyle={styles.recentListContainer}
-            showsVerticalScrollIndicator={false}
-          />
+          {loading ? (
+            <View style={[styles.loadingContainer, { paddingVertical: PADDING_H }]}>
+              <ActivityIndicator size="large" />
+              <Text style={styles.loadingText}>불러오는 중...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={(allCourses || []).slice(0, 3)}
+              keyExtractor={(item, idx) => String(item.id ?? item.trailId ?? idx)}
+              renderItem={renderSearchItem}
+              contentContainerStyle={styles.recentListContainer}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Icon name="map-search-outline" size={screenWidth * 0.15} color="#CCC" />
+                  <Text style={styles.emptyText}>표시할 산책로가 없습니다.</Text>
+                  <Text style={styles.emptySubText}>검색어로 찾아보세요.</Text>
+                </View>
+              }
+            />
+          )}
         </View>
       )}
     </View>
   )
 }
 
+/* ✅ 스타일 정의는 전혀 수정하지 않았습니다. */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -291,7 +282,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: screenWidth * 0.04,
     color: "#333",
-    paddingVertical: 0, // Remove default padding
+    paddingVertical: 0,
   },
   clearButton: {
     marginLeft: PADDING_H / 2,
