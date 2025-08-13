@@ -113,16 +113,15 @@ defaultConfig {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-    implementation 'com.google.android.gms:play-services-maps:18.2.0' // ✅ Google Maps SDK for Android
-    implementation 'com.google.android.gms:play-services-location:21.0.1' // ✅ 위치 서비스 (필수)
-
-    // ✅ RN 필수 구성
-    implementation("com.facebook.react:react-android")
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
+    implementation 'com.google.android.gms:play-services-maps:18.2.0'
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
     }
 }
+
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
 apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
+

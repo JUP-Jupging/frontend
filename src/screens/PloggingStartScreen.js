@@ -12,12 +12,13 @@ import {
   Modal,
   ScrollView,
   PermissionsAndroid,
+  Platform,
 } from "react-native"
 import MapView, { Marker, Polyline } from "react-native-maps"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
 import Config from "react-native-config"
-import Geolocation from '@react-native-community/geolocation';
+import Geolocation from "react-native-geolocation-service";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -117,26 +118,26 @@ export default function PloggingStartScreen({ navigation }) {
     }
   }
     useEffect(() => {
-        const getCurrentLocation = async () => {
-            const hasPermission = await requestLocationPermission();
-            if (!hasPermission) return;
+    const getCurrentLocation = async () => {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) return;
 
-            Geolocation.getCurrentPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords;
-                    setLocation({
-                        ...location,
-                        latitude,
-                        longitude,
-                    });
-                },
-                (error) => console.log(error),
-                { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-            );
-        };
+      Geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setCurrentLocation((prev) => ({
+            ...prev,
+            latitude,
+            longitude,
+          }));
+        },
+        (error) => console.log(error),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      );
+    };
 
-        getCurrentLocation();
-    }, []);
+    getCurrentLocation();
+  }, []);
   // 위치 추적 시작
   const startLocationTracking = () => {
     const id = Geolocation.watchPosition(
@@ -445,7 +446,31 @@ export default function PloggingStartScreen({ navigation }) {
       console.error("제보 목록 이동 오류:", error)
     }
   }
+// 현재 좌표 불러오기 함수 추가
+const getCurrentLocationNow = async () => {
+  const hasPermission = await requestLocationPermission();
+  if (!hasPermission) {
+    Alert.alert("권한 없음", "위치 접근 권한이 필요합니다.");
+    return;
+  }
 
+  Geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords;
+      setCurrentLocation((prev) => ({
+        ...prev,
+        latitude,
+        longitude,
+      }));
+      Alert.alert("현재 위치", `위도: ${latitude}\n경도: ${longitude}`);
+    },
+    (error) => {
+      console.log(error);
+      Alert.alert("오류", "위치를 가져올 수 없습니다.");
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+  );
+};
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -646,6 +671,7 @@ export default function PloggingStartScreen({ navigation }) {
         confirmText="종료"
       />
     </SafeAreaView>
+    
   )
 }
 

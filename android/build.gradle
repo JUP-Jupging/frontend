@@ -19,3 +19,15 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// ✅ 혹시 하위 모듈이 예전 GMS를 끌어오면 v21+로 강제
+subprojects { sub ->
+    sub.configurations.all { cfg ->
+        cfg.resolutionStrategy.eachDependency { d ->
+            if (d.requested.group == 'com.google.android.gms'
+                && d.requested.name == 'play-services-location') {
+                d.useVersion '21.3.0'
+            }
+        }
+    }
+}
