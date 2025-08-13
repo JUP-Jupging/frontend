@@ -9,8 +9,6 @@ import {
   Alert,
   SafeAreaView,
   Image,
-  AppState,
-  BackHandler,
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
@@ -86,61 +84,6 @@ export default function PloggingStartScreen({ navigation }) {
   const [selectedTrash, setSelectedTrash] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [mapReady, setMapReady] = useState(false)
-
-  // 백그라운드/포그라운드 상태 관리 - 플로깅 세션 유지
-  useEffect(() => {
-    console.log('[PloggingStartScreen] AppState 리스너 등록');
-    
-    const handleAppStateChange = (nextAppState) => {
-      console.log('[PloggingStartScreen] AppState 변경:', nextAppState, '현재 플로깅 상태:', status);
-      
-      if (status === "running" || status === "paused") {
-        if (nextAppState === 'background' || nextAppState === 'inactive') {
-          console.log('[PloggingStartScreen] ✅ 백그라운드 이동 - 플로깅 세션 유지 (타이머, GPS 계속 실행)');
-          // 플로깅 중일 때는 백그라운드에서도 모든 기능 유지
-          // usePlogging 훅의 타이머는 계속 실행되고
-          // useLocation 훅의 GPS 추적도 계속 실행됨
-        } else if (nextAppState === 'active') {
-          console.log('[PloggingStartScreen] ✅ 포그라운드 복귀 - 플로깅 세션 복원');
-          // 혹시 위치 추적이 중단되었을 경우를 대비한 재시작
-          if (status === "running") {
-            console.log('[PloggingStartScreen] GPS 추적 재활성화');
-            startLocationTracking(true);
-          }
-        }
-      } else {
-        console.log('[PloggingStartScreen] 플로깅 중이 아님 - AppState 변경 무시');
-      }
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    
-    return () => {
-      console.log('[PloggingStartScreen] AppState 리스너 해제');
-      subscription?.remove();
-    };
-  }, [status, startLocationTracking]);
-
-  // 뒤로가기 버튼 처리 - 직접 네비게이션 제어
-  useEffect(() => {
-    console.log('[PloggingStartScreen] 뒤로가기 핸들러 등록');
-    
-    const backAction = () => {
-      console.log('[PloggingStartScreen] 뒤로가기 버튼 클릭, 현재 상태:', status);
-      
-      // 플로깅 상태와 관계없이 항상 메인 화면으로 이동
-      console.log('[PloggingStartScreen] 메인 화면으로 이동');
-      navigation.navigate("Main");
-      return true; // 기본 뒤로가기 동작 방지 (앱 종료 방지)
-    };
-
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
-
-    return () => {
-      console.log('[PloggingStartScreen] 뒤로가기 핸들러 해제');
-      backHandler.remove();
-    };
-  }, [status, navigation]);
 
   // 컴포넌트 마운트 시 초기 데이터 로드
   useEffect(() => {
@@ -288,20 +231,15 @@ export default function PloggingStartScreen({ navigation }) {
     navigation.navigate("Main");
   }
 
-  const handleBackPress = () => {
-    console.log('[PloggingStartScreen] 헤더 뒤로가기 버튼 클릭, 현재 상태:', status);
-    
-    // 항상 메인 화면으로 이동
-    console.log('[PloggingStartScreen] 메인 화면으로 이동');
-    navigation.navigate("Main");
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       {/* 헤더 */}
       <View style={styles.header}>
         <TouchableOpacity 
-          onPress={handleBackPress}
+          onPress={() => {
+            console.log('[PloggingStartScreen] 뒤로가기 버튼 클릭');
+            navigation.goBack();
+          }}
         >
           <Icon name="arrow-back" size={24} color="#418663" />
         </TouchableOpacity>

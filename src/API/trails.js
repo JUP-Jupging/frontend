@@ -1,6 +1,6 @@
 // src/api/trails.js
 import axios from "axios";
-import BASE_URL from "../apiconfig";
+import BASE_URL from "./apiconfig";
 
 /**
  * 산책로 목록 전체 조회 (필터 선택)

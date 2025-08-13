@@ -15,8 +15,8 @@ import {
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
 
 // ✅ API 모듈 임포트 (경로는 프로젝트 구조에 맞춰 조정하세요)
-// 현재 파일이 src/screens에 있고, trails.js가 src/api에 있다면 아래 경로가 맞습니다.
-import { getTrails, searchTrails } from "../api/trails"
+// 현재 파일이 src/screens에 있고, trails.js가 src/API에 있다면 아래 경로가 맞습니다.
+import { getTrails, searchTrails } from "../API/trails"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -33,9 +33,15 @@ export default function WalkSearchScreen({ navigation }) {
   const [searchResults, setSearchResults] = useState([])
   // 🔹 전체 코스 목록 (초기 표시 및 "최근 검색한 산책로" 영역)
   const [allCourses, setAllCourses] = useState([])
+  // 🔹 필터 상태
+  const [filters, setFilters] = useState({
+    cityName: "",
+    difficultyLevel: ""
+  })
   // 🔹 로딩/보여주기 상태
   const [loading, setLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
 
   // 내부적으로 디바운스를 제어하기 위한 ref (중복 타이머 방지)
   const debounceRef = useRef(null)
@@ -46,26 +52,56 @@ export default function WalkSearchScreen({ navigation }) {
    * - 실패 시 콘솔에만 남기고 빈 목록 유지(화면은 기존 Empty UI가 처리)
    */
   useEffect(() => {
-    let isMounted = true
-    ;(async () => {
-      try {
-        setLoading(true)
-        const data = await getTrails() // 필터 없이 전체
-        if (isMounted) {
-          setAllCourses(Array.isArray(data) ? data : [])
-        }
-      } catch (e) {
-        // 콘솔 로깅만 하고 UI 붕괴 방지
-        console.error("초기 산책로 로드 실패:", e?.response?.data || e?.message)
-      } finally {
-        if (isMounted) setLoading(false)
-      }
-    })()
+    loadTrailsWithFilters()
+    
     return () => {
-      isMounted = false
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
   }, [])
+
+  /**
+   * 👉 필터를 적용하여 산책로 목록을 로드합니다.
+   */
+  const loadTrailsWithFilters = async (appliedFilters = {}) => {
+    let isMounted = true
+    try {
+      setLoading(true)
+      console.log("산책로 목록 로드 시작...", appliedFilters)
+      const data = await getTrails(appliedFilters)
+      console.log("받은 데이터:", data)
+      if (isMounted) {
+        setAllCourses(Array.isArray(data) ? data : [])
+      }
+    } catch (e) {
+      console.error("산책로 로드 실패:", e?.response?.data || e?.message)
+      if (isMounted) {
+        setAllCourses([]) // 실패 시 빈 배열
+      }
+    } finally {
+      if (isMounted) setLoading(false)
+    }
+  }
+
+  /**
+   * 👉 필터 적용 함수
+   */
+  const applyFilters = () => {
+    const activeFilters = {}
+    if (filters.cityName) activeFilters.cityName = filters.cityName
+    if (filters.difficultyLevel) activeFilters.difficultyLevel = filters.difficultyLevel
+    
+    loadTrailsWithFilters(activeFilters)
+    setShowFilters(false)
+  }
+
+  /**
+   * 👉 필터 초기화 함수
+   */
+  const resetFilters = () => {
+    setFilters({ cityName: "", difficultyLevel: "" })
+    loadTrailsWithFilters({})
+    setShowFilters(false)
+  }
 
   /**
    * 👉 검색 실행 함수
@@ -84,7 +120,9 @@ export default function WalkSearchScreen({ navigation }) {
     try {
       setLoading(true)
       setShowResults(true)
+      console.log("검색 실행:", q)
       const data = await searchTrails(q)
+      console.log("검색 결과:", data)
       setSearchResults(Array.isArray(data) ? data : [])
     } catch (e) {
       console.error("검색 실패:", e?.response?.data || e?.message)
@@ -114,11 +152,11 @@ export default function WalkSearchScreen({ navigation }) {
 
   // 검색 결과 아이템 클릭 → 상세 화면으로 이동 (기존 흐름 유지)
   const handleResultPress = (item) => {
-    // 백엔드에서 내려오는 키 이름에 맞춰 id/uuid 등으로 조정하세요.
-    navigation.navigate("CourseDetail", { courseId: item.id })
+    // 백엔드에서 내려오는 키 이름에 맞춰 trailId 사용
+    navigation.navigate("CourseDetail", { courseId: item.trailId || item.id })
   }
 
-  // 🔹 검색 결과 아이템 렌더링 (UI 원형 유지, 이미지 주석은 그대로)
+  // 🔹 검색 결과 아이템 렌더링 (API 응답 데이터 구조에 맞춰 필드 매핑)
   const renderSearchItem = ({ item }) => (
     <TouchableOpacity style={styles.searchItem} onPress={() => handleResultPress(item)}>
       {/* 
@@ -127,21 +165,36 @@ export default function WalkSearchScreen({ navigation }) {
         현재는 디자인 보존을 위해 주석 유지 
       */}
       <View style={styles.itemContent}>
-        {/* 백엔드 응답 키에 맞춰 필드명 매핑 필요 (예: trailName/address/difficulty/distance/duration 등) */}
-        <Text style={styles.itemName}>{item.trailName || item.name}</Text>
-        <Text style={styles.itemAddress}>{item.address || item.cityName}</Text>
+        {/* API 응답 데이터 구조에 맞춰 필드명 매핑 */}
+        <Text style={styles.itemName}>
+          {item.trailName || item.name || "산책로 이름"}
+        </Text>
+        <Text style={styles.itemAddress}>
+          {item.cityName || item.address || "위치 정보 없음"}
+        </Text>
+        <Text style={styles.itemType}>
+          {item.trailTypeName && `유형: ${item.trailTypeName}`}
+        </Text>
         <View style={styles.itemInfo}>
           <View style={styles.infoItem}>
             <Icon name="map-marker" size={screenWidth * 0.03} color="#666" />
-            <Text style={styles.infoText}>{item.distance || item.distanceText || "-"}</Text>
+            <Text style={styles.infoText}>
+              {item.distance ? `${item.distance}km` : 
+               item.distanceText || 
+               (item.distanceKm ? `${item.distanceKm}km` : "거리 정보 없음")}
+            </Text>
           </View>
           <View style={styles.infoItem}>
             <Icon name="clock-outline" size={screenWidth * 0.03} color="#666" />
-            <Text style={styles.infoText}>{item.duration || item.durationText || "-"}</Text>
+            <Text style={styles.infoText}>
+              {item.duration ? `${item.duration}분` : 
+               item.durationText || 
+               (item.durationMinutes ? `${item.durationMinutes}분` : "소요시간 정보 없음")}
+            </Text>
           </View>
           <View style={styles.infoItem}>
-            <Text style={[styles.difficultyText, { color: getDifficultyColor(item.difficulty || item.difficultyLevel) }]}>
-              {item.difficulty || item.difficultyLevel || "정보없음"}
+            <Text style={[styles.difficultyText, { color: getDifficultyColor(item.difficultyLevel || item.difficulty) }]}>
+              {item.difficultyLevel || item.difficulty || "난이도 정보 없음"}
             </Text>
           </View>
         </View>
@@ -171,6 +224,9 @@ export default function WalkSearchScreen({ navigation }) {
       {/* 검색바 (UI 원형 유지) */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
+          <TouchableOpacity style={styles.backButton} onPress={goBack}>
+            <Icon name="arrow-left" size={screenWidth * 0.06} color="#333" />
+          </TouchableOpacity>
           <Icon name="magnify" size={screenWidth * 0.05} color="#888" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
@@ -186,10 +242,61 @@ export default function WalkSearchScreen({ navigation }) {
               <Icon name="close-circle" size={screenWidth * 0.05} color="#888" />
             </TouchableOpacity>
           )}
+          <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(!showFilters)}>
+            <Icon name="tune" size={screenWidth * 0.05} color="#333" />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={goToProfile}>
             <Icon name="account" size={screenWidth * 0.06} color="#333" />
           </TouchableOpacity>
         </View>
+        
+        {/* 필터 영역 */}
+        {showFilters && (
+          <View style={styles.filterContainer}>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>지역:</Text>
+              <TextInput
+                style={styles.filterInput}
+                placeholder="예: 서울, 부산"
+                value={filters.cityName}
+                onChangeText={(text) => setFilters(prev => ({...prev, cityName: text}))}
+              />
+            </View>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>난이도:</Text>
+              <View style={styles.difficultyContainer}>
+                {["쉬움", "보통", "어려움"].map((level) => (
+                  <TouchableOpacity
+                    key={level}
+                    style={[
+                      styles.difficultyChip,
+                      filters.difficultyLevel === level && styles.difficultyChipActive
+                    ]}
+                    onPress={() => setFilters(prev => ({
+                      ...prev, 
+                      difficultyLevel: prev.difficultyLevel === level ? "" : level
+                    }))}
+                  >
+                    <Text style={[
+                      styles.difficultyChipText,
+                      filters.difficultyLevel === level && styles.difficultyChipTextActive
+                    ]}>
+                      {level}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={styles.filterActions}>
+              <TouchableOpacity style={styles.resetButton} onPress={resetFilters}>
+                <Text style={styles.resetButtonText}>초기화</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.applyButton} onPress={applyFilters}>
+                <Text style={styles.applyButtonText}>적용</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* 검색 결과 또는 초기 목록(최근) */}
@@ -205,7 +312,7 @@ export default function WalkSearchScreen({ navigation }) {
               <Text style={styles.resultsCount}>검색 결과 {searchResults.length}개</Text>
               <FlatList
                 data={searchResults}
-                keyExtractor={(item, idx) => String(item.id ?? item.trailId ?? idx)}
+                keyExtractor={(item, idx) => String(item.trailId ?? item.id ?? idx)}
                 renderItem={renderSearchItem}
                 contentContainerStyle={styles.listContainer}
                 showsVerticalScrollIndicator={false}
@@ -232,7 +339,7 @@ export default function WalkSearchScreen({ navigation }) {
           ) : (
             <FlatList
               data={(allCourses || []).slice(0, 3)}
-              keyExtractor={(item, idx) => String(item.id ?? item.trailId ?? idx)}
+              keyExtractor={(item, idx) => String(item.trailId ?? item.id ?? idx)}
               renderItem={renderSearchItem}
               contentContainerStyle={styles.recentListContainer}
               showsVerticalScrollIndicator={false}
@@ -274,6 +381,99 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingHorizontal: PADDING_H,
     height: SEARCH_HEIGHT,
+  },
+  backButton: {
+    marginRight: PADDING_H / 2,
+  },
+  filterButton: {
+    marginLeft: PADDING_H / 2,
+    marginRight: PADDING_H / 2,
+  },
+  headerButton: {
+    marginLeft: PADDING_H / 2,
+  },
+
+  // Filter Styles
+  filterContainer: {
+    backgroundColor: "#F8F9FA",
+    padding: PADDING_H,
+    marginTop: PADDING_H / 2,
+    borderRadius: 10,
+  },
+  filterRow: {
+    marginBottom: PADDING_H,
+  },
+  filterLabel: {
+    fontSize: screenWidth * 0.035,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: PADDING_H / 3,
+  },
+  filterInput: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    paddingHorizontal: PADDING_H,
+    paddingVertical: PADDING_H / 2,
+    fontSize: screenWidth * 0.035,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  difficultyContainer: {
+    flexDirection: "row",
+    gap: PADDING_H / 2,
+  },
+  difficultyChip: {
+    paddingHorizontal: PADDING_H,
+    paddingVertical: PADDING_H / 3,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  difficultyChipActive: {
+    backgroundColor: "#418663",
+    borderColor: "#418663",
+  },
+  difficultyChipText: {
+    fontSize: screenWidth * 0.032,
+    color: "#666",
+    fontWeight: "500",
+  },
+  difficultyChipTextActive: {
+    color: "#FFFFFF",
+  },
+  filterActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: PADDING_H / 2,
+  },
+  resetButton: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    paddingVertical: PADDING_H / 2,
+    marginRight: PADDING_H / 2,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  resetButtonText: {
+    fontSize: screenWidth * 0.035,
+    color: "#666",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  applyButton: {
+    flex: 1,
+    backgroundColor: "#418663",
+    borderRadius: 8,
+    paddingVertical: PADDING_H / 2,
+    marginLeft: PADDING_H / 2,
+  },
+  applyButtonText: {
+    fontSize: screenWidth * 0.035,
+    color: "#FFFFFF",
+    textAlign: "center",
+    fontWeight: "600",
   },
   searchIcon: {
     marginRight: PADDING_H / 2,
@@ -347,7 +547,13 @@ const styles = StyleSheet.create({
   itemAddress: {
     fontSize: screenWidth * 0.032,
     color: "#666",
+    marginBottom: PADDING_H / 4,
+  },
+  itemType: {
+    fontSize: screenWidth * 0.03,
+    color: "#418663",
     marginBottom: PADDING_H / 3,
+    fontWeight: "500",
   },
   itemInfo: {
     flexDirection: "row",
