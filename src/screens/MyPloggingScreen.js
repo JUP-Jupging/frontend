@@ -45,8 +45,7 @@ export default function MyPloggingScreen() {
 
           {/* 탭 인디케이터 */}
           <View style={styles.tabIndicatorContainer}>
-            <View style={[styles.tabIndicator, { left: activeTab === "줍깅" ? 0 : screenWidth * 0.5 }]} />
-            <View style={styles.tabUnderline} />
+            <View style={[styles.tabIndicator, { left: activeTab === "줍깅" ? 0 : (screenWidth - 40) / 2 }]} />            <View style={styles.tabUnderline} />
           </View>
         </View>
 
@@ -183,10 +182,12 @@ const styles = StyleSheet.create({
   tabIndicatorContainer: {
     position: "relative",
     height: 2,
+    width: screenWidth - 40, // paddingHorizontal: 20 * 2
+    alignSelf: "center",
   },
   tabIndicator: {
     position: "absolute",
-    width: screenWidth * 0.4,
+    width: (screenWidth - 40) / 2,
     height: 2,
     backgroundColor: "#418663",
   },
