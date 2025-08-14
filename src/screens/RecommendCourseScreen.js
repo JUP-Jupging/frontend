@@ -17,7 +17,7 @@ import DropDownPicker from "react-native-dropdown-picker"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
-// 더미 코스 데이터
+// 더미 코스 데이터 (reportCount 추가)
 const DUMMY_COURSES = [
   {
     id: "1",
@@ -26,9 +26,9 @@ const DUMMY_COURSES = [
     difficulty: "쉬움",
     region: "서울",
     image: "/placeholder.svg?height=50&width=50",
-    distance: "7.1km",
+    distance: "7.1", // km
     duration: "1시간30분",
-    trashLevel: "보통",
+    reportCount: 5,
   },
   {
     id: "2",
@@ -37,9 +37,9 @@ const DUMMY_COURSES = [
     difficulty: "어려움",
     region: "서울",
     image: "/placeholder.svg?height=50&width=50",
-    distance: "5.2km",
+    distance: "5.2",
     duration: "2시간",
-    trashLevel: "적음",
+    reportCount: 2,
   },
   {
     id: "3",
@@ -48,9 +48,9 @@ const DUMMY_COURSES = [
     difficulty: "쉬움",
     region: "서울",
     image: "/placeholder.svg?height=50&width=50",
-    distance: "8.5km",
+    distance: "8.5",
     duration: "2시간30분",
-    trashLevel: "많음",
+    reportCount: 10,
   },
   {
     id: "4",
@@ -59,9 +59,9 @@ const DUMMY_COURSES = [
     difficulty: "쉬움",
     region: "서울",
     image: "/placeholder.svg?height=50&width=50",
-    distance: "6.3km",
+    distance: "6.3",
     duration: "1시간45분",
-    trashLevel: "보통",
+    reportCount: 7,
   },
 ]
 
@@ -88,6 +88,13 @@ const DIFFICULTY_OPTIONS = [
   { label: "어려움", value: "어려움" },
 ]
 
+// 정렬 옵션
+const SORT_OPTIONS = [
+  { label: "전체", value: "all" },
+  { label: "가까운순", value: "distance" },
+  { label: "쓰레기 많은순", value: "trash" },
+]
+
 export default function RecommendCourseScreen({ navigation }) {
   const [tab, setTab] = useState("전체")
   const [courses, setCourses] = useState([])
@@ -103,84 +110,66 @@ export default function RecommendCourseScreen({ navigation }) {
   const [difficultyValue, setDifficultyValue] = useState(null)
   const [difficultyItems, setDifficultyItems] = useState(DIFFICULTY_OPTIONS)
 
+  const [sortOpen, setSortOpen] = useState(false)
+  const [sortValue, setSortValue] = useState("all")
+  const [sortItems, setSortItems] = useState(SORT_OPTIONS)
+
   // DB에서 코스 데이터 가져오기
   const fetchCourses = async () => {
     try {
       setLoading(true)
-      console.log("데이터 로딩 시작...")
-
       // 실제 API 호출 (예시)
       // const response = await fetch('https://your-api.com/api/courses');
       // const data = await response.json();
 
       // 시뮬레이션: 항상 더미 데이터 사용 (테스트용)
-      const hasDataInDB = true // Math.random() > 0.2
-
-      // 1초 로딩 시뮬레이션
       await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      if (hasDataInDB) {
-        console.log("더미 데이터 설정:", DUMMY_COURSES.length, "개")
-        setCourses(DUMMY_COURSES)
-        setFilteredCourses(DUMMY_COURSES)
-      } else {
-        console.log("빈 데이터 설정")
-        setCourses([])
-        setFilteredCourses([])
-      }
+      setCourses(DUMMY_COURSES)
+      setFilteredCourses(DUMMY_COURSES)
     } catch (error) {
-      console.error("Failed to fetch courses:", error)
-      console.log("에러 발생, 더미 데이터로 폴백")
       setCourses(DUMMY_COURSES)
       setFilteredCourses(DUMMY_COURSES)
     } finally {
       setLoading(false)
-      console.log("로딩 완료")
     }
   }
 
   // 필터 적용
   const applyFilters = () => {
     let filtered = [...courses]
-
     if (regionValue) {
       filtered = filtered.filter((course) => course.region === regionValue)
     }
-
     if (difficultyValue) {
       filtered = filtered.filter((course) => course.difficulty === difficultyValue)
     }
-
+    // 정렬
+    if (sortValue === "distance") {
+      filtered = filtered.sort((a, b) => {
+        const aDist = parseFloat(a.distance)
+        const bDist = parseFloat(b.distance)
+        return aDist - bDist
+      })
+    } else if (sortValue === "trash") {
+      filtered = filtered.sort((a, b) => b.reportCount - a.reportCount)
+    }
+    // 전체는 필터만 적용, 정렬 없음
     setFilteredCourses(filtered)
   }
-
-  // 필터 값 변경 시 필터 적용
-  useEffect(() => {
-    applyFilters()
-  }, [regionValue, difficultyValue, courses])
 
   useEffect(() => {
     fetchCourses()
   }, [])
 
+  useEffect(() => {
+    applyFilters()
+  }, [regionValue, difficultyValue, sortValue, courses])
+
   const goBack = () => navigation.goBack()
   const goToProfile = () => navigation.navigate("내 플로깅 기록")
 
-  // 난이도별 색상 반환
-  const getDifficultyColor = (difficulty) => {
-    switch (difficulty) {
-      case "쉬움":
-        return "#418663"
-      case "보통":
-        return "#418663"
-      case "어려움":
-        return "#418663"
-      default:
-        return "#418663"
-    }
-  }
+  const getDifficultyColor = (difficulty) => "#418663"
 
-  // 상단 탭 렌더링
   const renderTabs = () => (
     <View style={styles.tabContainer}>
       <View style={styles.tabRow}>
@@ -191,7 +180,6 @@ export default function RecommendCourseScreen({ navigation }) {
           <Text style={[styles.tabText, tab === "AI" && styles.activeTabText]}>AI 기반 추천</Text>
         </TouchableOpacity>
       </View>
-      {/* 탭 인디케이터 */}
       <View style={styles.tabIndicatorContainer}>
         <View style={styles.tabUnderline} />
         <View style={[styles.tabIndicator, { left: tab === "전체" ? 0 : screenWidth * 0.5 }]} />
@@ -199,7 +187,6 @@ export default function RecommendCourseScreen({ navigation }) {
     </View>
   )
 
-  // 코스 아이템 렌더링
   const renderCourseItem = ({ item }) => (
     <TouchableOpacity
       style={styles.courseItem}
@@ -213,20 +200,13 @@ export default function RecommendCourseScreen({ navigation }) {
           <View style={[styles.difficultyTag, { backgroundColor: "#C8DECB" }]}>
             <Text style={[styles.tagText, { color: getDifficultyColor(item.difficulty) }]}># {item.difficulty}</Text>
           </View>
+          <View style={[styles.reportTag, { backgroundColor: "#F5E6E6", marginLeft: 8 }]}>
+            <Text style={[styles.tagText, { color: "#C94A4A" }]}>쓰레기 {item.reportCount}</Text>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
   )
-
-  // useEffect 추가 (디버깅용)
-  useEffect(() => {
-    console.log("현재 상태:", {
-      loading,
-      coursesLength: courses.length,
-      filteredCoursesLength: filteredCourses.length,
-      tab,
-    })
-  }, [loading, courses, filteredCourses, tab])
 
   return (
     <SafeAreaView style={styles.container}>
@@ -237,7 +217,6 @@ export default function RecommendCourseScreen({ navigation }) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>산책로 추천</Text>
         <View style={styles.headerRight}>
-
           <TouchableOpacity style={styles.headerButton} onPress={goToProfile}>
             <Icon name="person" size={24} color="#333" />
           </TouchableOpacity>
@@ -245,50 +224,71 @@ export default function RecommendCourseScreen({ navigation }) {
       </View>
 
       {/* Tabs */}
-      {renderTabs()}
+      <View style={{ marginBottom: 15 }}>
+        {renderTabs()}
+      </View>
 
       {tab === "전체" ? (
         <View style={styles.contentContainer}>
           {/* Filters */}
-          <View style={styles.filterContainer}>
-            <View style={styles.filterItem}>
-              <DropDownPicker
-                placeholder="지역"
-                open={regionOpen}
-                value={regionValue}
-                items={regionItems}
-                setOpen={setRegionOpen}
-                setValue={setRegionValue}
-                setItems={setRegionItems}
-                style={styles.dropdown}
-                dropDownContainerStyle={styles.dropdownContainer}
-                textStyle={styles.dropdownText}
-                placeholderStyle={styles.dropdownPlaceholder}
-                zIndex={3000}
-                zIndexInverse={1000}
-              />
+          <View style={styles.filterBar}>
+            <View style={styles.filterLeft}>
+              <View style={styles.filterItem}>
+                <DropDownPicker
+                  placeholder="지역"
+                  open={regionOpen}
+                  value={regionValue}
+                  items={regionItems}
+                  setOpen={setRegionOpen}
+                  setValue={setRegionValue}
+                  setItems={setRegionItems}
+                  style={styles.dropdown}
+                  dropDownContainerStyle={styles.dropdownContainer}
+                  textStyle={styles.dropdownText}
+                  placeholderStyle={styles.dropdownPlaceholder}
+                  zIndex={3000}
+                  zIndexInverse={1000}
+                />
+              </View>
+              <View style={styles.filterItem}>
+                <DropDownPicker
+                  placeholder="난이도"
+                  open={difficultyOpen}
+                  value={difficultyValue}
+                  items={difficultyItems}
+                  setOpen={setDifficultyOpen}
+                  setValue={setDifficultyValue}
+                  setItems={setDifficultyItems}
+                  style={styles.dropdown}
+                  dropDownContainerStyle={styles.dropdownContainer}
+                  textStyle={styles.dropdownText}
+                  placeholderStyle={styles.dropdownPlaceholder}
+                  zIndex={2000}
+                  zIndexInverse={1000}
+                />
+              </View>
             </View>
-            <View style={styles.filterItem}>
+            <View style={styles.filterRight}>
               <DropDownPicker
-                placeholder="난이도"
-                open={difficultyOpen}
-                value={difficultyValue}
-                items={difficultyItems}
-                setOpen={setDifficultyOpen}
-                setValue={setDifficultyValue}
-                setItems={setDifficultyItems}
+                placeholder="정렬"
+                open={sortOpen}
+                value={sortValue}
+                items={sortItems}
+                setOpen={setSortOpen}
+                setValue={setSortValue}
+                setItems={setSortItems}
                 style={styles.dropdown}
                 dropDownContainerStyle={styles.dropdownContainer}
                 textStyle={styles.dropdownText}
                 placeholderStyle={styles.dropdownPlaceholder}
-                zIndex={2000}
+                zIndex={1000}
                 zIndexInverse={1000}
               />
             </View>
           </View>
 
           {/* Course Count */}
-          <Text style={styles.countText}>산책로 {filteredCourses.length}</Text>
+          <Text style={[styles.countText, { marginTop: 25 }]}>산책로 {filteredCourses.length}</Text>
 
           {/* Course List */}
           {loading ? (
@@ -319,8 +319,6 @@ export default function RecommendCourseScreen({ navigation }) {
         <View style={styles.aiContainer}>
           <Text style={styles.aiSubtitle}>AI에게 산책로를 추천 받아보세요.</Text>
           <Text style={styles.aiTitle}>나에게 맞는 산책로는?</Text>
-
-          {/* AI 카드 컨테이너 */}
           <View style={styles.aiCard}>
             <View style={styles.aiImageContainer}>
               <Image
@@ -329,15 +327,11 @@ export default function RecommendCourseScreen({ navigation }) {
                 resizeMode="contain"
               />
             </View>
-
-            {/* 분석 버튼 */}
             <TouchableOpacity style={styles.aiAnalysisButton}>
               <Text style={styles.aiAnalysisButtonText}>나에게 맞는 산책로 분석</Text>
             </TouchableOpacity>
           </View>
-
           <Text style={styles.aiDescription}>나의 플로깅 기록, 선호도를 바탕으로{"\n"}산책로를 추천 받아 보세요.</Text>
-
           <TouchableOpacity style={styles.aiButton}>
             <Text style={styles.aiButtonText}>AI 분석하기</Text>
           </TouchableOpacity>
@@ -354,11 +348,10 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: screenHeight * 0.05,
-
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: screenWidth * 0.078, // 28px at 360px width
+    paddingHorizontal: screenWidth * 0.078,
     paddingVertical: 15,
     backgroundColor: "#FFFFFF",
   },
@@ -413,12 +406,23 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    paddingHorizontal: screenWidth * 0.075, // 27px at 360px width
+    paddingHorizontal: screenWidth * 0.075,
   },
-  filterContainer: {
+  filterBar: {
     flexDirection: "row",
-    paddingVertical: 15,
-    gap: 20,
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
+    zIndex: 10,
+  },
+  filterLeft: {
+    flexDirection: "row",
+    flex: 2,
+    gap: 10,
+  },
+  filterRight: {
+    flex: 1,
+    alignItems: "flex-end",
   },
   filterItem: {
     flex: 1,
@@ -483,8 +487,14 @@ const styles = StyleSheet.create({
   },
   tagContainer: {
     flexDirection: "row",
+    alignItems: "center",
   },
   difficultyTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+    borderRadius: 20,
+  },
+  reportTag: {
     paddingHorizontal: 12,
     paddingVertical: 2,
     borderRadius: 20,
@@ -529,7 +539,7 @@ const styles = StyleSheet.create({
   // AI Tab Styles
   aiContainer: {
     flex: 1,
-    paddingHorizontal: screenWidth * 0.067, // 24px at 360px width
+    paddingHorizontal: screenWidth * 0.067,
     paddingTop: 20,
     alignItems: "center",
   },
@@ -548,8 +558,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   aiCard: {
-    width: screenWidth * 0.867, // 312px at 360px width
-    height: screenHeight * 0.386, // 301px at 780px height
+    width: screenWidth * 0.867,
+    height: screenHeight * 0.386,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     paddingVertical: 20,
@@ -602,7 +612,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 40,
     alignItems: "center",
-    width: screenWidth * 0.889, // 320px at 360px width
+    width: screenWidth * 0.889,
   },
   aiButtonText: {
     fontSize: 18,
