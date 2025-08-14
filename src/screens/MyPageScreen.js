@@ -1,20 +1,39 @@
 "use client"
 
 import { useState } from "react"
-import { View, Text, TouchableOpacity, StyleSheet, Image, SafeAreaView, ScrollView, Dimensions } from "react-native"
+import { View, Text, TouchableOpacity, StyleSheet, Image, SafeAreaView, ScrollView, Dimensions, Modal } from "react-native"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
 import { launchImageLibrary } from 'react-native-image-picker' // 이미지 경로를 올바르게 설정해야 합니다.  
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
-
+const REGION_LIST = [
+  "서울특별시",
+  "부산광역시",
+  "대구광역시",
+  "인천광역시",
+  "광주광역시",
+  "대전광역시",
+  "울산광역시",
+  "세종특별자치시",
+  "경기도",
+  "강원특별자치도",
+  "충청북도",
+  "충청남도",
+  "전북특별자치도",
+  "전라남도",
+  "경상북도",
+  "경상남도",
+  "제주특별자치도"
+];
 export default function MyPageScreen({ navigation }) {
   const [modalVisible, setModalVisible] = useState(false)
   const [profileImage, setProfileImage] = useState(require("../assets/profile.png")) // 기본 프로필 이미지
+  const [region, setRegion] = useState("지역을 선택하세요")
+  const [regionModal, setRegionModal] = useState(false)
   // 추후 DB에서 받아올 유저 데이터
   const user = {
     nickname: "쓰레기줍기장인",
     email: "trasxh@kakao.com",
-    region: "서울특별시",
   }
 
   // 확인 버튼 누르면 삭제 실행
@@ -87,7 +106,12 @@ export default function MyPageScreen({ navigation }) {
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>활동 지역</Text>
-            <Text style={styles.infoValue}>{user.region}</Text>
+            <TouchableOpacity style={styles.regionRow} onPress={() => setRegionModal(true)}>
+              <Text style={[styles.infoValue, { color: region === "지역을 선택하세요" ? "#aaa" : "#333" }]}>
+                {region}
+              </Text>
+              <Icon name="chevron-right" size={24} color="#131214" />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -99,7 +123,31 @@ export default function MyPageScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-
+      {/* 지역 선택 모달 */}
+      <Modal visible={regionModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.regionModal}>
+            <Text style={styles.regionModalTitle}>지역을 선택하세요</Text>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {REGION_LIST.map((item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={styles.regionItem}
+                  onPress={() => {
+                    setRegion(item)
+                    setRegionModal(false)
+                  }}
+                >
+                  <Text style={styles.regionText}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.regionCancel} onPress={() => setRegionModal(false)}>
+              <Text style={{ color: "#418663", fontWeight: "bold" }}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       {/* 모달 컴포넌트 */}
       <CommonModal
         visible={modalVisible}
@@ -216,5 +264,45 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     color: "rgba(51, 51, 51, 0.5)",
     letterSpacing: -0.1,
+  },
+    modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  regionModal: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 20,
+    width: screenWidth * 0.6,
+    alignItems: "center",
+  },
+  regionModalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+    color: "#333",
+  },
+  regionItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    width: "100%",
+    alignItems: "center",
+  },
+  regionText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  regionCancel: {
+    marginTop: 10,
+    padding: 10,
+  },
+  regionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "flex-end",
   },
 })

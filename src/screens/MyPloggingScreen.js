@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   },
   tabIndicator: {
     position: "absolute",
-    width: screenWidth * 0.5,
+    width: screenWidth * 0.4,
     height: 2,
     backgroundColor: "#418663",
   },
@@ -278,10 +278,10 @@ const styles = StyleSheet.create({
   },
   trashIcon: {
     position: "absolute",
-    top: -8,
-    right: -8,
-    width: 24,
-    height: 24,
+    top: -16,
+    right: -16,
+    width: 28,
+    height: 28,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     justifyContent: "center",
@@ -296,8 +296,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   trashIconImage: {
-    width: 16,
-    height: 16,
+    width: 24,
+    height: 24,
     tintColor: "#418663",
   },
 })
