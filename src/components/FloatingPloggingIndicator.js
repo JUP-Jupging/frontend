@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated, Platform, PanResponder } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useNavigationState } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { usePloggingContext } from '../contexts/PloggingContext'; // 플로깅 전역 상태 사용
 
@@ -26,6 +26,36 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
   const insets = useSafeAreaInsets(); // 디바이스 안전 영역 정보
   const navigation = useNavigation(); // 네비게이션 객체
+  
+  // 🔍 현재 활성화된 화면 감지
+  const navigationState = useNavigationState(state => state);
+  
+  // 현재 화면이 PloggingStartScreen인지 확인하는 함수
+  const isPloggingStartScreen = () => {
+    try {
+      // 네비게이션 스택에서 현재 활성 화면 찾기
+      const getCurrentRouteName = (state) => {
+        if (!state || !state.routes) return null;
+        
+        const route = state.routes[state.index];
+        if (route.state) {
+          return getCurrentRouteName(route.state);
+        }
+        return route.name;
+      };
+      
+      const currentRouteName = getCurrentRouteName(navigationState);
+      console.log('[FloatingPloggingIndicator] 현재 화면:', currentRouteName);
+      
+      const isPloggingScreen = currentRouteName === 'PloggingStart';
+      console.log('[FloatingPloggingIndicator] PloggingStart 화면 여부:', isPloggingScreen);
+      
+      return isPloggingScreen;
+    } catch (error) {
+      console.error('[FloatingPloggingIndicator] 화면 감지 오류:', error);
+      return false;
+    }
+  };
   
   // 플로깅 전역 상태에서 필요한 데이터 추출
   const { 
@@ -114,13 +144,23 @@ const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
 
   // 플로깅 중이 아니면 렌더링하지 않음
   if (status !== "running" && status !== "paused") {
+    console.log('[FloatingPloggingIndicator] 플로깅 중이 아님 - 숨김, 상태:', status);
     return null;
   }
 
-  // hideOnPlogging이 true이면 렌더링하지 않음 (플로깅 화면용)
-  if (hideOnPlogging) {
+  // PloggingStartScreen에서는 항상 숨김
+  if (isPloggingStartScreen()) {
+    console.log('[FloatingPloggingIndicator] PloggingStartScreen에서 숨김');
     return null;
   }
+
+  // hideOnPlogging이 true이면 렌더링하지 않음 (추가 옵션)
+  if (hideOnPlogging) {
+    console.log('[FloatingPloggingIndicator] hideOnPlogging=true로 숨김');
+    return null;
+  }
+
+  console.log('[FloatingPloggingIndicator] 인디케이터 표시, 상태:', status, '접힘 상태:', isCollapsed);
 
   const toggleCollapse = () => {
     console.log('[FloatingPloggingIndicator] 접기/펼치기 버튼 클릭, 현재 상태:', isCollapsed);
@@ -131,6 +171,7 @@ const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
   const goToPloggingScreen = () => {
     console.log('[FloatingPloggingIndicator] 플로깅 화면으로 이동 버튼 클릭');
     console.log('[FloatingPloggingIndicator] 현재 상태:', status);
+    console.log('[FloatingPloggingIndicator] PloggingStart 화면 진입 시 이 인디케이터는 숨겨질 예정');
     
     // 바텀탭 유지하면서 홈 탭의 PloggingStart로 이동
     navigation.navigate("Main", {

@@ -8,6 +8,16 @@ import LoginScreen from './src/screens/LoginScreen';
 import BottomTabNavigator from './src/navigation/BottomTabNavigator'; // 하단 탭 네비게이터 (FloatingPloggingIndicator 포함)
 import { PloggingProvider } from './src/contexts/PloggingContext'; // 🎯 플로깅 전역 상태 관리: 앱 전체에서 플로깅 세션을 공유
 
+// 🛠️ React DevTools 연결 (개발 환경에서만)
+if (__DEV__) {
+  console.log('🔧 React DevTools 연결 중...');
+  // React DevTools 자동 연결 설정
+  require('react-devtools-core').connectToDevTools({
+    host: 'localhost',
+    port: 8097,
+  });
+}
+
 const Stack = createNativeStackNavigator();
 
 function App() {

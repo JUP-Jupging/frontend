@@ -71,6 +71,8 @@ const DUMMY_TRASH_LOCATIONS = [
  */
 export default function PloggingStartScreen({ navigation }) {
   console.log('[PloggingStartScreen] 컴포넌트 렌더링 시작');
+  console.log('[PloggingStartScreen] FloatingPloggingIndicator 숨김 처리 - 이 화면에서는 표시되지 않음');
+  
   
   // 🎯 플로깅 전역 상태에서 필요한 데이터와 함수들 추출
   const {
@@ -100,6 +102,31 @@ export default function PloggingStartScreen({ navigation }) {
   const [selectedTrash, setSelectedTrash] = useState(null)             // 선택된 쓰레기 정보
   const [isLoading, setIsLoading] = useState(false)                    // 로딩 상태
   const [mapReady, setMapReady] = useState(false)                      // 지도 초기화 완료 여부
+
+  // 🔍 백그라운드 모드에서 polyline 업데이트 디버깅
+  useEffect(() => {
+    console.log('[PloggingStartScreen] 📍 경로 좌표 업데이트:', {
+      좌표개수: routeCoordinates?.length || 0,
+      총거리: formatDistance(totalDistance),
+      백그라운드모드: isBackgroundMode,
+      플로깅상태: status
+    });
+    
+    if (routeCoordinates && routeCoordinates.length > 0) {
+      const lastCoordinate = routeCoordinates[routeCoordinates.length - 1];
+      console.log('[PloggingStartScreen] 📍 최신 위치:', lastCoordinate);
+    }
+    
+    // 백그라운드에서도 polyline이 업데이트되는지 확인
+    if (isBackgroundMode && routeCoordinates && routeCoordinates.length > 1) {
+      console.log('[PloggingStartScreen] ✅ 백그라운드에서 경로 데이터 계속 업데이트됨');
+      console.log('[PloggingStartScreen] 📊 백그라운드 진행 상황:', {
+        경로점수: routeCoordinates.length,
+        총거리: formatDistance(totalDistance),
+        소요시간: formatTime(time)
+      });
+    }
+  }, [routeCoordinates, totalDistance, isBackgroundMode, status, formatDistance, formatTime, time]);
 
   // 🧹 가상의 쓰레기 위치 데이터 (개발/테스트용)
   // 실제 서비스에서는 API에서 받아온 실제 쓰레기 위치 데이터로 대체
@@ -133,7 +160,8 @@ export default function PloggingStartScreen({ navigation }) {
     console.log('[PloggingStartScreen] 뒤로가기 핸들러 등록');
     
     const backAction = () => {
-      console.log('[PloggingStartScreen] 뒤로가기 버튼 클릭, 현재 상태:', status);
+      console.log('[PloggingStartScreen] 하드웨어 뒤로가기 버튼 클릭, 현재 상태:', status);
+      console.log('[PloggingStartScreen] 메인 화면으로 이동 시 FloatingPloggingIndicator 다시 표시');
       
       // 플로깅 상태와 관계없이 항상 메인 화면으로 이동
       // 플로깅은 백그라운드에서 계속 실행되며, FloatingPloggingIndicator로 확인 가능
@@ -269,12 +297,14 @@ export default function PloggingStartScreen({ navigation }) {
   }
 
   const handleGoToMain = () => {
-    console.log('[PloggingStartScreen] 메인 화면으로 이동');
+    console.log('[PloggingStartScreen] 메인 화면으로 이동 버튼 클릭');
+    console.log('[PloggingStartScreen] FloatingPloggingIndicator가 메인 화면에서 활성화될 예정');
     navigation.navigate("Main");
   }
 
   const handleBackPress = () => {
     console.log('[PloggingStartScreen] 헤더 뒤로가기 버튼 클릭, 현재 상태:', status);
+    console.log('[PloggingStartScreen] 다른 화면으로 이동 시 FloatingPloggingIndicator가 다시 표시될 예정');
     
     // 플로깅 중이라면 백그라운드 실행 안내
     if (status === "running" || status === "paused") {
@@ -283,7 +313,10 @@ export default function PloggingStartScreen({ navigation }) {
         '플로깅 진행 중',
         '플로깅이 백그라운드에서 계속 실행됩니다.\n언제든 다시 돌아올 수 있습니다.',
         [
-          { text: '확인', onPress: () => navigation.navigate("Main") }
+          { text: '확인', onPress: () => {
+            console.log('[PloggingStartScreen] 메인 화면으로 이동 - FloatingPloggingIndicator 활성화됨');
+            navigation.navigate("Main");
+          }}
         ]
       );
     } else {
