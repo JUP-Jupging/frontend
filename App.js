@@ -1,5 +1,5 @@
 import React from 'react';
-import { StatusBar, useColorScheme, TouchableOpacity, Image } from 'react-native';
+import { StatusBar, useColorScheme } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import PloggingRecordScreen from './src/screens/PloggingRecordScreen'; // 추가
@@ -32,12 +32,18 @@ function App() {
             options={{ headerShown: false }} // 탭에 헤더 필요 없으면 숨김
           />
 
+          {/* 플로깅 기록 화면 */}
+          <Stack.Screen
+            name="PloggingRecord"
+            component={PloggingRecordScreen}
+            options={{ headerShown: false }}
+          />
+
           <Stack.Screen
             name="TrashCanInfo"
             component={TrashCanInfoScreen}
-             options={{ headerShown: false }} // 추가: 근처 쓰레기통 정보 화면 
+            options={{ headerShown: false }} // 추가: 근처 쓰레기통 정보 화면 
           />
-
         </Stack.Navigator>
       </NavigationContainer>
     </PloggingProvider>

@@ -108,7 +108,15 @@ const DUMMY_RECOMMENDED_COURSES = [
 
 export default function MainScreen({ navigation }) {
   // 플로깅 전역 상태 확인
-  const { status, time, formatTime, trashCount, isBackgroundMode } = usePloggingContext();
+  const { 
+    status, 
+    time, 
+    formatTime, 
+    trashCount, 
+    totalDistance, 
+    formatDistance,
+    isBackgroundMode 
+  } = usePloggingContext();
   
   const [selectedTag, setSelectedTag] = useState("가까운 곳")
   const [todayData, setTodayData] = useState(DUMMY_TODAY_DATA)
@@ -142,6 +150,15 @@ export default function MainScreen({ navigation }) {
   const goToPlogging = () => navigation.navigate("PloggingStart")
   const goToTrashBin = () => navigation.navigate("TrashCanInfo")
   const goToMyPloggingRecords = () => navigation.navigate("내 플로깅 기록")
+
+  // 플로깅 화면으로 이동 (진행 중일 때)
+  const goToPloggingScreen = () => {
+    if (status === "running" || status === "paused") {
+      navigation.navigate("PloggingStart");
+    } else {
+      goToRealtimePlogging();
+    }
+  };
 
   // DB에서 오늘의 플로깅 데이터 가져오기
   const fetchTodayData = async () => {
@@ -289,27 +306,11 @@ export default function MainScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: PADDING_H * 2 }}>
-      {/* 플로깅 진행 중 인디케이터 */}
-      {(status === "running" || status === "paused") && (
-        <TouchableOpacity 
-          style={styles.ploggingIndicator}
-          onPress={() => navigation.navigate("PloggingStart")}
-        >
-          <View style={styles.ploggingIndicatorContent}>
-            <View style={[styles.statusDot, { backgroundColor: status === "running" ? "#4CAF50" : "#FFC107" }]} />
-            <Text style={styles.ploggingIndicatorText}>
-              플로깅 {status === "running" ? "진행 중" : "일시정지"} • {formatTime(time)} • 쓰레기 {trashCount}개
-            </Text>
-            <Icon name="chevron-right" size={20} color="#418663" />
-          </View>
-        </TouchableOpacity>
-      )}
-
       {/* Header */}
       <View style={styles.headerRow}>
         <Image source={require("../assets/logo.png")} style={styles.logoImage} />
         <TouchableOpacity style={styles.searchBar} onPress={() => navigation.navigate("코스 검색")}>
-          <Icon name="magnify" size={screenWidth * 0.04} color="#888" />
+          <Icon name="search" size={screenWidth * 0.04} color="#888" />
           <Text style={styles.searchPlaceholder}>산책로 검색</Text>
         </TouchableOpacity>
 
@@ -331,11 +332,18 @@ export default function MainScreen({ navigation }) {
         {/* Right Cards */}
         <View style={styles.rightCards}>
           {/* 실시간 플로깅 카드 */}
-          <TouchableOpacity style={styles.realtimePloggingCard} onPress={goToRealtimePlogging}>
+          <TouchableOpacity style={styles.realtimePloggingCard} onPress={goToPloggingScreen}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>진행중인 플로깅</Text>
+              <Text style={styles.cardTitle}>
+                {status === "running" || status === "paused" ? "플로깅 진행중" : "진행중인 플로깅"}
+              </Text>
+              {(status === "running" || status === "paused") && (
+                <View style={[styles.statusIndicator, { backgroundColor: status === "running" ? "#4CAF50" : "#FFC107" }]} />
+              )}
             </View>
-            <Text style={styles.cardLink}>실시간 플로깅 {">"}</Text>
+            <Text style={styles.cardLink}>
+              {status === "running" || status === "paused" ? "플로깅 화면으로 >" : "실시간 플로깅 >"}
+            </Text>
 
             {/* Progress Bars */}
             <View style={styles.progressSection}>
@@ -343,21 +351,43 @@ export default function MainScreen({ navigation }) {
                 <View style={styles.progressHeader}>
                   <Text style={styles.progressLabel}>시간</Text>
                   <Text style={styles.progressValue}>
-                    {Math.round(realtimeData.currentTime)}분 / {realtimeData.targetTime}분
+                    {status === "running" || status === "paused" 
+                      ? `${formatTime(time)} / 1시간` 
+                      : `${Math.round(realtimeData.currentTime)}분 / ${realtimeData.targetTime}분`
+                    }
                   </Text>
                 </View>
-                <ProgressBar progress={timeProgress} color="#4CAF50" />
+                <ProgressBar 
+                  progress={status === "running" || status === "paused" ? (time / 3600) * 100 : timeProgress} 
+                  color="#4CAF50" 
+                />
               </View>
 
               <View style={styles.progressItem}>
                 <View style={styles.progressHeader}>
                   <Text style={styles.progressLabel}>거리</Text>
                   <Text style={styles.progressValue}>
-                    {realtimeData.currentDistance.toFixed(1)}km / {realtimeData.targetDistance}km
+                    {status === "running" || status === "paused" 
+                      ? `${formatDistance(totalDistance)} / 3.0km`
+                      : `${realtimeData.currentDistance.toFixed(1)}km / ${realtimeData.targetDistance}km`
+                    }
                   </Text>
                 </View>
-                <ProgressBar progress={distanceProgress} color="#2196F3" />
+                <ProgressBar 
+                  progress={status === "running" || status === "paused" ? (totalDistance / 3000) * 100 : distanceProgress} 
+                  color="#2196F3" 
+                />
               </View>
+
+              {/* 플로깅 중일 때 쓰레기 개수 표시 */}
+              {(status === "running" || status === "paused") && (
+                <View style={styles.progressItem}>
+                  <View style={styles.progressHeader}>
+                    <Text style={styles.progressLabel}>쓰레기</Text>
+                    <Text style={styles.progressValue}>{trashCount}개</Text>
+                  </View>
+                </View>
+              )}
             </View>
           </TouchableOpacity>
 
@@ -525,35 +555,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
 
-  // 플로깅 진행 중 인디케이터
-  ploggingIndicator: {
-    backgroundColor: "#E8F5E8",
-    marginHorizontal: PADDING_H,
-    marginTop: screenHeight * 0.05,
-    marginBottom: PADDING_H / 2,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: "#418663",
-  },
-  ploggingIndicatorContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 12,
-  },
-  ploggingIndicatorText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#418663",
-  },
-
   // Header Styles
   headerRow: {
 
@@ -651,6 +652,13 @@ const styles = StyleSheet.create({
     fontSize: screenWidth * 0.028,
     fontWeight: "600",
     color: "#666",
+    flex: 1,
+  },
+  statusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: 8,
   },
   participantsText: {
     fontSize: screenWidth * 0.025,
