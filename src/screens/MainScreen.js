@@ -140,6 +140,7 @@ export default function MainScreen({ navigation }) {
   const goToPlogging = () => navigation.navigate("PloggingStart")
   const goToTrashBin = () => navigation.navigate("TrashCanInfo")
   const goToMyPloggingRecords = () => navigation.navigate("내 플로깅 기록")
+  const goToRecommendCourse = () => navigation.navigate("RecommendCourse")
 
   // 플로깅 화면으로 이동 (진행 중일 때)
   const goToPloggingScreen = () => {
@@ -488,6 +489,13 @@ export default function MainScreen({ navigation }) {
               # 쓰레기 많은 곳
             </Text>
           </TouchableOpacity>
+
+          <View style={styles.tagSpacer} />
+
+          <TouchableOpacity onPress={goToRecommend} style={styles.moreButton}>
+            <Text style={styles.moreButtonText}>더보기</Text>
+            <Icon name="chevron-right" size={screenWidth * 0.035} color="#666" />
+          </TouchableOpacity>
         </View>
 
         {coursesLoading ? (
@@ -605,22 +613,19 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#F5F5F5",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
   },
   userIcon: {
     width: 20,
     height: 20,
-    tintColor: "#333",
   },
 
   // Top Section Styles
   topRow: {
     flexDirection: "row",
     paddingHorizontal: PADDING_H,
+    marginTop: PADDING_H,
     marginBottom: PADDING_H,
     height: screenHeight * 0.28,
   },
@@ -796,11 +801,10 @@ const styles = StyleSheet.create({
     minWidth: 70,
   },
   timeText: {
-    fontSize: screenWidth * 0.032, // 12px 상당
+    fontSize: screenWidth * 0.035, // 12px 상당
     fontWeight: "700",
     color: "#333333",
-    lineHeight: screenWidth * 0.054, // 20px 상당
-    marginBottom: 2,
+    lineHeight: screenWidth * 0.1, // 20px 상당
   },
   distanceText: {
     fontSize: screenWidth * 0.032, // 12px 상당
@@ -812,14 +816,14 @@ const styles = StyleSheet.create({
     fontSize: screenWidth * 0.08,
     fontWeight: "800",
     color: "#333",
-    lineHeight: screenWidth * 0.09,
+    lineHeight: screenWidth * 0.1,
   },
   trashCountInline: {
     fontSize: screenWidth * 0.038, // 14px 상당
     fontWeight: "700",
     color: "#333333",
     textAlign: "center",
-    lineHeight: screenWidth * 0.054, // 20px 상당
+    lineHeight: screenWidth * 0.06, // 20px 상당
   },
   trashLabel: {
     fontSize: screenWidth * 0.03,
@@ -898,7 +902,6 @@ const styles = StyleSheet.create({
   // Mission Banner Styles
   missionBanner: {
     marginTop: screenHeight * 0.02,
-    marginHorizontal: PADDING_H,
     overflow: "hidden",
     height: BANNER_HEIGHT,
   },
@@ -940,6 +943,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: PADDING_H / 3,
     marginBottom: PADDING_H / 2,
+    alignItems: "center",
   },
   tag: {
     paddingHorizontal: PADDING_H / 2,
@@ -959,6 +963,23 @@ const styles = StyleSheet.create({
   },
   tagSelectedText: {
     color: "#fff",
+  },
+
+  // Tag Spacer and More Button Styles
+  tagSpacer: {
+    flex: 1,
+  },
+  moreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: PADDING_H / 3,
+    paddingVertical: PADDING_H / 4,
+  },
+  moreButtonText: {
+    fontSize: screenWidth * 0.03,
+    color: "#666",
+    fontWeight: "500",
+    marginRight: 2,
   },
 
   // Courses Loading Styles
@@ -1043,3 +1064,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 })
+
