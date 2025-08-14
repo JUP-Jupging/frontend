@@ -116,7 +116,7 @@ export default function MainScreen({ navigation }) {
   const [coursesLoading, setCoursesLoading] = useState(true)
 
   // Progress Bar 컴포넌트
-  const ProgressBar = ({ progress, color = "#4CAF50", height = 6 }) => {
+  const ProgressBar = ({ progress, color = "#4CAF50", height = 4 }) => {
     return (
       <View style={[styles.progressBarContainer, { height }]}>
         <View
@@ -150,38 +150,34 @@ export default function MainScreen({ navigation }) {
     }
   };
 
-  // DB에서 오늘의 플로깅 데이터 가져오기
+  // DB에서 오늘의 플로깅 데이터 가져오기 (완료된 플로깅 기록만)
   const fetchTodayData = async () => {
     try {
       setLoading(true)
 
-      // 실제 API 호출 (예시)
-      // const response = await fetch('https://your-api.com/api/plogging/today');
+      // 오늘 날짜 생성 (YYYY-MM-DD 형식)
+      const today = new Date()
+      const todayString = today.toISOString().split('T')[0]
+
+      // 실제 API 호출 - 오늘 날짜로 완료된 플로깅 기록 조회
+      // const response = await fetch(`https://your-api.com/api/plogging/records/today?date=${todayString}`);
       // const data = await response.json();
 
-      // 시뮬레이션: 50% 확률로 DB 데이터 존재
-      const hasDataInDB = Math.random() > 0.5
+      // 시뮬레이션: API 호출 대신 더미 데이터 사용
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
-      // 2초 로딩 시뮬레이션
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      if (hasDataInDB) {
-        // DB에 데이터가 있는 경우
-        const dbData = {
-          timeSpent: 45, // 45분
-          targetTime: 60,
-          distance: 2.3,
-          targetDistance: 3.0,
-          trashCount: 7,
-        }
-        setTodayData(dbData)
-      } else {
-        // DB에 데이터가 없으면 더미 데이터 사용
-        setTodayData(DUMMY_TODAY_DATA)
+      // 확인용 더미 데이터 - 항상 데이터가 있는 것으로 표시
+      const todayRecord = {
+        timeSpent: 75, // 1시간 15분
+        targetTime: 60,
+        distance: 2.8, // 2.8km
+        targetDistance: 3.0,
+        trashCount: 12, // 12개
       }
+      setTodayData(todayRecord)
     } catch (error) {
-      console.error("Failed to fetch today data:", error)
-      // 에러 발생시 더미 데이터 사용
+      console.error("Failed to fetch today's plogging data:", error)
+      // 에러 발생시 초기값 사용
       setTodayData(DUMMY_TODAY_DATA)
     } finally {
       setLoading(false)
@@ -289,7 +285,13 @@ export default function MainScreen({ navigation }) {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.headerButton} onPress={goToMyPloggingRecords}>
-          <Icon name="person" size={24} color="#333" />
+          <View style={styles.userIconContainer}>
+            <Image 
+              source={require("../assets/user.png")} 
+              style={styles.userIcon} 
+              resizeMode="contain" 
+            />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -348,8 +350,7 @@ export default function MainScreen({ navigation }) {
 
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
-                      <Text style={styles.progressLabel}>쓰레기</Text>
-                      <Text style={styles.progressValue}>{trashCount}개</Text>
+                      <Text style={styles.trashCountText}>{trashCount}개</Text>
                     </View>
                   </View>
                 </>
@@ -377,37 +378,51 @@ export default function MainScreen({ navigation }) {
                       color="#2196F3" 
                     />
                   </View>
-
-                  <View style={styles.progressItem}>
-                    <View style={styles.progressHeader}>
-                      <Text style={styles.progressLabel}>쓰레기</Text>
-                      <Text style={styles.progressValue}>0개</Text>
-                    </View>
-                  </View>
                 </>
               )}
             </View>
           </TouchableOpacity>
 
-          {/* 오늘의 플로깅 카드 */}
+          {/* 오늘의 플로깅 카드 - DB에서 오늘 완료된 플로깅 기록 표시 */}
           <View style={styles.todayPloggingCard}>
-            <Text style={styles.cardTitle}>오늘의 플로깅</Text>
+            {/* 상단 헤더 */}
+            <View style={styles.todayCardHeader}>
+              <Text style={styles.cardTitle}>오늘의 플로깅</Text>
+              <Text style={styles.trashTitle}>주운 쓰레기 수</Text>
+            </View>
+            
             {loading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color="#4CAF50" />
-                <Text style={styles.loadingText}>데이터 로딩중...</Text>
+                <Text style={styles.loadingText}>오늘 기록 조회중...</Text>
               </View>
             ) : (
               <View style={styles.todayDataContainer}>
-                <Text style={styles.cardDetail}>
-                  {todayData.timeSpent} / {todayData.targetTime}분
-                </Text>
-                <Text style={styles.cardDetail}>
-                  {todayData.distance.toFixed(1)} / {todayData.targetDistance}km
-                </Text>
-                <Text style={styles.cardDetail}>
-                  주운 쓰레기 수: <Text style={styles.trashCount}>{todayData.trashCount}개</Text>
-                </Text>
+                {(todayData.timeSpent === 0 && todayData.distance === 0 && todayData.trashCount === 0) ? (
+                  // 오늘 플로깅 기록이 없는 경우
+                  <View style={styles.noTodayDataContainer}>
+                    <Text style={styles.noTodayDataText}>오늘 아직 플로깅을{"\n"}시작하지 않았어요</Text>
+                    <Text style={styles.noTodayDataSubText}>플로깅을 시작해보세요!</Text>
+                  </View>
+                ) : (
+                  // 오늘 플로깅 기록이 있는 경우
+                  <View style={styles.todayMainRow}>
+                    {/* 왼쪽: 시간과 거리 */}
+                    <View style={styles.leftSection}>
+                      <Text style={styles.timeText}>
+                        {Math.floor(todayData.timeSpent / 60)}시간 {todayData.timeSpent % 60}분
+                      </Text>
+                      <Text style={styles.distanceText}>
+                        {todayData.distance.toFixed(1)}km
+                      </Text>
+                    </View>
+                    
+                    {/* 오른쪽: 쓰레기 개수 */}
+                    <View style={styles.rightSection}>
+                      <Text style={styles.trashCountInline}>{todayData.trashCount}개</Text>
+                    </View>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -491,10 +506,10 @@ export default function MainScreen({ navigation }) {
                 {/* <Image source={require(course.image)} style={styles.pickImage} /> */}
                 <Text style={styles.pickCourseName}>{course.name}</Text>
                 <View style={styles.pickInfoRow}>
-                  <Icon name="map-marker" size={screenWidth * 0.03} color="#797982" />
+                  <Text style={styles.pickInfoLabel}>거리:</Text>
                   <Text style={styles.pickDistance}>{course.distance}</Text>
                   <Text style={styles.pickSeparator}>|</Text>
-                  <Icon name="clock-outline" size={screenWidth * 0.03} color="#797982" />
+                  <Text style={styles.pickInfoLabel}>시간:</Text>
                   <Text style={styles.pickDistance}>{course.duration}</Text>
                 </View>
                 <View style={styles.pickTagsRow}>
@@ -524,7 +539,7 @@ export default function MainScreen({ navigation }) {
                         },
                       ]}
                     >
-                      쓰레기 {course.trashLevel}
+                      쓰레기 {course.trashCount || 0}개
                     </Text>
                   </View>
                   <View style={[styles.pickTag, { backgroundColor: "#E3F2FD" }]}>
@@ -586,10 +601,20 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 5,
   },
+  userIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F5F5F5",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
   userIcon: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
+    width: 20,
+    height: 20,
+    tintColor: "#333",
   },
 
   // Top Section Styles
@@ -613,16 +638,19 @@ const styles = StyleSheet.create({
   bannerTextContainer: {
     position: "absolute",
     top: PADDING_H,
-    left: PADDING_H / 2,
-    right: PADDING_H / 2,
+    left: PADDING_H,
+    right: PADDING_H,
   },
   bannerText: {
     color: "#fff",
     fontSize: screenWidth * 0.038,
     fontWeight: "700",
-    padding: PADDING_H / 2,
+    paddingLeft: PADDING_H / 2,
+    paddingRight: PADDING_H / 2,
+    paddingTop: PADDING_H / 2,
+    paddingBottom: PADDING_H / 2,
     borderRadius: 8,
-    textAlign: "center",
+    textAlign: "left",
     lineHeight: screenWidth * 0.05,
   },
   rightCards: {
@@ -635,8 +663,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(76, 175, 80, 0.05)",
     borderRadius: 12,
-    padding: PADDING_H / 2,
-    marginBottom: PADDING_H / 3,
+    padding: PADDING_H / 2.5,
+    marginBottom: PADDING_H / 2,
     borderWidth: 1,
     borderColor: "rgba(76, 175, 80, 0.1)",
   },
@@ -647,10 +675,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   cardTitle: {
-    fontSize: screenWidth * 0.028,
-    fontWeight: "600",
-    color: "#666",
+    fontSize: screenWidth * 0.027, // 10px 상당
+    fontWeight: "700",
+    color: "#AAB2C8",
     flex: 1,
+    lineHeight: screenWidth * 0.054, // 20px 상당
   },
   statusIndicator: {
     width: 8,
@@ -667,13 +696,13 @@ const styles = StyleSheet.create({
     fontSize: screenWidth * 0.032,
     fontWeight: "700",
     color: "#333",
-    marginBottom: PADDING_H / 3,
+    marginBottom: PADDING_H / 4,
   },
   progressSection: {
-    gap: PADDING_H / 4,
+    gap: PADDING_H / 6,
   },
   progressItem: {
-    gap: 4,
+    gap: 2,
   },
   progressHeader: {
     flexDirection: "row",
@@ -681,7 +710,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   progressLabel: {
-    fontSize: screenWidth * 0.025,
+    fontSize: screenWidth * 0.04,
     color: "#666",
     fontWeight: "500",
   },
@@ -689,6 +718,13 @@ const styles = StyleSheet.create({
     fontSize: screenWidth * 0.025,
     color: "#333",
     fontWeight: "600",
+  },
+  trashCountText: {
+    fontSize: screenWidth * 0.02,
+    color: "#333",
+    fontWeight: "200",
+    textAlign: "center",
+    lineHeight: screenWidth * 0.03,
   },
 
   // Progress Bar Styles
@@ -704,23 +740,117 @@ const styles = StyleSheet.create({
   // Today Plogging Card
   todayPloggingCard: {
     flex: 1,
-    backgroundColor: "rgba(121,121,130,0.08)",
-    borderRadius: 12,
-    padding: PADDING_H / 2,
-    justifyContent: "center",
+    backgroundColor: "rgba(121, 121, 130, 0.1)",
+    borderRadius: 10,
+    padding: PADDING_H / 3,
+    justifyContent: "flex-start",
+  },
+  todayCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  cardTitle: {
+    fontSize: screenWidth * 0.027, // 10px 상당
+    fontWeight: "700",
+    color: "#AAB2C8",
+    lineHeight: screenWidth * 0.054, // 20px 상당
+  },
+  trashTitle: {
+    fontSize: screenWidth * 0.024, // 크기 증가 (6px -> 9px 상당)
+    fontWeight: "700",
+    color: "#AAB2C8",
+    lineHeight: screenWidth * 0.054, // 20px 상당
   },
   loadingContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: PADDING_H / 3,
+    gap: PADDING_H / 1.5,
+    flex: 1,
   },
   loadingText: {
-    fontSize: screenWidth * 0.03,
+    fontSize: screenWidth * 0.05,
+    alignItems: 4,
     color: "#666",
   },
   todayDataContainer: {
-    gap: 4,
+    flex: 1,
+    justifyContent: "flex-start",
+  },
+  todayMainRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    flex: 1,
+    paddingHorizontal: 2,
+  },
+  leftSection: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  rightSection: {
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 70,
+  },
+  timeText: {
+    fontSize: screenWidth * 0.032, // 12px 상당
+    fontWeight: "700",
+    color: "#333333",
+    lineHeight: screenWidth * 0.054, // 20px 상당
+    marginBottom: 2,
+  },
+  distanceText: {
+    fontSize: screenWidth * 0.032, // 12px 상당
+    fontWeight: "700",
+    color: "#333333",
+    lineHeight: screenWidth * 0.054, // 20px 상당
+  },
+  trashCountBig: {
+    fontSize: screenWidth * 0.08,
+    fontWeight: "800",
+    color: "#333",
+    lineHeight: screenWidth * 0.09,
+  },
+  trashCountInline: {
+    fontSize: screenWidth * 0.038, // 14px 상당
+    fontWeight: "700",
+    color: "#333333",
+    textAlign: "center",
+    lineHeight: screenWidth * 0.054, // 20px 상당
+  },
+  trashLabel: {
+    fontSize: screenWidth * 0.03,
+    color: "#666",
+    textAlign: "center",
+    marginTop: -4,
+  },
+  noTodayDataContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 16,
+  },
+  noTodayDataText: {
+    fontSize: screenWidth * 0.032,
+    fontWeight: "600",
+    color: "#666",
+    textAlign: "center",
+    lineHeight: screenWidth * 0.04,
+    marginBottom: 4,
+  },
+  noTodayDataSubText: {
+    fontSize: screenWidth * 0.028,
+    color: "#999",
+    textAlign: "center",
+  },
+  subTitle: {
+    fontSize: screenWidth * 0.025,
+    color: "#666",
+    textAlign: "left",
+    marginTop: 8,
   },
   cardDetail: {
     fontSize: screenWidth * 0.032,
@@ -761,7 +891,7 @@ const styles = StyleSheet.create({
   iconLabel: {
     fontSize: screenWidth * 0.032,
     fontWeight: "600",
-    color: "#797982",
+    color: "#000000ff",
     textAlign: "center",
   },
 
@@ -769,7 +899,6 @@ const styles = StyleSheet.create({
   missionBanner: {
     marginTop: screenHeight * 0.02,
     marginHorizontal: PADDING_H,
-    borderRadius: 12,
     overflow: "hidden",
     height: BANNER_HEIGHT,
   },
@@ -870,6 +999,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
     marginBottom: 6,
+  },
+  pickInfoLabel: {
+    fontSize: screenWidth * 0.028,
+    color: "#797982",
+    fontWeight: "500",
+    marginRight: 4,
   },
   pickDistance: {
     fontSize: screenWidth * 0.028,
