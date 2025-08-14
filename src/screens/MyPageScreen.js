@@ -4,12 +4,12 @@ import { useState } from "react"
 import { View, Text, TouchableOpacity, StyleSheet, Image, SafeAreaView, ScrollView, Dimensions } from "react-native"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
-
+import { launchImageLibrary } from 'react-native-image-picker' // 이미지 경로를 올바르게 설정해야 합니다.  
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 export default function MyPageScreen({ navigation }) {
   const [modalVisible, setModalVisible] = useState(false)
-
+  const [profileImage, setProfileImage] = useState(require("../assets/profile.png")) // 기본 프로필 이미지
   // 추후 DB에서 받아올 유저 데이터
   const user = {
     nickname: "쓰레기줍기장인",
@@ -28,6 +28,27 @@ export default function MyPageScreen({ navigation }) {
     })
   }
 
+  const handleChangeProfilePhoto = () => { 
+    const options = {
+      mediaType: 'photo',
+      quality: 1,
+        selectionLimit: 1,
+
+    };
+    launchImageLibrary(options, (response) => {
+      if (response.didCancel) {
+        console.log('사용자가 사진 선택을 취소했습니다.');
+      } else if (response.error) {
+        console.error('사진 선택 중 오류 발생:', response.error);
+      }
+      else if (response.assets && response.assets.length > 0) {
+        const selectedImageUri = response.assets[0].uri;
+        setProfileImage({ uri: selectedImageUri});
+        // 여기에서 선택된 이미지를 서버에 업로드하거나 상태에 저장하는 로직을 추가하세요.
+        console.log('선택된 이미지:', selectedImageUri);
+      }
+    });
+  } 
   return (
     <SafeAreaView style={styles.container}>
       {/* 헤더 */}
@@ -42,8 +63,8 @@ export default function MyPageScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* 프로필 이미지 섹션 */}
         <View style={styles.profileSection}>
-          <Image source={require("../assets/profile.png")} style={styles.profileImage} />
-          <TouchableOpacity style={styles.changePhotoButton}>
+          <Image source={profileImage} style={styles.profileImage} />
+          <TouchableOpacity style={styles.changePhotoButton} onPress={handleChangeProfilePhoto}>
             <Text style={styles.changePhotoText}>프로필 사진 바꾸기</Text>
           </TouchableOpacity>
         </View>
