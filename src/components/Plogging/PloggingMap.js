@@ -120,13 +120,22 @@ const PloggingMap = ({
         
         {/* 경로 표시 - 더 부드러운 라인 */}
         {routeCoordinates && routeCoordinates.length > 1 && (
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeColor="#418663"
-            strokeWidth={5}
-            lineJoin="round"
-            lineCap="round"
-          />
+          (() => {
+            console.log('[PloggingMap] 🗺️ Polyline 렌더링:', {
+              좌표개수: routeCoordinates.length,
+              시작점: routeCoordinates[0],
+              끝점: routeCoordinates[routeCoordinates.length - 1]
+            });
+            return (
+              <Polyline
+                coordinates={routeCoordinates}
+                strokeColor="#418663"
+                strokeWidth={5}
+                lineJoin="round"
+                lineCap="round"
+              />
+            );
+          })()
         )}
         
         {/* 쓰레기 위치 마커 */}

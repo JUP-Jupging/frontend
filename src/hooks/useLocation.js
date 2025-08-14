@@ -130,6 +130,12 @@ export const useLocation = () => {
         setRouteCoordinates(prevRoute => {
           const newRoute = [...prevRoute, newCoordinate];
           
+          console.log('[useLocation] 📍 경로 좌표 추가:', {
+            이전좌표수: prevRoute.length,
+            새좌표수: newRoute.length,
+            새위치: newCoordinate
+          });
+          
           // 거리 계산 (첫 번째 좌표가 아닌 경우에만)
           if (prevRoute.length > 0) {
             const lastCoordinate = prevRoute[prevRoute.length - 1];
@@ -139,11 +145,24 @@ export const useLocation = () => {
               latitude,
               longitude
             );
+            
+            console.log('[useLocation] 📏 거리 계산:', {
+              이전위치: lastCoordinate,
+              현재위치: newCoordinate,
+              계산된거리: distance.toFixed(2) + 'm'
+            });
+            
             // 3미터 이상 이동했을 때만 거리 추가 및 경로 업데이트 (GPS 오차 방지)
             if (distance >= 3) {
-              setTotalDistance(prev => prev + distance);
+              console.log('[useLocation] ✅ 의미있는 이동 감지 - 경로 업데이트');
+              setTotalDistance(prev => {
+                const newTotal = prev + distance;
+                console.log('[useLocation] 📊 총 거리 업데이트:', prev.toFixed(2) + 'm → ' + newTotal.toFixed(2) + 'm');
+                return newTotal;
+              });
               return newRoute;
             } else {
+              console.log('[useLocation] ⚠️ 미세한 이동 - 마지막 좌표만 업데이트');
               // 3미터 미만이면 마지막 좌표만 업데이트 (부드러운 라인을 위해)
               const updatedRoute = [...prevRoute];
               updatedRoute[updatedRoute.length - 1] = newCoordinate;
@@ -151,6 +170,7 @@ export const useLocation = () => {
             }
           }
           
+          console.log('[useLocation] 🎯 첫 번째 좌표 추가');
           return newRoute;
         });
       },

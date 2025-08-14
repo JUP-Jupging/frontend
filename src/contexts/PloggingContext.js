@@ -26,11 +26,13 @@ export const PloggingProvider = ({ children }) => {
       if (ploggingHook.status === "running" || ploggingHook.status === "paused") {
         if (nextAppState === 'background' || nextAppState === 'inactive') {
           console.log('[PloggingContext] ✅ 백그라운드 모드 활성화 - 플로깅 세션 유지');
+          console.log('[PloggingContext] 📍 백그라운드에서도 GPS 추적과 polyline 업데이트 계속됨');
           setIsBackgroundMode(true);
           // 플로깅 중일 때는 백그라운드에서도 모든 기능 유지
           // GPS 추적과 타이머가 계속 실행됨
         } else if (nextAppState === 'active') {
           console.log('[PloggingContext] ✅ 포그라운드 복귀');
+          console.log('[PloggingContext] 📍 백그라운드에서 수집된 경로 데이터 확인 가능');
           setIsBackgroundMode(false);
           // GPS 추적 재활성화 (혹시 중단되었을 경우를 대비)
           if (ploggingHook.status === "running") {
