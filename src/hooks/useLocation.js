@@ -104,10 +104,20 @@ export const useLocation = () => {
     
     const id = Geolocation.watchPosition(
       (position) => {
-        const { latitude, longitude } = position.coords;
-        const newCoordinate = { latitude, longitude };
+        const { latitude, longitude, accuracy, speed } = position.coords;
+        const newCoordinate = { latitude, longitude, accuracy, speed };
         
-        console.log('[useLocation] 새 위치 수신:', newCoordinate);
+        console.log('[useLocation] 새 위치 수신:', { 
+          ...newCoordinate, 
+          정확도: accuracy?.toFixed(1) + 'm',
+          속도: speed?.toFixed(1) + 'm/s'
+        });
+
+        // GPS 정확도가 너무 낮으면 무시 (50미터 이상 오차)
+        if (accuracy && accuracy > 50) {
+          console.log('[useLocation] ⚠️ GPS 정확도 낮음 - 위치 무시:', accuracy.toFixed(1) + 'm');
+          return;
+        }
 
         // 현재 위치 업데이트
         setCurrentLocation(prev => ({
@@ -118,7 +128,6 @@ export const useLocation = () => {
 
         // 맵 카메라를 새 위치로 이동 (플로깅 중일 때만)
         if (isRunning && mapRef.current) {
-          console.log('[useLocation] 플로깅 중 - 맵 카메라 이동');
           mapRef.current.animateToRegion({
             latitude,
             longitude,
@@ -128,14 +137,6 @@ export const useLocation = () => {
         }
 
         setRouteCoordinates(prevRoute => {
-          const newRoute = [...prevRoute, newCoordinate];
-          
-          console.log('[useLocation] 📍 경로 좌표 추가:', {
-            이전좌표수: prevRoute.length,
-            새좌표수: newRoute.length,
-            새위치: newCoordinate
-          });
-          
           // 거리 계산 (첫 번째 좌표가 아닌 경우에만)
           if (prevRoute.length > 0) {
             const lastCoordinate = prevRoute[prevRoute.length - 1];
@@ -149,42 +150,46 @@ export const useLocation = () => {
             console.log('[useLocation] 📏 거리 계산:', {
               이전위치: lastCoordinate,
               현재위치: newCoordinate,
-              계산된거리: distance.toFixed(2) + 'm'
+              계산된거리: distance.toFixed(2) + 'm',
+              GPS정확도: accuracy?.toFixed(1) + 'm'
             });
             
-            // 3미터 이상 이동했을 때만 거리 추가 및 경로 업데이트 (GPS 오차 방지)
-            if (distance >= 3) {
-              console.log('[useLocation] ✅ 의미있는 이동 감지 - 경로 업데이트');
+            // 더 세밀한 거리 체크: 1.5미터 이상 이동했을 때만 새로운 점 추가
+            if (distance >= 1.5) {
+              console.log('[useLocation] ✅ 의미있는 이동 감지 - 새 좌표 추가');
+              const newRoute = [...prevRoute, newCoordinate];
+              
               setTotalDistance(prev => {
                 const newTotal = prev + distance;
                 console.log('[useLocation] 📊 총 거리 업데이트:', prev.toFixed(2) + 'm → ' + newTotal.toFixed(2) + 'm');
                 return newTotal;
               });
+              
               return newRoute;
             } else {
-              console.log('[useLocation] ⚠️ 미세한 이동 - 마지막 좌표만 업데이트');
-              // 3미터 미만이면 마지막 좌표만 업데이트 (부드러운 라인을 위해)
-              const updatedRoute = [...prevRoute];
-              updatedRoute[updatedRoute.length - 1] = newCoordinate;
-              return updatedRoute;
+              console.log('[useLocation] ⚠️ 미세한 이동 (' + distance.toFixed(2) + 'm) - 무시');
+              // 미세한 움직임은 무시하여 polyline이 떨리는 것을 방지
+              return prevRoute;
             }
           }
           
           console.log('[useLocation] 🎯 첫 번째 좌표 추가');
-          return newRoute;
+          return [newCoordinate];
         });
       },
       (error) => {
-        console.error('위치 추적 오류:', error);
+        console.error('[useLocation] 위치 추적 오류:', error);
         Alert.alert('위치 오류', 'GPS 신호가 약합니다. 야외로 이동해주세요.');
       },
       {
         enableHighAccuracy: true,
-        distanceFilter: 2,
-        interval: 1000,
-        fastestInterval: 500,
-        timeout: 15000,
-        maximumAge: 5000,
+        distanceFilter: 1, // 1미터마다 업데이트 (더 세밀한 추적)
+        interval: 2000, // 2초마다 위치 확인
+        fastestInterval: 1000, // 최소 1초 간격
+        timeout: 20000, // 타임아웃 시간 증가
+        maximumAge: 3000, // 캐시된 위치 사용 시간 단축
+        forceRequestLocation: true, // 강제로 새 위치 요청
+        showLocationDialog: true, // 위치 서비스 활성화 다이얼로그 표시
       }
     );
 

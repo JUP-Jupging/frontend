@@ -16,7 +16,7 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons"
 
 // ✅ API 모듈 임포트 (경로는 프로젝트 구조에 맞춰 조정하세요)
 // 현재 파일이 src/screens에 있고, trails.js가 src/API에 있다면 아래 경로가 맞습니다.
-import { getTrails, searchTrails } from "../API/trails"
+import { getTrails, searchTrails, testConnection } from "../API/trails"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -47,12 +47,28 @@ export default function WalkSearchScreen({ navigation }) {
   const debounceRef = useRef(null)
 
   /**
-   * 👉 컴포넌트 마운트 시점에 전체 산책로 목록을 1회 로드합니다.
-   * - UI: 최근 목록 영역에 사용
-   * - 실패 시 콘솔에만 남기고 빈 목록 유지(화면은 기존 Empty UI가 처리)
+   * 👉 컴포넌트 마운트 시점에 초기 설정만 진행합니다.
+   * - 처음엔 검색 결과 없음 (빈 상태)
+   * - 사용자가 검색하거나 필터를 적용할 때만 API 호출
    */
   useEffect(() => {
-    loadTrailsWithFilters()
+    const initializeScreen = async () => {
+      console.log("🚀 [WalkSearchScreen] 화면 초기화 시작")
+      console.log("- 초기 상태: 검색 결과 없음, 사용자 입력 대기 중")
+      
+      // 네트워크 연결 테스트만 진행 (실제 데이터는 로드하지 않음)
+      const isConnected = await testConnection()
+      if (!isConnected) {
+        console.warn("⚠️ [WalkSearchScreen] 네트워크 연결 실패")
+      } else {
+        console.log("✅ [WalkSearchScreen] 네트워크 연결 성공")
+      }
+      
+      // 초기에는 데이터를 로드하지 않음 - 사용자가 검색하거나 필터 적용 시에만 로드
+      console.log("📝 [WalkSearchScreen] 초기화 완료 - 사용자 입력 대기 중")
+    }
+    
+    initializeScreen()
     
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -66,16 +82,29 @@ export default function WalkSearchScreen({ navigation }) {
     let isMounted = true
     try {
       setLoading(true)
-      console.log("산책로 목록 로드 시작...", appliedFilters)
+      console.log("🏞️ [WalkSearchScreen] 산책로 목록 로드 시작...")
+      console.log("- 적용된 필터:", appliedFilters)
+      
       const data = await getTrails(appliedFilters)
-      console.log("받은 데이터:", data)
+      
+      console.log("✅ [WalkSearchScreen] 산책로 목록 로드 성공!")
+      console.log("- 받은 데이터:", data)
+      console.log("- 데이터 개수:", data?.length)
+      
       if (isMounted) {
         setAllCourses(Array.isArray(data) ? data : [])
+        console.log("- 상태 업데이트 완료, 총", Array.isArray(data) ? data.length : 0, "개 산책로")
       }
     } catch (e) {
-      console.error("산책로 로드 실패:", e?.response?.data || e?.message)
+      console.error("❌ [WalkSearchScreen] 산책로 로드 실패:")
+      console.error("- 에러 객체:", e)
+      console.error("- 에러 메시지:", e?.message)
+      console.error("- 응답 데이터:", e?.response?.data)
+      console.error("- 응답 상태:", e?.response?.status)
+      
       if (isMounted) {
         setAllCourses([]) // 실패 시 빈 배열
+        console.log("- 빈 배열로 상태 업데이트")
       }
     } finally {
       if (isMounted) setLoading(false)
@@ -114,19 +143,33 @@ export default function WalkSearchScreen({ navigation }) {
     if (!q) {
       setSearchResults([])
       setShowResults(false)
+      console.log("🔍 [WalkSearchScreen] 검색어가 비어있음, 검색 결과 초기화")
       return
     }
 
     try {
       setLoading(true)
       setShowResults(true)
-      console.log("검색 실행:", q)
+      console.log("🔍 [WalkSearchScreen] 검색 실행 시작:")
+      console.log("- 검색어:", q)
+      
       const data = await searchTrails(q)
-      console.log("검색 결과:", data)
+      
+      console.log("✅ [WalkSearchScreen] 검색 성공!")
+      console.log("- 검색 결과:", data)
+      console.log("- 결과 개수:", data?.length)
+      
       setSearchResults(Array.isArray(data) ? data : [])
+      console.log("- 검색 결과 상태 업데이트 완료")
     } catch (e) {
-      console.error("검색 실패:", e?.response?.data || e?.message)
+      console.error("❌ [WalkSearchScreen] 검색 실패:")
+      console.error("- 에러 객체:", e)
+      console.error("- 에러 메시지:", e?.message)
+      console.error("- 응답 데이터:", e?.response?.data)
+      console.error("- 응답 상태:", e?.response?.status)
+      
       setSearchResults([]) // 실패 시 빈 배열
+      console.log("- 빈 배열로 검색 결과 상태 업데이트")
     } finally {
       setLoading(false)
     }
@@ -153,7 +196,7 @@ export default function WalkSearchScreen({ navigation }) {
   // 검색 결과 아이템 클릭 → 상세 화면으로 이동 (기존 흐름 유지)
   const handleResultPress = (item) => {
     // 백엔드에서 내려오는 키 이름에 맞춰 trailId 사용
-    navigation.navigate("CourseDetail", { courseId: item.trailId || item.id })
+    navigation.navigate("CourseDetail", { courseId: item.trailId || item.id, trailId: item.trailId || item.id })
   }
 
   // 🔹 검색 결과 아이템 렌더링 (API 응답 데이터 구조에 맞춰 필드 매핑)
@@ -179,17 +222,13 @@ export default function WalkSearchScreen({ navigation }) {
           <View style={styles.infoItem}>
             <Icon name="map-marker" size={screenWidth * 0.03} color="#666" />
             <Text style={styles.infoText}>
-              {item.distance ? `${item.distance}km` : 
-               item.distanceText || 
-               (item.distanceKm ? `${item.distanceKm}km` : "거리 정보 없음")}
+              {item.length ? `${item.length}` : "거리 정보 없음"}
             </Text>
           </View>
           <View style={styles.infoItem}>
             <Icon name="clock-outline" size={screenWidth * 0.03} color="#666" />
             <Text style={styles.infoText}>
-              {item.duration ? `${item.duration}분` : 
-               item.durationText || 
-               (item.durationMinutes ? `${item.durationMinutes}분` : "소요시간 정보 없음")}
+              {item.trackTime ? `${item.trackTime}` : "소요시간 정보 없음"}
             </Text>
           </View>
           <View style={styles.infoItem}>

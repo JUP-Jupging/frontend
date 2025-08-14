@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import {
   View,
   Text,
@@ -102,6 +102,7 @@ export default function PloggingStartScreen({ navigation }) {
   const [selectedTrash, setSelectedTrash] = useState(null)             // 선택된 쓰레기 정보
   const [isLoading, setIsLoading] = useState(false)                    // 로딩 상태
   const [mapReady, setMapReady] = useState(false)                      // 지도 초기화 완료 여부
+  const [capturedImage, setCapturedImage] = useState(null)            // 캡처된 지도 이미지
 
   // 🔍 백그라운드 모드에서 polyline 업데이트 디버깅
   useEffect(() => {
@@ -256,22 +257,115 @@ export default function PloggingStartScreen({ navigation }) {
     setModalVisible(true);
   }
 
-  const confirmEnd = () => {
+  // 🗺️ 지도 캡처 함수 - 전체 polyline이 보이도록 자동 줌 조정
+  const captureMap = async () => {
+    try {
+      if (!mapRef.current) {
+        console.log('[PloggingStartScreen] ⚠️ 지도 참조가 없음');
+        return null;
+      }
+
+      if (!routeCoordinates || routeCoordinates.length === 0) {
+        console.log('[PloggingStartScreen] ⚠️ 경로 좌표가 없음');
+        return null;
+      }
+
+      console.log('[PloggingStartScreen] 📸 지도 캡처 시작...');
+      
+      // 전체 경로를 포함하는 영역 계산
+      const latitudes = routeCoordinates.map(coord => coord.latitude);
+      const longitudes = routeCoordinates.map(coord => coord.longitude);
+      
+      const minLat = Math.min(...latitudes);
+      const maxLat = Math.max(...latitudes);
+      const minLng = Math.min(...longitudes);
+      const maxLng = Math.max(...longitudes);
+      
+      // 경로 중심점 계산
+      const centerLat = (minLat + maxLat) / 2;
+      const centerLng = (minLng + maxLng) / 2;
+      
+      // 경로 범위에 패딩 추가 (20% 여유공간)
+      const latDelta = Math.max((maxLat - minLat) * 1.2, 0.005); // 최소 델타 값 설정
+      const lngDelta = Math.max((maxLng - minLng) * 1.2, 0.005);
+
+      // 지도를 전체 경로가 보이도록 조정
+      await mapRef.current.animateToRegion({
+        latitude: centerLat,
+        longitude: centerLng,
+        latitudeDelta: latDelta,
+        longitudeDelta: lngDelta,
+      }, 1000);
+
+      console.log('[PloggingStartScreen] 📍 지도 영역 조정 완료:', {
+        center: { lat: centerLat, lng: centerLng },
+        delta: { lat: latDelta, lng: lngDelta },
+        routePoints: routeCoordinates.length
+      });
+      
+      // 지도 애니메이션 완료 대기
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // 지도 캡처 실행
+      const snapshot = await mapRef.current.takeSnapshot({
+        width: Math.floor(screenWidth * 0.9),
+        height: Math.floor(screenHeight * 0.5),
+        format: 'png',
+        quality: 0.8,
+        result: 'base64'
+      });
+
+      if (snapshot) {
+        console.log('[PloggingStartScreen] ✅ 지도 캡처 완료');
+        return `data:image/png;base64,${snapshot}`;
+      } else {
+        console.log('[PloggingStartScreen] ⚠️ 지도 캡처 결과가 없음');
+        return null;
+      }
+    } catch (error) {
+      console.error('[PloggingStartScreen] ❌ 지도 캡처 실패:', error);
+      return null;
+    }
+  }
+
+  const confirmEnd = async () => {
     console.log('[PloggingStartScreen] 플로깅 종료 확정')
     try {
       setModalVisible(false);
       
+      // 지도 캡처
+      console.log('[PloggingStartScreen] 📸 지도 캡처 중...');
+      const capturedMapImage = await captureMap();
+      
       // 플로깅 결과 데이터 생성 및 상태 초기화
       const ploggingResult = endPlogging();
 
-      console.log('[PloggingStartScreen] 플로깅 결과:', ploggingResult);
+      // 캡처된 이미지와 추가 정보를 결과에 추가
+      const finalResult = {
+        ...ploggingResult,
+        mapImage: capturedMapImage, // 캡처된 지도 이미지
+        routeImage: capturedMapImage, // 추후 별도 생성 가능
+        routeName: route.params?.routeName || route.params?.courseName || "자유 플로깅", // 선택한 산책로 이름
+        routeLocation: route.params?.routeLocation || route.params?.location || "플로깅 경로", // 산책로 위치
+      };
+
+      console.log('[PloggingStartScreen] 플로깅 결과:', {
+        ...finalResult,
+        mapImage: capturedMapImage ? '✅ 캡처됨' : '❌ 캡처 실패'
+      });
 
       // 결과 화면으로 이동
       navigation.navigate("PloggingRecord", {
-        result: ploggingResult,
+        result: finalResult,
       });
     } catch (error) {
       console.error('[PloggingStartScreen] 플로깅 종료 처리 오류:', error);
+      
+      // 에러 발생시에도 결과 화면으로 이동 (이미지 없이)
+      const ploggingResult = endPlogging();
+      navigation.navigate("PloggingRecord", {
+        result: ploggingResult,
+      });
     }
   }
 
@@ -326,6 +420,11 @@ export default function PloggingStartScreen({ navigation }) {
     }
   };
 
+  const handleGoToMyPlogging = () => {
+    console.log('[PloggingStartScreen] 마이플로깅기록으로 이동');
+    navigation.navigate("내 플로깅 기록");
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* 헤더 */}
@@ -337,37 +436,56 @@ export default function PloggingStartScreen({ navigation }) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>플로깅</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Icon name="help-outline" size={20} color="#418663" />
+          <TouchableOpacity style={styles.headerButton} onPress={handleGoToMyPlogging}>
+            <Icon name="person" size={24} color="#418663" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* 지도 영역 */}
-      <PloggingMap
-        mapRef={mapRef}
-        currentLocation={currentLocation}
-        routeCoordinates={routeCoordinates}
-        trashLocations={trashLocations}
-        isLoading={isLoading}
-        mapReady={mapReady}
-        onTrashMarkerPress={handleTrashMarkerPress}
-      />
-
-      {/* 하단 컨트롤 */}
-      <PloggingControls
-        status={status}
-        time={time}
-        trashCount={trashCount}
-        totalDistance={totalDistance}
-        formatTime={formatTime}
-        formatDistance={formatDistance}
-        onStart={handleStart}
-        onPause={handlePause}
-        onResume={handleResume}
-        onEnd={handleEnd}
-        onGoToMain={handleGoToMain}
-      />
+      {/* 전체 화면 지도 */}
+      <View style={styles.mapContainer}>
+        <PloggingMap
+          mapRef={mapRef}
+          currentLocation={currentLocation}
+          routeCoordinates={routeCoordinates}
+          trashLocations={trashLocations}
+          isLoading={isLoading}
+          mapReady={mapReady}
+          onTrashMarkerPress={handleTrashMarkerPress}
+        />
+        
+        {/* 지도 위 오버레이 컨트롤들 */}
+        {status === "idle" ? (
+          // 🎯 플로깅 시작 전 - 지도 위에 시작 버튼들 오버레이
+          <View style={styles.overlayControls}>
+            <TouchableOpacity 
+              style={styles.overlayStartButton} 
+              onPress={handleStart}
+            >
+              <Text style={styles.overlayStartButtonText}>시작</Text>
+            </TouchableOpacity>
+            
+            
+          </View>
+        ) : (
+          // 🎯 플로깅 진행 중 - 기존 하단 컨트롤 유지
+          <View style={styles.runningControls}>
+            <PloggingControls
+              status={status}
+              time={time}
+              trashCount={trashCount}
+              totalDistance={totalDistance}
+              formatTime={formatTime}
+              formatDistance={formatDistance}
+              onStart={handleStart}
+              onPause={handlePause}
+              onResume={handleResume}
+              onEnd={handleEnd}
+              onGoToMain={handleGoToMain}
+            />
+          </View>
+        )}
+      </View>
 
       {/* 종료 확인 모달 */}
       <CommonModal
@@ -397,6 +515,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   header: {
+
+        paddingTop: screenHeight * 0.05,
+
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -405,6 +526,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
+    zIndex: 10, // 헤더가 지도 위에 표시되도록
   },
   headerTitle: {
     fontSize: 18,
@@ -418,5 +540,73 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: 5,
     marginLeft: 10,
+  },
+  
+  // 🗺️ 전체 화면 지도 컨테이너
+  mapContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  
+  // 🎯 지도 위 오버레이 컨트롤 (플로깅 시작 전)
+  overlayControls: {
+    position: 'absolute',
+    bottom: screenHeight * 0.1,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  overlayStartButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#418663",
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 32,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  overlayStartButtonText: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "500",
+  },
+  overlayMainButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderWidth: 2,
+    borderColor: "#418663",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  overlayMainButtonText: {
+    color: "#418663",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  
+  // 🎯 플로깅 진행 중 컨트롤 (기존 하단 위치)
+  runningControls: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
   },
 })

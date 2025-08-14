@@ -1,3 +1,3 @@
 // apiconfig.js
-const BASE_URL = 'https://zubging';
+const BASE_URL = 'https://api.jupging.store';
 export default BASE_URL;

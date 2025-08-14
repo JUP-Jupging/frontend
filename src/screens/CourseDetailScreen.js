@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
+import { getTrailDetail } from "../API/trails"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -71,32 +72,58 @@ export default function CourseDetailScreen({ navigation, route }) {
   const fetchCourseDetail = async () => {
     try {
       setLoading(true)
+      const courseId = route.params?.courseId || route.params?.trailId
 
-      // 실제 API 호출 (예시)
-      // const courseId = route.params?.courseId || 1;
-      // const response = await fetch(`https://your-api.com/api/courses/${courseId}`);
-      // const data = await response.json();
+      console.log("📋 [CourseDetailScreen] 코스 상세 정보 로드 시작:")
+      console.log("- route.params:", route.params)
+      console.log("- courseId:", courseId)
 
-      // 시뮬레이션: 80% 확률로 DB 데이터 존재
-      const hasDataInDB = Math.random() > 0.2
-
-      // 1.5초 로딩 시뮬레이션
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      if (hasDataInDB) {
-        // DB에 데이터가 있는 경우
-        setCourseData(DUMMY_COURSE_DATA)
-      } else {
-        // DB에 데이터가 없는 경우 기본 더미 데이터
-        setCourseData({
-          ...DUMMY_COURSE_DATA,
-          name: "데이터를 불러올 수 없습니다",
-          description: "네트워크 연결을 확인해주세요.",
-        })
+      if (!courseId) {
+        console.error("❌ [CourseDetailScreen] 코스 ID가 없습니다")
+        setCourseData(null)
+        return
       }
+
+      const data = await getTrailDetail(courseId)
+      
+      console.log("✅ [CourseDetailScreen] 코스 상세 정보 로드 성공!")
+      console.log("- 원본 데이터:", data)
+      
+      // API 응답 데이터를 화면에서 사용할 형태로 변환
+      const transformedData = {
+        id: data.trailId,
+        name: data.trailName || "산책로 이름 없음",
+        address: data.lotNumberAddress || "주소 정보 없음",
+        region: data.cityName || "지역 정보 없음",
+        duration: data.trackTime || "소요시간 정보 없음",
+        length: data.length || "거리 정보 없음",
+        level: data.difficultyLevel || "난이도 정보 없음",
+        images: [], // 이미지는 별도 처리 필요
+        mapImage: null, // 지도 이미지는 별도 처리 필요
+        toilet: data.toiletDescription || "화장실 정보 없음",
+        sunsetInfo: data.optionDescription || "추가 정보 없음",
+        tip: data.amenityDescription || "편의시설 정보 없음",
+        description: data.descriptionDetail || "상세 설명 없음",
+        trashReports: [], // 쓰레기 신고는 별도 API 필요
+        // 추가 정보
+        trailTypeName: data.trailTypeName,
+        spotLatitude: data.spotLatitude,
+        spotLongitude: data.spotLongitude,
+        reportCount: data.reportCount
+      }
+      
+      console.log("🔄 [CourseDetailScreen] 데이터 변환 완료:")
+      console.log("- 변환된 데이터:", transformedData)
+      
+      setCourseData(transformedData)
+      console.log("- 상태 업데이트 완료")
     } catch (error) {
-      console.error("Failed to fetch course detail:", error)
-      setCourseData(DUMMY_COURSE_DATA)
+      console.error("❌ [CourseDetailScreen] 코스 상세 정보 로드 실패:")
+      console.error("- 에러 객체:", error)
+      console.error("- 에러 메시지:", error?.message)
+      console.error("- 응답 데이터:", error?.response?.data)
+      console.error("- 응답 상태:", error?.response?.status)
+      setCourseData(null)
     } finally {
       setLoading(false)
     }
@@ -120,6 +147,23 @@ export default function CourseDetailScreen({ navigation, route }) {
   const goToTrashInfo = () => navigation.navigate("TrashCanInfo")
   const goBack = () => navigation.goBack()
   const goToMyPloggingRecords = () => navigation.navigate("내 플로깅 기록")
+  
+  const startPlogging = () => {
+    if (courseData) {
+      navigation.navigate("PloggingStart", {
+        selectedRoute: {
+          id: courseData.id,
+          name: courseData.name,
+          location: courseData.address,
+          difficulty: courseData.level,
+          distance: courseData.length,
+          duration: courseData.duration,
+          latitude: courseData.spotLatitude,
+          longitude: courseData.spotLongitude
+        }
+      })
+    }
+  }
 
   if (loading) {
     return (
@@ -211,7 +255,7 @@ export default function CourseDetailScreen({ navigation, route }) {
           <View style={styles.detailItem}>
             <View style={styles.detailHeader}>
               <Icon name="weather-sunset" size={screenWidth * 0.05} color="#FF9800" />
-              <Text style={styles.detailLabel}>해질 정보</Text>
+              <Text style={styles.detailLabel}>옵션 정보</Text>
             </View>
             <Text style={styles.detailText}>{courseData.sunsetInfo}</Text>
           </View>
@@ -224,6 +268,37 @@ export default function CourseDetailScreen({ navigation, route }) {
             </View>
             <Text style={styles.detailText}>{courseData.toilet}</Text>
           </View>
+
+          {/* Amenity Info */}
+          <View style={styles.detailItem}>
+            <View style={styles.detailHeader}>
+              <Icon name="information" size={screenWidth * 0.05} color="#4CAF50" />
+              <Text style={styles.detailLabel}>편의시설 정보</Text>
+            </View>
+            <Text style={styles.detailText}>{courseData.tip}</Text>
+          </View>
+
+          {/* Trail Type */}
+          {courseData.trailTypeName && (
+            <View style={styles.detailItem}>
+              <View style={styles.detailHeader}>
+                <Icon name="nature" size={screenWidth * 0.05} color="#8BC34A" />
+                <Text style={styles.detailLabel}>산책로 유형</Text>
+              </View>
+              <Text style={styles.detailText}>{courseData.trailTypeName}</Text>
+            </View>
+          )}
+
+          {/* Report Count */}
+          {courseData.reportCount !== undefined && (
+            <View style={styles.detailItem}>
+              <View style={styles.detailHeader}>
+                <Icon name="flag" size={screenWidth * 0.05} color="#FF5722" />
+                <Text style={styles.detailLabel}>신고 횟수</Text>
+              </View>
+              <Text style={styles.detailText}>{courseData.reportCount}회</Text>
+            </View>
+          )}
         </View>
 
         {/* Description */}
@@ -236,25 +311,36 @@ export default function CourseDetailScreen({ navigation, route }) {
         <View style={styles.section}>
           <View style={styles.trashHeader}>
             <Icon name="delete" size={screenWidth * 0.05} color="#FF5722" />
-            <Text style={styles.sectionTitle}>제보된 쓰레기 {courseData.trashReports.length}개</Text>
+            <Text style={styles.sectionTitle}>제보된 쓰레기 {courseData.trashReports?.length || 0}개</Text>
           </View>
-          {courseData.trashReports.map((report) => (
-            <View key={report.id} style={styles.trashCard}>
-              <View style={styles.trashCardHeader}>
-                <Text style={styles.trashTitle}>{report.title}</Text>
-                <Text style={styles.trashDate}>{report.reportedAt}</Text>
+          {courseData.trashReports && courseData.trashReports.length > 0 ? (
+            courseData.trashReports.map((report) => (
+              <View key={report.id} style={styles.trashCard}>
+                <View style={styles.trashCardHeader}>
+                  <Text style={styles.trashTitle}>{report.title}</Text>
+                  <Text style={styles.trashDate}>{report.reportedAt}</Text>
+                </View>
+                <Text style={styles.trashDetail}>{report.detail}</Text>
+                <Text style={styles.trashLocation}>📍 {report.location}</Text>
               </View>
-              <Text style={styles.trashDetail}>{report.detail}</Text>
-              <Text style={styles.trashLocation}>📍 {report.location}</Text>
-            </View>
-          ))}
+            ))
+          ) : (
+            <Text style={styles.detailText}>현재 등록된 쓰레기 신고가 없습니다.</Text>
+          )}
         </View>
 
-        {/* Trash Bin Button */}
-        <TouchableOpacity style={styles.trashBinButton} onPress={goToTrashInfo}>
-          <Icon name="delete-outline" size={screenWidth * 0.05} color="#fff" />
-          <Text style={styles.trashBinButtonText}>근처 쓰레기통 찾기</Text>
-        </TouchableOpacity>
+        {/* Action Buttons */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.startPloggingButton} onPress={() => startPlogging()}>
+            <Icon name="play" size={screenWidth * 0.05} color="#fff" />
+            <Text style={styles.startPloggingButtonText}>이 코스로 플로깅 시작하기</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.trashBinButton} onPress={goToTrashInfo}>
+            <Icon name="delete-outline" size={screenWidth * 0.05} color="#fff" />
+            <Text style={styles.trashBinButtonText}>근처 쓰레기통 찾기</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   )
@@ -494,13 +580,32 @@ const styles = StyleSheet.create({
     color: "#888",
   },
 
+  // Button Container and Action Button Styles
+  buttonContainer: {
+    paddingHorizontal: PADDING_H,
+    paddingBottom: PADDING_H,
+    gap: PADDING_H / 2,
+  },
+  startPloggingButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4CAF50",
+    paddingVertical: PADDING_H,
+    borderRadius: 25,
+    gap: PADDING_H / 2,
+  },
+  startPloggingButtonText: {
+    color: "#fff",
+    fontSize: screenWidth * 0.04,
+    fontWeight: "600",
+  },
   // Trash Bin Button Styles
   trashBinButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#333",
-    marginHorizontal: PADDING_H,
     paddingVertical: PADDING_H,
     borderRadius: 25,
     gap: PADDING_H / 2,

@@ -118,7 +118,7 @@ const PloggingMap = ({
           <CurrentLocationMarker />
         </Marker>
         
-        {/* 경로 표시 - 더 부드러운 라인 */}
+        {/* 경로 표시 - 더 부드럽고 예쁜 라인 */}
         {routeCoordinates && routeCoordinates.length > 1 && (
           (() => {
             console.log('[PloggingMap] 🗺️ Polyline 렌더링:', {
@@ -127,13 +127,34 @@ const PloggingMap = ({
               끝점: routeCoordinates[routeCoordinates.length - 1]
             });
             return (
-              <Polyline
-                coordinates={routeCoordinates}
-                strokeColor="#418663"
-                strokeWidth={5}
-                lineJoin="round"
-                lineCap="round"
-              />
+              <>
+                {/* 그림자 효과를 위한 더 두꺼운 배경 라인 */}
+                <Polyline
+                  coordinates={routeCoordinates}
+                  strokeColor="rgba(65, 134, 99, 0.3)"
+                  strokeWidth={8}
+                  lineJoin="round"
+                  lineCap="round"
+                />
+                {/* 메인 경로 라인 */}
+                <Polyline
+                  coordinates={routeCoordinates}
+                  strokeColor="#418663"
+                  strokeWidth={6}
+                  lineJoin="round"
+                  lineCap="round"
+                  geodesic={true} // 지구의 곡률을 고려한 더 정확한 라인
+                />
+                {/* 하이라이트 라인 (중앙) */}
+                <Polyline
+                  coordinates={routeCoordinates}
+                  strokeColor="#52C574"
+                  strokeWidth={3}
+                  lineJoin="round"
+                  lineCap="round"
+                  geodesic={true}
+                />
+              </>
             );
           })()
         )}

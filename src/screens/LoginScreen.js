@@ -50,12 +50,7 @@ function buildAuthorizeUrl(provider) {
     const redirectUri = encodeURIComponent(Config.KAKAO_REDIRECT_URI);
     return `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&prompt=login`;
   }
-  if (provider === "google") {
-    const clientId = encodeURIComponent(Config.GOOGLE_CLIENT_ID);
-    const redirectUri = encodeURIComponent(Config.GOOGLE_REDIRECT_URI);
-    const scope = encodeURIComponent(Config.GOOGLE_SCOPE || "email profile");
-    return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
-  }
+
   throw new Error("Unsupported provider");
 }
 
@@ -173,7 +168,6 @@ export default function HomeScreen({ navigation }) {
 
   // 카카오/구글 핸들러 (UI 바인딩용)
   const handleKakaoLogin = () => openAuthUrl("kakao");
-  const handleGoogleLogin = () => openAuthUrl("google");
 
   // 개발용: 메인 화면으로 바로 이동
   const handleGoToMain = () => {
@@ -182,8 +176,8 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 상단 로고 */}
-      <View style={styles.logoContainer}>
+      {/* 상단 jupging 텍스트 */}
+      <View style={styles.headerContainer}>
         <Image source={require("../assets/logo.png")} style={styles.logoImage} resizeMode="contain" />
       </View>
 
@@ -193,28 +187,25 @@ export default function HomeScreen({ navigation }) {
       </View>
 
       {/* 메인 텍스트 */}
-      <Text style={styles.mainText}>봉사하는 플로깅앱, 줍깅</Text>
+      <Text style={styles.mainText}>봉사하는 플로깅앱,{'\n'}줍깅</Text>
 
       {/* 설명 텍스트 */}
       <Text style={styles.description}>
-        <Text style={styles.highlight}>줍깅은</Text> 조깅을 하면서 길가의 쓰레기를 수거하는 플로깅의 한국말입니다.
+        <Text style={styles.highlight}>줍깅은{'\n'}</Text>조깅을 하면서 길가의 쓰레기를{'\n'}수거하는 플로깅의 한국말입니다.
       </Text>
 
-      {/* 카카오 로그인 버튼 */}
-      <TouchableOpacity style={styles.kakaoButton} onPress={handleKakaoLogin}>
-        <View style={styles.kakaoIcon}>
-          <Image source={require("../assets/kakao.png")} style={styles.socialIcon} resizeMode="contain" />
-        </View>
-        <Text style={styles.kakaoText}>카카오로 계속하기</Text>
-      </TouchableOpacity>
+      {/* 버튼 컨테이너 */}
+      <View style={styles.buttonContainer}>
+        {/* 카카오 로그인 버튼 */}
+        <TouchableOpacity style={styles.kakaoButton} onPress={handleKakaoLogin}>
+          <View style={styles.buttonIconContainer}>
+            <Image source={require("../assets/kakao.png")} style={styles.kakaoIcon} resizeMode="contain" />
+          </View>
+          <Text style={styles.kakaoText}>카카오로 계속하기</Text>
+        </TouchableOpacity>
 
-      {/* 구글 로그인 버튼 */}
-      <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
-        <View style={styles.googleIcon}>
-          <Image source={require("../assets/Google.png")} style={styles.socialIcon} resizeMode="contain" />
-        </View>
-        <Text style={styles.googleText}>Google로 계속하기</Text>
-      </TouchableOpacity>
+
+      </View>
 
       {/* 개발용 메인 이동 버튼 */}
       <TouchableOpacity style={styles.mainButton} onPress={handleGoToMain}>
@@ -224,24 +215,123 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-// 기존 styles 객체는 그대로 사용하셔도 됩니다.
-// 아래는 예시(이미 가지고 계시면 이 블록은 생략하세요).
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", paddingHorizontal: screenWidth * 0.06 },
-  logoContainer: { alignItems: "center", marginTop: screenHeight * 0.02 },
-  logoImage: { width: screenWidth * 0.35, height: screenHeight * 0.08 },
-  imageContainer: { alignItems: "center", marginTop: screenHeight * 0.02 },
-  mainImage: { width: screenWidth * 0.8, height: screenHeight * 0.28 },
-  mainText: { fontSize: 20, fontWeight: "700", marginTop: 10 },
-  description: { marginTop: 6, fontSize: 14, lineHeight: 20 },
-  highlight: { fontWeight: "700" },
-  kakaoButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#FEE500", borderRadius: 8, paddingVertical: 14, paddingHorizontal: 12, marginTop: 20 },
-  kakaoIcon: { width: 28, height: 28, marginRight: 8 },
-  googleButton: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 8, paddingVertical: 14, paddingHorizontal: 12, marginTop: 12, borderWidth: 1, borderColor: "#ddd" },
-  googleIcon: { width: 28, height: 28, marginRight: 8 },
-  socialIcon: { width: "100%", height: "100%" },
-  kakaoText: { fontWeight: "700" },
-  googleText: { fontWeight: "700" },
-  mainButton: { marginTop: 16, alignItems: "center", paddingVertical: 12 },
-  mainButtonText: { color: "#4A89DC", fontWeight: "700" },
+  container: { 
+    flex: 1, 
+    backgroundColor: "#fff", 
+    paddingHorizontal: screenWidth * 0.08,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  headerContainer: { 
+    alignItems: "center", 
+    marginBottom: screenHeight * 0.05 
+  },
+  logoImage: { 
+    width: screenWidth * 0.55, 
+    height: screenHeight * 0.15 
+  },
+  imageContainer: { 
+    alignItems: "center", 
+    marginBottom: screenHeight * 0.04 
+  },
+  mainImage: { 
+    width: screenWidth * 0.6, 
+    height: screenHeight * 0.25 
+  },
+  mainText: { 
+    fontSize: 24, 
+    fontWeight: "bold", 
+    color: "#333",
+    textAlign: 'center',
+    marginBottom: screenHeight * 0.02,
+    lineHeight: 32
+  },
+  description: { 
+    fontSize: 14, 
+    lineHeight: 22,
+    textAlign: 'center',
+    color: "#666",
+    marginBottom: screenHeight * 0.04
+  },
+  highlight: { 
+    fontWeight: "600",
+    color: "#4A90E2"
+  },
+  buttonContainer: {
+    width: '100%',
+    paddingHorizontal: screenWidth * 0.02
+  },
+  kakaoButton: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    justifyContent: "center",
+    backgroundColor: "#FEE500", 
+    borderRadius: 12, 
+    paddingVertical: 16, 
+    marginBottom: 12,
+    width: '100%',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  googleButton: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    justifyContent: "center",
+    backgroundColor: "#fff", 
+    borderRadius: 12, 
+    paddingVertical: 16, 
+    borderWidth: 1, 
+    borderColor: "#E0E0E0",
+    width: '100%',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  buttonIconContainer: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  kakaoIcon: { 
+    width: 20, 
+    height: 20 
+  },
+  googleIcon: { 
+    width: 20, 
+    height: 20 
+  },
+  kakaoText: { 
+    fontWeight: "600",
+    fontSize: 16,
+    color: '#000'
+  },
+  googleText: { 
+    fontWeight: "600",
+    fontSize: 16,
+    color: '#333'
+  },
+  mainButton: { 
+    marginTop: screenHeight * 0.03, 
+    alignItems: "center", 
+    paddingVertical: 12 
+  },
+  mainButtonText: { 
+    color: "#4A89DC", 
+    fontWeight: "600",
+    fontSize: 14
+  },
 });

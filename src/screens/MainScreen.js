@@ -33,15 +33,6 @@ const DUMMY_TODAY_DATA = {
   trashCount: 0,
 }
 
-const DUMMY_REALTIME_DATA = {
-  isActive: true,
-  currentTime: 25, // 현재 25분
-  targetTime: 60, // 목표 60분
-  currentDistance: 1.2, // 현재 1.2km
-  targetDistance: 3.0, // 목표 3km
-  participants: 12, // 현재 참여자 수
-}
-
 // 추천 코스 더미 데이터
 const DUMMY_RECOMMENDED_COURSES = [
   {
@@ -120,7 +111,6 @@ export default function MainScreen({ navigation }) {
   
   const [selectedTag, setSelectedTag] = useState("가까운 곳")
   const [todayData, setTodayData] = useState(DUMMY_TODAY_DATA)
-  const [realtimeData, setRealtimeData] = useState(DUMMY_REALTIME_DATA)
   const [recommendedCourses, setRecommendedCourses] = useState([])
   const [loading, setLoading] = useState(true)
   const [coursesLoading, setCoursesLoading] = useState(true)
@@ -271,15 +261,6 @@ export default function MainScreen({ navigation }) {
     }
   }
 
-  // 실시간 플로깅 데이터 업데이트
-  const updateRealtimeData = () => {
-    setRealtimeData((prev) => ({
-      ...prev,
-      currentTime: Math.min(prev.currentTime + 0.2, prev.targetTime),
-      currentDistance: Math.min(prev.currentDistance + 0.02, prev.targetDistance),
-    }))
-  }
-
   // 태그별 코스 필터링
   const getFilteredCourses = () => {
     if (selectedTag === "가까운 곳") {
@@ -295,13 +276,6 @@ export default function MainScreen({ navigation }) {
     fetchRecommendedCourses()
   }, [])
 
-  useEffect(() => {
-    const interval = setInterval(updateRealtimeData, 3000) // 3초마다 업데이트
-    return () => clearInterval(interval)
-  }, [])
-
-  const timeProgress = (realtimeData.currentTime / realtimeData.targetTime) * 100
-  const distanceProgress = (realtimeData.currentDistance / realtimeData.targetDistance) * 100
   const filteredCourses = getFilteredCourses()
 
   return (
@@ -347,46 +321,70 @@ export default function MainScreen({ navigation }) {
 
             {/* Progress Bars */}
             <View style={styles.progressSection}>
-              <View style={styles.progressItem}>
-                <View style={styles.progressHeader}>
-                  <Text style={styles.progressLabel}>시간</Text>
-                  <Text style={styles.progressValue}>
-                    {status === "running" || status === "paused" 
-                      ? `${formatTime(time)} / 1시간` 
-                      : `${Math.round(realtimeData.currentTime)}분 / ${realtimeData.targetTime}분`
-                    }
-                  </Text>
-                </View>
-                <ProgressBar 
-                  progress={status === "running" || status === "paused" ? (time / 3600) * 100 : timeProgress} 
-                  color="#4CAF50" 
-                />
-              </View>
-
-              <View style={styles.progressItem}>
-                <View style={styles.progressHeader}>
-                  <Text style={styles.progressLabel}>거리</Text>
-                  <Text style={styles.progressValue}>
-                    {status === "running" || status === "paused" 
-                      ? `${formatDistance(totalDistance)} / 3.0km`
-                      : `${realtimeData.currentDistance.toFixed(1)}km / ${realtimeData.targetDistance}km`
-                    }
-                  </Text>
-                </View>
-                <ProgressBar 
-                  progress={status === "running" || status === "paused" ? (totalDistance / 3000) * 100 : distanceProgress} 
-                  color="#2196F3" 
-                />
-              </View>
-
-              {/* 플로깅 중일 때 쓰레기 개수 표시 */}
-              {(status === "running" || status === "paused") && (
-                <View style={styles.progressItem}>
-                  <View style={styles.progressHeader}>
-                    <Text style={styles.progressLabel}>쓰레기</Text>
-                    <Text style={styles.progressValue}>{trashCount}개</Text>
+              {(status === "running" || status === "paused") ? (
+                // 플로깅 진행 중일 때만 실제 데이터 표시
+                <>
+                  <View style={styles.progressItem}>
+                    <View style={styles.progressHeader}>
+                      <Text style={styles.progressLabel}>시간</Text>
+                      <Text style={styles.progressValue}>{formatTime(time)} / 1시간</Text>
+                    </View>
+                    <ProgressBar 
+                      progress={(time / 3600) * 100} 
+                      color="#4CAF50" 
+                    />
                   </View>
-                </View>
+
+                  <View style={styles.progressItem}>
+                    <View style={styles.progressHeader}>
+                      <Text style={styles.progressLabel}>거리</Text>
+                      <Text style={styles.progressValue}>{formatDistance(totalDistance)} / 3.0km</Text>
+                    </View>
+                    <ProgressBar 
+                      progress={(totalDistance / 3000) * 100} 
+                      color="#2196F3" 
+                    />
+                  </View>
+
+                  <View style={styles.progressItem}>
+                    <View style={styles.progressHeader}>
+                      <Text style={styles.progressLabel}>쓰레기</Text>
+                      <Text style={styles.progressValue}>{trashCount}개</Text>
+                    </View>
+                  </View>
+                </>
+              ) : (
+                // 플로깅 진행 중이 아닐 때는 빈 progress bar 표시
+                <>
+                  <View style={styles.progressItem}>
+                    <View style={styles.progressHeader}>
+                      <Text style={styles.progressLabel}>시간</Text>
+                      <Text style={styles.progressValue}>0분 / 1시간</Text>
+                    </View>
+                    <ProgressBar 
+                      progress={0} 
+                      color="#4CAF50" 
+                    />
+                  </View>
+
+                  <View style={styles.progressItem}>
+                    <View style={styles.progressHeader}>
+                      <Text style={styles.progressLabel}>거리</Text>
+                      <Text style={styles.progressValue}>0.0km / 3.0km</Text>
+                    </View>
+                    <ProgressBar 
+                      progress={0} 
+                      color="#2196F3" 
+                    />
+                  </View>
+
+                  <View style={styles.progressItem}>
+                    <View style={styles.progressHeader}>
+                      <Text style={styles.progressLabel}>쓰레기</Text>
+                      <Text style={styles.progressValue}>0개</Text>
+                    </View>
+                  </View>
+                </>
               )}
             </View>
           </TouchableOpacity>
