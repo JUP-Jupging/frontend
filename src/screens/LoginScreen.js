@@ -228,8 +228,8 @@ const styles = StyleSheet.create({
     marginBottom: screenHeight * 0.05 
   },
   logoImage: { 
-    width: screenWidth * 0.55, 
-    height: screenHeight * 0.15 
+    width: screenWidth * 0.3, 
+    height: screenHeight * 0.04 
   },
   imageContainer: { 
     alignItems: "center", 
@@ -250,13 +250,13 @@ const styles = StyleSheet.create({
   description: { 
     fontSize: 14, 
     lineHeight: 22,
-    textAlign: 'center',
+    textAlign: 'left',
     color: "#666",
     marginBottom: screenHeight * 0.04
   },
   highlight: { 
     fontWeight: "600",
-    color: "#4A90E2"
+    color: "#418663"
   },
   buttonContainer: {
     width: '100%',
@@ -265,10 +265,11 @@ const styles = StyleSheet.create({
   kakaoButton: { 
     flexDirection: "row", 
     alignItems: "center", 
-    justifyContent: "center",
+    justifyContent: "flex-start",
     backgroundColor: "#FEE500", 
     borderRadius: 12, 
     paddingVertical: 16, 
+    paddingHorizontal: 16,
     marginBottom: 12,
     width: '100%',
     shadowColor: "#000",
@@ -280,25 +281,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  googleButton: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    justifyContent: "center",
-    backgroundColor: "#fff", 
-    borderRadius: 12, 
-    paddingVertical: 16, 
-    borderWidth: 1, 
-    borderColor: "#E0E0E0",
-    width: '100%',
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
+
   buttonIconContainer: {
     width: 24,
     height: 24,
@@ -307,23 +290,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   kakaoIcon: { 
-    width: 20, 
-    height: 20 
-  },
-  googleIcon: { 
-    width: 20, 
-    height: 20 
+    width: 25, 
+    height: 25
   },
   kakaoText: { 
     fontWeight: "600",
     fontSize: 16,
-    color: '#000'
+    color: '#000',
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 24
   },
-  googleText: { 
-    fontWeight: "600",
-    fontSize: 16,
-    color: '#333'
-  },
+
   mainButton: { 
     marginTop: screenHeight * 0.03, 
     alignItems: "center", 
