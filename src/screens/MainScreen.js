@@ -13,6 +13,8 @@ import {
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import DropDownPicker from "react-native-dropdown-picker"
+import { usePloggingContext } from "../contexts/PloggingContext" // 플로깅 상태 확인용
+
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 // Responsive size constants
@@ -105,6 +107,9 @@ const DUMMY_RECOMMENDED_COURSES = [
 ]
 
 export default function MainScreen({ navigation }) {
+  // 플로깅 전역 상태 확인
+  const { status, time, formatTime, trashCount, isBackgroundMode } = usePloggingContext();
+  
   const [selectedTag, setSelectedTag] = useState("가까운 곳")
   const [todayData, setTodayData] = useState(DUMMY_TODAY_DATA)
   const [realtimeData, setRealtimeData] = useState(DUMMY_REALTIME_DATA)
@@ -284,6 +289,22 @@ export default function MainScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: PADDING_H * 2 }}>
+      {/* 플로깅 진행 중 인디케이터 */}
+      {(status === "running" || status === "paused") && (
+        <TouchableOpacity 
+          style={styles.ploggingIndicator}
+          onPress={() => navigation.navigate("PloggingStart")}
+        >
+          <View style={styles.ploggingIndicatorContent}>
+            <View style={[styles.statusDot, { backgroundColor: status === "running" ? "#4CAF50" : "#FFC107" }]} />
+            <Text style={styles.ploggingIndicatorText}>
+              플로깅 {status === "running" ? "진행 중" : "일시정지"} • {formatTime(time)} • 쓰레기 {trashCount}개
+            </Text>
+            <Icon name="chevron-right" size={20} color="#418663" />
+          </View>
+        </TouchableOpacity>
+      )}
+
       {/* Header */}
       <View style={styles.headerRow}>
         <Image source={require("../assets/logo.png")} style={styles.logoImage} />
@@ -502,6 +523,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+
+  // 플로깅 진행 중 인디케이터
+  ploggingIndicator: {
+    backgroundColor: "#E8F5E8",
+    marginHorizontal: PADDING_H,
+    marginTop: screenHeight * 0.05,
+    marginBottom: PADDING_H / 2,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#418663",
+  },
+  ploggingIndicatorContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 12,
+  },
+  ploggingIndicatorText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#418663",
   },
 
   // Header Styles

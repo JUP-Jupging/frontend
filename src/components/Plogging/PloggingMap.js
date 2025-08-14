@@ -1,7 +1,58 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+
+// 현재 위치 마커 컴포넌트 (심플한 원형)
+const CurrentLocationMarker = () => {
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const pulse = () => {
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => pulse());
+    };
+    pulse();
+  }, [pulseAnim]);
+
+  const pulseScale = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 2.5],
+  });
+
+  const pulseOpacity = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 0],
+  });
+
+  return (
+    <View style={styles.currentLocationContainer}>
+      {/* 펄스 애니메이션 */}
+      <Animated.View
+        style={[
+          styles.currentLocationPulse,
+          {
+            transform: [{ scale: pulseScale }],
+            opacity: pulseOpacity,
+          },
+        ]}
+      />
+      
+      {/* 메인 마커 - 간단한 원형 */}
+      <View style={styles.currentLocationMarker} />
+    </View>
+  );
+};
 
 const PloggingMap = ({ 
   mapRef, 
@@ -58,15 +109,13 @@ const PloggingMap = ({
         scrollEnabled={true}
         zoomEnabled={true}
       >
-        {/* 현재 위치 마커 (사용자 정의) */}
+        {/* 현재 위치 마커 (개선된 디자인) */}
         <Marker 
           coordinate={currentLocation} 
           title="현재 위치"
           anchor={{ x: 0.5, y: 0.5 }}
         >
-          <View style={styles.currentLocationMarker}>
-            <View style={styles.currentLocationInner} />
-          </View>
+          <CurrentLocationMarker />
         </Marker>
         
         {/* 경로 표시 - 더 부드러운 라인 */}
@@ -93,7 +142,7 @@ const PloggingMap = ({
               }}
             >
               <View style={styles.trashMarker}>
-                <Icon name="delete" size={20} color="#418663" />
+                <Icon name="delete" size={22} color="#418663" />
               </View>
             </Marker>
           );
@@ -121,13 +170,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
   },
+  currentLocationContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  currentLocationPulse: {
+    position: 'absolute',
+    width: 25,
+    height: 25,
+    borderRadius: 12.5,
+    backgroundColor: '#4A90E2',
+  },
   currentLocationMarker: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#4A90E2",
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF',
     borderWidth: 3,
-    borderColor: "#FFFFFF",
+    borderColor: '#4A90E2',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 6,
+  },
+  trashMarker: {
+    width: 36,
+    height: 36,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 3,
+    borderColor: "#418663",
+    justifyContent: "center",
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -135,25 +213,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
-  },
-  currentLocationInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#FFFFFF",
-    alignSelf: "center",
-    marginTop: 3,
-  },
-  trashMarker: {
-    width: 30,
-    height: 30,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 15,
-    borderWidth: 3,
-    borderColor: "#418663",
-    justifyContent: "center",
-    alignItems: "center",
+    elevation: 6,
   },
 });
 

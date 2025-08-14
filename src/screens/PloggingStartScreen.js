@@ -16,9 +16,8 @@ import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
 import Config from "react-native-config"
 
-// 분리된 컴포넌트와 훅들 import
-import { useLocation } from "../hooks/useLocation"
-import { usePlogging } from "../hooks/usePlogging"
+// 전역 상태 및 컴포넌트들 import
+import { usePloggingContext } from "../contexts/PloggingContext"
 import PloggingMap from "../components/Plogging/PloggingMap"
 import PloggingControls from "../components/Plogging/PloggingControls"
 import TrashInfoModal from "../components/Plogging/TrashInfoModal"
@@ -54,72 +53,34 @@ const DUMMY_TRASH_LOCATIONS = [
 export default function PloggingStartScreen({ navigation }) {
   console.log('[PloggingStartScreen] 컴포넌트 렌더링 시작');
   
-  // 분리된 훅들 사용
+  // 전역 플로깅 상태 사용
   const {
     status,
     time,
     trashCount,
     formatTime,
+    currentLocation,
+    routeCoordinates,
+    totalDistance,
+    formatDistance,
+    mapRef,
+    trashLocations,
+    isBackgroundMode,
     startPlogging,
     pausePlogging,
     resumePlogging,
     endPlogging,
-    addTrash
-  } = usePlogging();
+    addTrash,
+    setTrashLocations,
+    removeTrash,
+  } = usePloggingContext();
 
-  const {
-    currentLocation,
-    routeCoordinates,
-    totalDistance,
-    mapRef,
-    getCurrentLocation,
-    startLocationTracking,
-    stopLocationTracking,
-    formatDistance,
-    resetLocation,
-  } = useLocation();
-
-  // 로컬 상태들
-  const [trashLocations, setTrashLocations] = useState(DUMMY_TRASH_LOCATIONS)
+  // 로컬 상태들 (UI 관련만)
   const [modalVisible, setModalVisible] = useState(false)
   const [trashInfoModalVisible, setTrashInfoModalVisible] = useState(false)
   const [selectedTrash, setSelectedTrash] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [mapReady, setMapReady] = useState(false)
-
-  // 백그라운드/포그라운드 상태 관리 - 플로깅 세션 유지
-  useEffect(() => {
-    console.log('[PloggingStartScreen] AppState 리스너 등록');
-    
-    const handleAppStateChange = (nextAppState) => {
-      console.log('[PloggingStartScreen] AppState 변경:', nextAppState, '현재 플로깅 상태:', status);
-      
-      if (status === "running" || status === "paused") {
-        if (nextAppState === 'background' || nextAppState === 'inactive') {
-          console.log('[PloggingStartScreen] ✅ 백그라운드 이동 - 플로깅 세션 유지 (타이머, GPS 계속 실행)');
-          // 플로깅 중일 때는 백그라운드에서도 모든 기능 유지
-          // usePlogging 훅의 타이머는 계속 실행되고
-          // useLocation 훅의 GPS 추적도 계속 실행됨
-        } else if (nextAppState === 'active') {
-          console.log('[PloggingStartScreen] ✅ 포그라운드 복귀 - 플로깅 세션 복원');
-          // 혹시 위치 추적이 중단되었을 경우를 대비한 재시작
-          if (status === "running") {
-            console.log('[PloggingStartScreen] GPS 추적 재활성화');
-            startLocationTracking(true);
-          }
-        }
-      } else {
-        console.log('[PloggingStartScreen] 플로깅 중이 아님 - AppState 변경 무시');
-      }
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    
-    return () => {
-      console.log('[PloggingStartScreen] AppState 리스너 해제');
-      subscription?.remove();
-    };
-  }, [status, startLocationTracking]);
 
   // 뒤로가기 버튼 처리 - 직접 네비게이션 제어
   useEffect(() => {
@@ -129,7 +90,8 @@ export default function PloggingStartScreen({ navigation }) {
       console.log('[PloggingStartScreen] 뒤로가기 버튼 클릭, 현재 상태:', status);
       
       // 플로깅 상태와 관계없이 항상 메인 화면으로 이동
-      console.log('[PloggingStartScreen] 메인 화면으로 이동');
+      // 플로깅은 백그라운드에서 계속 실행됨
+      console.log('[PloggingStartScreen] 메인 화면으로 이동 (플로깅 세션 유지)');
       navigation.navigate("Main");
       return true; // 기본 뒤로가기 동작 방지 (앱 종료 방지)
     };
@@ -157,10 +119,10 @@ export default function PloggingStartScreen({ navigation }) {
     
     initializeApp()
 
-    // 컴포넌트 언마운트 시 위치 추적 중지
+    // 컴포넌트 언마운트 시에는 위치 추적을 중지하지 않음 (백그라운드 실행 유지)
     return () => {
-      console.log('[PloggingStartScreen] 컴포넌트 언마운트 - 위치 추적 중지');
-      stopLocationTracking()
+      console.log('[PloggingStartScreen] 컴포넌트 언마운트 - 플로깅 세션 유지');
+      // stopLocationTracking() - 제거됨: 백그라운드에서도 계속 실행되어야 함
     }
   }, [])
 
@@ -171,13 +133,17 @@ export default function PloggingStartScreen({ navigation }) {
       
       await new Promise(resolve => setTimeout(resolve, 500))
       
-      // 더미 데이터 설정
-      setTrashLocations(DUMMY_TRASH_LOCATIONS)
+      // 더미 데이터 설정 (이미 쓰레기가 있는 경우 덮어쓰지 않음)
+      if (trashLocations.length === 0) {
+        setTrashLocations(DUMMY_TRASH_LOCATIONS)
+      }
       
       console.log('[PloggingStartScreen] 데이터 로딩 완료')
     } catch (error) {
       console.error('[PloggingStartScreen] 데이터 로딩 실패:', error)
-      setTrashLocations([])
+      if (trashLocations.length === 0) {
+        setTrashLocations([])
+      }
     } finally {
       setIsLoading(false)
     }
@@ -186,33 +152,20 @@ export default function PloggingStartScreen({ navigation }) {
   // 플로깅 시작 핸들러
   const handleStart = async () => {
     console.log('[PloggingStartScreen] 플로깅 시작 시도...')
-    
-    try {
-      const location = await getCurrentLocation();
-      if (location) {
-        console.log('[PloggingStartScreen] 위치 획득 성공, 플로깅 시작');
-        startPlogging();
-        startLocationTracking(status === "running");
-      } else {
-        console.log('[PloggingStartScreen] 위치 획득 실패');
-        Alert.alert('위치 오류', 'GPS 위치를 가져올 수 없습니다.');
-      }
-    } catch (error) {
-      console.error('[PloggingStartScreen] 플로깅 시작 오류:', error);
-      Alert.alert('오류', '플로깅 시작 중 오류가 발생했습니다.');
+    const success = await startPlogging();
+    if (!success) {
+      console.log('[PloggingStartScreen] 플로깅 시작 실패');
     }
   }
 
   const handlePause = () => {
     console.log('[PloggingStartScreen] 플로깅 일시정지')
     pausePlogging();
-    stopLocationTracking();
   }
 
   const handleResume = () => {
     console.log('[PloggingStartScreen] 플로깅 재시작')
     resumePlogging();
-    startLocationTracking(true);
     
     // 현재 위치로 맵 이동
     if (mapRef.current && currentLocation) {
@@ -233,25 +186,11 @@ export default function PloggingStartScreen({ navigation }) {
     console.log('[PloggingStartScreen] 플로깅 종료 확정')
     try {
       setModalVisible(false);
-      stopLocationTracking();
       
-      // 플로깅 결과 데이터 생성
-      const ploggingResult = {
-        id: Date.now(),
-        title: "방금 완료한 플로깅",
-        date: new Date().toLocaleDateString('ko-KR'),
-        location: "마로니에 공원",
-        duration: formatTime(time),
-        distance: formatDistance(totalDistance),
-        trashCount: trashCount,
-        routeCoordinates: routeCoordinates,
-      };
+      // 플로깅 결과 데이터 생성 및 상태 초기화
+      const ploggingResult = endPlogging();
 
       console.log('[PloggingStartScreen] 플로깅 결과:', ploggingResult);
-
-      // 상태 초기화
-      endPlogging();
-      resetLocation();
 
       // 결과 화면으로 이동
       navigation.navigate("PloggingRecord", {
@@ -275,7 +214,7 @@ export default function PloggingStartScreen({ navigation }) {
       setTrashInfoModalVisible(false);
       
       // 해당 쓰레기를 목록에서 제거
-      setTrashLocations(prev => prev.filter(t => t.id !== trash.id));
+      removeTrash(trash.id);
       
       Alert.alert('성공', '쓰레기를 주웠습니다!', [{ text: '확인' }]);
     } catch (error) {
@@ -291,9 +230,21 @@ export default function PloggingStartScreen({ navigation }) {
   const handleBackPress = () => {
     console.log('[PloggingStartScreen] 헤더 뒤로가기 버튼 클릭, 현재 상태:', status);
     
-    // 항상 메인 화면으로 이동
-    console.log('[PloggingStartScreen] 메인 화면으로 이동');
-    navigation.navigate("Main");
+    // 플로깅 중이라면 백그라운드 실행 안내
+    if (status === "running" || status === "paused") {
+      console.log('[PloggingStartScreen] 플로깅 진행 중 - 백그라운드 실행 안내');
+      Alert.alert(
+        '플로깅 진행 중',
+        '플로깅이 백그라운드에서 계속 실행됩니다.\n언제든 다시 돌아올 수 있습니다.',
+        [
+          { text: '확인', onPress: () => navigation.navigate("Main") }
+        ]
+      );
+    } else {
+      // 플로깅 중이 아니면 바로 메인 화면으로 이동
+      console.log('[PloggingStartScreen] 메인 화면으로 이동');
+      navigation.navigate("Main");
+    }
   };
 
   return (
