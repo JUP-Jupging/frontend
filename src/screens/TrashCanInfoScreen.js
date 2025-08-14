@@ -17,6 +17,7 @@ export default function TrashCanInfoScreen({ navigation }) {
         <View style={styles.headerRow}>
           {/* 📌 쓰레기통 종류 - 나중에 DB에서 받아올 값 */}
           <Text style={styles.trashType}>일반 쓰레기통</Text>
+          <Image source={require('../assets/seoul.png')} style={styles.trashLogo} />
 
           {/* 📌 로고 이미지 - 기관별 이미지도 추후 서버에서 받아올 수 있도록 설정
           <Image source={require('../assets/trash_logo.png')} style={styles.trashLogo} /> */}
@@ -42,9 +43,15 @@ export default function TrashCanInfoScreen({ navigation }) {
           <Text style={styles.label}>관리기관 전화번호</Text>
           <Text style={styles.phone}>061-860-6054</Text>
         </View>
+        {/* divider */}
+        <View style={styles.divider} />
 
         {/* ✅ 길찾기 버튼 - 나중에 네비게이션 연동 */}
         <TouchableOpacity style={styles.navigateBtn}>
+          <Image
+            source={require('../assets/navigation-pointer.png')}
+            style={styles.navigateIcon}
+          />
           <Text style={styles.navigateText}>길찾기 안내</Text>
         </TouchableOpacity>
       </View>
@@ -60,49 +67,106 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   mapBox: {
-    height: 300,
-    backgroundColor: '#ddd',
+    width: '100%',
+    aspectRatio: 360 / 350, // 피그마 비율 참고
+    backgroundColor: '#eee',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  mapText: {
-    color: '#555',
+  mapImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 0,
   },
   infoBox: {
-    padding: 20,
-    gap: 14,
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: -16,
+    elevation: 2,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+    gap: 10,
+  },
+  trashType: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    flex: 1,
+  },
+  trashLogo: {
+    width: 50,
+    height: 50,
+    resizeMode: 'contain',
   },
   infoRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 10,
   },
   label: {
-    fontWeight: 'bold',
-    color: '#666',
+    fontWeight: '600',
+    color: '#AAB2C8',
+    fontSize: 16,
+    width: 110,
   },
   value: {
-    color: '#222',
+    color: '#333',
+    fontSize: 16,
     flex: 1,
     textAlign: 'right',
+    fontWeight: '600',
   },
   phone: {
-    color: '#777',
-    backgroundColor: '#eee',
+    color: '#797982',
+    backgroundColor: 'rgba(153,153,153,0.2)',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 8,
-    fontSize: 12,
+    fontSize: 13,
     textAlign: 'right',
+    fontWeight: '500',
+    minWidth: 120,
+    flex: 1,
+
+  },
+    divider: {
+    width: '100%',
+    height: 2,
+    backgroundColor: 'rgba(170,178,200,0.2)',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 38,
   },
   navigateBtn: {
-    marginTop: 30,
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    borderRadius: 24,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#418663',
+    borderRadius: 30,
+    height: 44,
+    width: '70%',
+    alignSelf: 'center',
+    gap: 8,
+  },
+  navigateIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 4,
+    resizeMode: 'contain',
   },
   navigateText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '700',
+    fontSize: 18,
+    letterSpacing: -0.24,
   },
 });
