@@ -88,14 +88,21 @@ function TabNavigator() {
 export default function BottomTabNavigator() {
   const navigation = useNavigation();
   
-  // 현재 활성화된 탭 이름 가져오기 (네비게이션 상태 추적)
+  // 현재 활성화된 화면 이름을 더 정확하게 가져오기
   const currentRouteName = useNavigationState(state => {
     if (!state || !state.routes || state.index === undefined) return null;
-    return state.routes[state.index]?.name;
+    
+    const currentRoute = state.routes[state.index];
+    if (currentRoute.state) {
+      // 스택 네비게이터 내부의 현재 화면 확인
+      const nestedRoute = currentRoute.state.routes[currentRoute.state.index];
+      return nestedRoute.name;
+    }
+    return currentRoute.name;
   });
   
   // 현재 화면이 플로깅 관련 화면인지 확인 (인디케이터 표시 여부 결정)
-  const isPloggingScreen = currentRouteName === "플로깅 시작";
+  const isPloggingScreen = currentRouteName === "PloggingStart" || currentRouteName === "PloggingRecord";
   
   return (
     <View style={{ flex: 1 }}>
@@ -104,8 +111,7 @@ export default function BottomTabNavigator() {
       
       {/* 🎯 플로깅 진행 상황 인디케이터 (오버레이)
           - 플로깅 중일 때만 표시
-          - 플로깅 시작 화면에서는 숨김 (hideOnPlogging=true)
-          - 드래그해서 위치 이동 가능 */}
+          - 플로깅 시작 화면과 기록 화면에서는 숨김 */}
       <FloatingPloggingIndicator 
         hideOnPlogging={isPloggingScreen}
       />

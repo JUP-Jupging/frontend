@@ -69,7 +69,7 @@ const DUMMY_TRASH_LOCATIONS = [
  * - 화면을 벗어나도 위치 추적과 시간 측정 계속
  * - FloatingPloggingIndicator를 통해 다른 화면에서도 진행 상황 확인 가능
  */
-export default function PloggingStartScreen({ navigation }) {
+export default function PloggingStartScreen({ navigation, route }) {
   console.log('[PloggingStartScreen] 컴포넌트 렌더링 시작');
   console.log('[PloggingStartScreen] FloatingPloggingIndicator 숨김 처리 - 이 화면에서는 표시되지 않음');
   
@@ -103,6 +103,7 @@ export default function PloggingStartScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(false)                    // 로딩 상태
   const [mapReady, setMapReady] = useState(false)                      // 지도 초기화 완료 여부
   const [capturedImage, setCapturedImage] = useState(null)            // 캡처된 지도 이미지
+  const [collectedTrashList, setCollectedTrashList] = useState([])    // 수집된 쓰레기 목록
 
   // 🔍 백그라운드 모드에서 polyline 업데이트 디버깅
   useEffect(() => {
@@ -345,8 +346,9 @@ export default function PloggingStartScreen({ navigation }) {
         ...ploggingResult,
         mapImage: capturedMapImage, // 캡처된 지도 이미지
         routeImage: capturedMapImage, // 추후 별도 생성 가능
-        routeName: route.params?.routeName || route.params?.courseName || "자유 플로깅", // 선택한 산책로 이름
-        routeLocation: route.params?.routeLocation || route.params?.location || "플로깅 경로", // 산책로 위치
+        routeName: route?.params?.routeName || route?.params?.courseName || "자유 플로깅", // 선택한 산책로 이름
+        routeLocation: route?.params?.routeLocation || route?.params?.location || "플로깅 경로", // 산책로 위치
+        collectedTrash: collectedTrashList, // 수집된 쓰레기 목록 추가
       };
 
       console.log('[PloggingStartScreen] 플로깅 결과:', {
@@ -363,8 +365,15 @@ export default function PloggingStartScreen({ navigation }) {
       
       // 에러 발생시에도 결과 화면으로 이동 (이미지 없이)
       const ploggingResult = endPlogging();
+      const fallbackResult = {
+        ...ploggingResult,
+        routeName: "자유 플로깅",
+        routeLocation: "플로깅 경로",
+        collectedTrash: collectedTrashList,
+      };
+      
       navigation.navigate("PloggingRecord", {
-        result: ploggingResult,
+        result: fallbackResult,
       });
     }
   }
@@ -379,6 +388,21 @@ export default function PloggingStartScreen({ navigation }) {
     console.log('[PloggingStartScreen] 쓰레기 줍기:', trash.id);
     try {
       addTrash();
+      
+      // 수집된 쓰레기 목록에 추가 (더 자세한 정보 포함)
+      const newTrash = {
+        id: Date.now(),
+        type: trash.title || "쓰레기",
+        time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+        location: trash.location || "플로깅 경로",
+        amount: trash.amount || "보통",
+        coordinate: trash.coordinate || null,
+      };
+      setCollectedTrashList(prev => [...prev, newTrash]);
+      
+      console.log('[PloggingStartScreen] 수집된 쓰레기 목록에 추가:', newTrash);
+      console.log('[PloggingStartScreen] 현재 수집된 쓰레기 총 개수:', collectedTrashList.length + 1);
+      
       setTrashInfoModalVisible(false);
       
       // 해당 쓰레기를 목록에서 제거
@@ -482,6 +506,7 @@ export default function PloggingStartScreen({ navigation }) {
               onResume={handleResume}
               onEnd={handleEnd}
               onGoToMain={handleGoToMain}
+              collectedTrashList={collectedTrashList}
             />
           </View>
         )}
