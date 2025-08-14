@@ -3,29 +3,53 @@ import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated, Platfor
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { usePloggingContext } from '../contexts/PloggingContext';
+import { usePloggingContext } from '../contexts/PloggingContext'; // 플로깅 전역 상태 사용
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
+/**
+ * 🎯 FloatingPloggingIndicator: 드래그 가능한 플로깅 진행 상황 인디케이터
+ * 
+ * 주요 기능:
+ * 1. 플로깅 진행 중일 때 화면 위에 오버레이로 표시
+ * 2. 실시간 플로깅 정보 표시 (시간, 거리, 쓰레기 개수)
+ * 3. 드래그해서 화면 내 자유롭게 이동 가능
+ * 4. 접기/펼치기 기능으로 공간 절약
+ * 5. 플로깅 화면으로 빠른 이동 버튼
+ * 
+ * 표시 조건:
+ * - 플로깅 상태가 "running" 또는 "paused"일 때만 표시
+ * - hideOnPlogging=true일 때는 숨김 (플로깅 시작 화면에서 중복 방지)
+ * 
+ * @param {boolean} hideOnPlogging - 플로깅 화면에서 인디케이터를 숨길지 여부
+ */
 const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
-  const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const insets = useSafeAreaInsets(); // 디바이스 안전 영역 정보
+  const navigation = useNavigation(); // 네비게이션 객체
+  
+  // 플로깅 전역 상태에서 필요한 데이터 추출
   const { 
-    status, 
-    time, 
-    formatTime, 
-    trashCount, 
-    totalDistance, 
-    formatDistance 
+    status,        // 플로깅 상태 (idle/running/paused)
+    time,          // 경과 시간 (초)
+    formatTime,    // 시간 포맷팅 함수
+    trashCount,    // 수집한 쓰레기 개수
+    totalDistance, // 총 이동 거리 (미터)
+    formatDistance // 거리 포맷팅 함수
   } = usePloggingContext();
 
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // 컴포넌트 로컬 상태
+  const [isCollapsed, setIsCollapsed] = useState(false); // 접힘/펼침 상태
   
   // 드래그 기능을 위한 Animated Values
-  const pan = useRef(new Animated.ValueXY()).current;
-  const opacity = useRef(new Animated.Value(1)).current;
+  const pan = useRef(new Animated.ValueXY()).current;     // X, Y 위치 값
+  const opacity = useRef(new Animated.Value(1)).current;  // 투명도 값
 
-  // PanResponder 설정
+  /**
+   * 🖱️ PanResponder: 드래그 제스처 처리
+   * - 작은 움직임은 버튼 클릭으로 인식하여 무시
+   * - 드래그 중에는 투명도 변경으로 시각적 피드백
+   * - 화면 경계를 벗어나지 않도록 제한
+   */
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {

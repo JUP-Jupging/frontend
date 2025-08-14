@@ -16,15 +16,19 @@ import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
 import Config from "react-native-config"
 
-// 전역 상태 및 컴포넌트들 import
-import { usePloggingContext } from "../contexts/PloggingContext"
-import PloggingMap from "../components/Plogging/PloggingMap"
-import PloggingControls from "../components/Plogging/PloggingControls"
-import TrashInfoModal from "../components/Plogging/TrashInfoModal"
+// 🎯 플로깅 관련 컴포넌트 및 전역 상태
+import { usePloggingContext } from "../contexts/PloggingContext"    // 플로깅 전역 상태 관리
+import PloggingMap from "../components/Plogging/PloggingMap"        // 지도 및 마커 표시
+import PloggingControls from "../components/Plogging/PloggingControls" // 플로깅 제어 버튼들
+import TrashInfoModal from "../components/Plogging/TrashInfoModal"  // 쓰레기 정보 모달
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
-// 더미 데이터
+/**
+ * 🗑️ 더미 쓰레기 위치 데이터
+ * - 실제 API가 연동되면 이 데이터는 서버에서 받아옴
+ * - 지도에 마커로 표시되며, 클릭 시 쓰레기 정보 모달 표시
+ */
 const DUMMY_TRASH_LOCATIONS = [
   {
     id: 1,
@@ -50,39 +54,81 @@ const DUMMY_TRASH_LOCATIONS = [
   },
 ]
 
+/**
+ * 🏃‍♂️ PloggingStartScreen: 플로깅 시작 및 진행 화면
+ * 
+ * 주요 기능:
+ * 1. 플로깅 시작/일시정지/재시작/종료 제어
+ * 2. 실시간 지도 표시 (현재 위치, 이동 경로, 쓰레기 위치)
+ * 3. 플로깅 통계 실시간 표시 (시간, 거리, 쓰레기 개수)
+ * 4. 백그라운드 실행 지원 (다른 화면으로 이동해도 플로깅 계속)
+ * 5. 쓰레기 마커 클릭 시 정보 모달 표시 및 수집 기능
+ * 
+ * 백그라운드 실행:
+ * - PloggingContext를 통해 전역 상태 관리
+ * - 화면을 벗어나도 위치 추적과 시간 측정 계속
+ * - FloatingPloggingIndicator를 통해 다른 화면에서도 진행 상황 확인 가능
+ */
 export default function PloggingStartScreen({ navigation }) {
   console.log('[PloggingStartScreen] 컴포넌트 렌더링 시작');
   
-  // 전역 플로깅 상태 사용
+  // 🎯 플로깅 전역 상태에서 필요한 데이터와 함수들 추출
   const {
-    status,
-    time,
-    trashCount,
-    formatTime,
-    currentLocation,
-    routeCoordinates,
-    totalDistance,
-    formatDistance,
-    mapRef,
-    trashLocations,
-    isBackgroundMode,
-    startPlogging,
-    pausePlogging,
-    resumePlogging,
-    endPlogging,
-    addTrash,
-    setTrashLocations,
-    removeTrash,
+    status,             // 플로깅 상태 (idle/running/paused)
+    time,               // 경과 시간 (초)
+    trashCount,         // 수집한 쓰레기 개수
+    formatTime,         // 시간 포맷팅 함수 (초 → HH:MM:SS)
+    currentLocation,    // 현재 위치 좌표
+    routeCoordinates,   // 이동 경로 좌표 배열
+    totalDistance,      // 총 이동 거리 (미터)
+    formatDistance,     // 거리 포맷팅 함수 (미터 → km)
+    mapRef,             // 지도 컴포넌트 참조
+    trashLocations,     // 쓰레기 위치 목록
+    isBackgroundMode,   // 백그라운드 모드 여부
+    startPlogging,      // 플로깅 시작 함수
+    pausePlogging,      // 플로깅 일시정지 함수
+    resumePlogging,     // 플로깅 재시작 함수
+    endPlogging,        // 플로깅 종료 함수
+    addTrash,           // 쓰레기 수집 카운트 증가 함수
+    setTrashLocations,  // 쓰레기 위치 설정 함수
+    removeTrash,        // 특정 쓰레기 위치 제거 함수
   } = usePloggingContext();
 
-  // 로컬 상태들 (UI 관련만)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [trashInfoModalVisible, setTrashInfoModalVisible] = useState(false)
-  const [selectedTrash, setSelectedTrash] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [mapReady, setMapReady] = useState(false)
+  // 🗺️ 컴포넌트 내부 상태 관리 (UI 전용)
+  const [modalVisible, setModalVisible] = useState(false)               // 플로깅 종료 확인 모달
+  const [trashInfoModalVisible, setTrashInfoModalVisible] = useState(false) // 쓰레기 정보 모달
+  const [selectedTrash, setSelectedTrash] = useState(null)             // 선택된 쓰레기 정보
+  const [isLoading, setIsLoading] = useState(false)                    // 로딩 상태
+  const [mapReady, setMapReady] = useState(false)                      // 지도 초기화 완료 여부
 
-  // 뒤로가기 버튼 처리 - 직접 네비게이션 제어
+  // 🧹 가상의 쓰레기 위치 데이터 (개발/테스트용)
+  // 실제 서비스에서는 API에서 받아온 실제 쓰레기 위치 데이터로 대체
+  const dummyTrashData = [
+    {
+      id: 1,
+      coordinate: { latitude: 37.541, longitude: 126.986 }, // 강남역 근처
+      type: '일반쓰레기',    // 쓰레기 유형
+      description: '길가에 버려진 플라스틱 병',
+      isCollected: false   // 수집 여부
+    },
+    {
+      id: 2,
+      coordinate: { latitude: 37.542, longitude: 126.987 },
+      type: '재활용',
+      description: '공원 벤치 옆 캔',
+      isCollected: false
+    },
+    {
+      id: 3,
+      coordinate: { latitude: 37.543, longitude: 126.985 },
+      type: '유해폐기물',
+      description: '담배꽁초',
+      isCollected: false
+    }
+  ];
+
+  // ⬅️ 뒤로가기 버튼 처리 - 백그라운드 모드로 전환
+  // 플로깅 진행 중에도 다른 화면으로 이동 가능하도록 처리
   useEffect(() => {
     console.log('[PloggingStartScreen] 뒤로가기 핸들러 등록');
     
@@ -90,7 +136,7 @@ export default function PloggingStartScreen({ navigation }) {
       console.log('[PloggingStartScreen] 뒤로가기 버튼 클릭, 현재 상태:', status);
       
       // 플로깅 상태와 관계없이 항상 메인 화면으로 이동
-      // 플로깅은 백그라운드에서 계속 실행됨
+      // 플로깅은 백그라운드에서 계속 실행되며, FloatingPloggingIndicator로 확인 가능
       console.log('[PloggingStartScreen] 메인 화면으로 이동 (플로깅 세션 유지)');
       navigation.navigate("Main");
       return true; // 기본 뒤로가기 동작 방지 (앱 종료 방지)
