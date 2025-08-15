@@ -18,14 +18,14 @@ export default function HomeStackNavigator() {
       <Stack.Screen
         name="PloggingStart"
         component={PloggingStartScreen}
-options={{ headerShown: false }}
+        options={{ headerShown: false }}
       />
-<Stack.Screen
-  name="PloggingRecordScreen"
-  component={PloggingRecordScreen}
-  options={{ headerShown: false }}
-/>
 
+      <Stack.Screen
+        name="PloggingRecord"
+        component={PloggingRecordScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }

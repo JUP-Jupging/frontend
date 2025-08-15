@@ -190,7 +190,11 @@ export default function RecommendCourseScreen({ navigation }) {
   const renderCourseItem = ({ item }) => (
     <TouchableOpacity
       style={styles.courseItem}
-      onPress={() => navigation.navigate("CourseDetail", { courseId: item.id })}
+      onPress={() => navigation.navigate("CourseDetail", { 
+        courseId: item.id,
+        trailId: item.id,
+        courseData: item // 더미 데이터도 함께 전달
+      })}
     >
       <Image source={{ uri: item.image }} style={styles.courseImage} />
       <View style={styles.courseContent}>

@@ -13,7 +13,8 @@ import {
   BackHandler,
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialIcons"
-import CommonModal from "../components/CommonModal"
+// CommonModal 제거
+// import CommonModal from "../components/CommonModal"
 import Config from "react-native-config"
 
 // 🎯 플로깅 관련 컴포넌트 및 전역 상태
@@ -21,6 +22,7 @@ import { usePloggingContext } from "../contexts/PloggingContext"    // 플로깅
 import PloggingMap from "../components/Plogging/PloggingMap"        // 지도 및 마커 표시
 import PloggingControls from "../components/Plogging/PloggingControls" // 플로깅 제어 버튼들
 import TrashInfoModal from "../components/Plogging/TrashInfoModal"  // 쓰레기 정보 모달
+import PloggingEndModal from "../components/Plogging/PloggingEndModal" // 새로운 플로깅 종료 모달 import
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -378,6 +380,11 @@ export default function PloggingStartScreen({ navigation, route }) {
     }
   }
 
+  const handleContinuePlogging = () => {
+    console.log('[PloggingStartScreen] 플로깅 계속하기')
+    setModalVisible(false);
+  }
+
   const handleTrashMarkerPress = (trash) => {
     console.log('[PloggingStartScreen] 쓰레기 마커 클릭:', trash.id);
     setSelectedTrash(trash);
@@ -512,15 +519,12 @@ export default function PloggingStartScreen({ navigation, route }) {
         )}
       </View>
 
-      {/* 종료 확인 모달 */}
-      <CommonModal
+      {/* 종료 확인 모달 - PloggingEndModal 사용 */}
+      <PloggingEndModal
         visible={modalVisible}
-        title="플로깅 종료"
-        message={`플로깅을 종료하시겠습니까?\n주운 쓰레기: ${trashCount}개\n총 거리: ${formatDistance(totalDistance)}`}
-        onConfirm={confirmEnd}
-        onCancel={() => setModalVisible(false)}
-        confirmText="종료"
-        cancelText="취소"
+        trashCount={trashCount}
+        onContinue={handleContinuePlogging}
+        onEnd={confirmEnd}
       />
 
       {/* 쓰레기 정보 모달 */}
