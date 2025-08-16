@@ -1,13 +1,55 @@
 // 📁 TrashCanInfoScreen.js
 import React from 'react';
-import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity, SafeAreaView } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
-export default function TrashCanInfoScreen({ navigation }) {
+export default function TrashCanInfoScreen({ navigation, route }) {
+  // 쓰레기통 위치 (더미 데이터)
+  const trashCanLocation = {
+    latitude: 37.548,
+    longitude: 126.985,
+    latitudeDelta: 0.005,
+    longitudeDelta: 0.005,
+  };
+
   return (
-    <View style={styles.container}>
-      {/* ✅ 지도 영역 더미 - 나중에 Google Map 또는 KakaoMap 연동 */}
+    <SafeAreaView style={styles.container}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Icon name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>쓰레기통 정보</Text>
+        <TouchableOpacity>
+          <Icon name="person" size={24} color="#333" />
+        </TouchableOpacity>
+      </View>
+
+      {/* 지도 영역 */}
       <View style={styles.mapBox}>
-        <Text style={styles.mapText}>[지도 영역 - 쓰레기통 위치]</Text>
+        <MapView
+          style={styles.map}
+          region={trashCanLocation}
+          showsUserLocation={true}
+          showsMyLocationButton={false}
+        >
+          <Marker
+            coordinate={{
+              latitude: trashCanLocation.latitude,
+              longitude: trashCanLocation.longitude
+            }}
+            title="일반 쓰레기통"
+            description="서울특별시 구로구 구로중앙로 135-6"
+          >
+            <View style={styles.markerContainer}>
+              <Image
+                source={require('../assets/trash-02.png')}
+                style={styles.markerIcon}
+              />
+            </View>
+          </Marker>
+        </MapView>
       </View>
 
       {/* ✅ 쓰레기통 상세 정보 영역 */}
@@ -55,7 +97,7 @@ export default function TrashCanInfoScreen({ navigation }) {
           <Text style={styles.navigateText}>길찾기 안내</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -66,107 +108,126 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+  },
   mapBox: {
     width: '100%',
-    aspectRatio: 360 / 350, // 피그마 비율 참고
+    height: 350,
     backgroundColor: '#eee',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  mapImage: {
+  map: {
     width: '100%',
     height: '100%',
-    borderRadius: 0,
+  },
+  markerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerIcon: {
+    width: 30,
+    height: 30,
+    resizeMode: 'contain',
   },
   infoBox: {
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 24,
-    paddingBottom: 0,
+    paddingBottom: 20,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -16,
-    elevation: 2,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 20,
     gap: 10,
   },
   trashType: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#333',
     flex: 1,
   },
   trashLogo: {
-    width: 50,
-    height: 50,
+    width: 40,
+    height: 40,
     resizeMode: 'contain',
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 0,
   },
   label: {
-    fontWeight: '600',
-    color: '#AAB2C8',
-    fontSize: 16,
-    width: 110,
+    fontWeight: '400',
+    color: '#666',
+    fontSize: 14,
+    width: 90,
+    textAlign: 'left',
   },
   value: {
     color: '#333',
-    fontSize: 16,
+    fontSize: 14,
     flex: 1,
-    textAlign: 'right',
-    fontWeight: '600',
+    textAlign: 'left',
+    fontWeight: '400',
+    marginLeft: 20,
   },
   phone: {
-    color: '#797982',
-    backgroundColor: 'rgba(153,153,153,0.2)',
+    color: '#666',
+    backgroundColor: '#F5F5F5',
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 8,
-    fontSize: 13,
-    textAlign: 'right',
-    fontWeight: '500',
-    minWidth: 120,
-    flex: 1,
-
+    paddingVertical: 6,
+    borderRadius: 15,
+    fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '400',
+    marginLeft: 20,
   },
-    divider: {
+  divider: {
     width: '100%',
-    height: 2,
-    backgroundColor: 'rgba(170,178,200,0.2)',
+    height: 1,
+    backgroundColor: '#E0E0E0',
     alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 38,
+    marginTop: 20,
+    marginBottom: 20,
   },
   navigateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#418663',
-    borderRadius: 30,
-    height: 44,
-    width: '70%',
+    borderRadius: 25,
+    height: 50,
+    width: '100%',
     alignSelf: 'center',
     gap: 8,
+    marginTop: 10,
   },
   navigateIcon: {
-    width: 24,
-    height: 24,
-    marginRight: 4,
+    width: 20,
+    height: 20,
+    tintColor: '#fff',
     resizeMode: 'contain',
   },
   navigateText: {
     color: '#fff',
-    fontWeight: '700',
-    fontSize: 18,
-    letterSpacing: -0.24,
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
