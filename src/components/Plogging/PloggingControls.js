@@ -1,99 +1,73 @@
-import React, { useRef, useEffect } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native'
-import Icon from 'react-native-vector-icons/MaterialIcons'
-
-const { width: screenWidth } = Dimensions.get('window');
+import React from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native'
 
 export default function PloggingControls({
   status,
   time,
   trashCount,
-  onStart,
+  formatTime,
   onPause,
   onResume,
   onEnd,
   onShowTrashList,
-  formatTime,
 }) {
-  const isMounted = useRef(true);
-  
-  useEffect(() => {
-    isMounted.current = true;
-    return () => { isMounted.current = false; };
-  }, []);
 
-  const safeOnPause = () => onPause?.();
-  const safeOnResume = () => onResume?.();
-  const safeOnEnd = () => onEnd?.();
-  const safeOnShowTrashList = () => onShowTrashList?.();
-
-  const safeFormatTime = (t) => (formatTime && t !== undefined ? formatTime(t) : '00:00:00');
-
-  // PloggingStartScreen에서 idle 상태는 다른 UI를 사용하므로 이 컴포넌트는 running/paused일 때만 보입니다.
   if (status === 'idle') {
-    return null; 
+    return null;
   }
 
   return (
     <View style={styles.container}>
-      {/* 상단 시간 표시 */}
       <View style={styles.timeContainer}>
         <Text style={styles.timeLabel}>플로깅 시간</Text>
-        <Text style={[styles.timeValue, status === 'paused' && styles.pausedTimeValue]}>
-          {safeFormatTime(time)}
+        <Text style={styles.timeValue}>
+          {formatTime ? formatTime(time) : '00:00:00'}
         </Text>
       </View>
 
-      {/* 구분선 */}
+      {/* [추가] 중간 가로줄 */}
       <View style={styles.divider} />
 
-      {/* 쓰레기 정보 영역 */}
       <View style={styles.trashInfoContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.trashListButton}
-          onPress={safeOnShowTrashList}
-          activeOpacity={0.8}
+          onPress={onShowTrashList}
         >
-          {/* 디자인 명세에 있는 menu-01 아이콘 적용 */}
-          <Icon name="menu" size={24} color="#418663" />
+          <View style={styles.hamburgerMenu}>
+            <View style={styles.hamburgerLine} />
+            <View style={styles.hamburgerLine} />
+            <View style={styles.hamburgerLine} />
+          </View>
         </TouchableOpacity>
-        
         <Text style={styles.trashText}>
           현재 주운 쓰레기 <Text style={styles.trashCount}>{trashCount || 0}개</Text>
         </Text>
       </View>
 
-      {/* 제어 버튼들 */}
       <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={onEnd}
+        >
+          <Image source={require("../../assets/tablet.png")} style={styles.buttonIcon} />
+          <Text style={styles.secondaryButtonText}>종료</Text>
+        </TouchableOpacity>
         {status === 'running' ? (
-          // [진행 중] 상태일 때의 버튼
-          <TouchableOpacity 
-            style={styles.singleButton} 
-            onPress={safeOnPause}
-            activeOpacity={0.8}
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={onPause}
           >
-            <Text style={styles.buttonText}>일시정지</Text>
             <Image source={require("../../assets/tablet.png")} style={styles.buttonIcon} />
+            <Text style={styles.primaryButtonText}>일시정지</Text>
           </TouchableOpacity>
         ) : (
-          // [일시정지] 상태일 때의 버튼들
-          <>
-            <TouchableOpacity 
-              style={styles.secondaryButton} 
-              onPress={safeOnEnd}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.buttonText}>종료</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.primaryButton} 
-              onPress={safeOnResume}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.buttonText}>재시작</Text>
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={onResume}
+          >
+            <Image source={require("../../assets/play.png")} style={styles.buttonIcon} />
+            <Text style={styles.primaryButtonText}>재시작</Text>
+          </TouchableOpacity>
         )}
       </View>
     </View>
@@ -105,105 +79,109 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingVertical: 24,
-    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 40,
+    paddingHorizontal: 30,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 10,
-    alignItems: 'center',
+    minHeight: 200,
   },
   timeContainer: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 15, // 여백 조정
   },
   timeLabel: {
-    fontFamily: 'Pretendard',
+    fontSize: 16,
+    color: '#2E2E2E',
+    marginBottom: 8,
     fontWeight: '500',
-    fontSize: 14,
-    color: '#999999',
   },
   timeValue: {
-    fontFamily: 'Pretendard',
-    fontWeight: '600',
-    fontSize: 30,
-    color: '#333333',
-    marginTop: 4,
+    fontSize: 48,
+    color: '#2E2E2E',
+    fontWeight: '300',
+    letterSpacing: 2,
   },
-  pausedTimeValue: {
-    color: '#D9D9D9',
-  },
+  // [추가] 가로줄 스타일
   divider: {
-    width: 320,
-    height: 2,
-    backgroundColor: 'rgba(170, 178, 200, 0.2)',
-    marginVertical: 12,
+    width: '100%',
+    height: 1,
+    backgroundColor: '#EAEAEA',
+    marginVertical: 15, // 위아래 여백
   },
   trashInfoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 15, // 여백 조정
     width: '100%',
-    marginBottom: 20,
   },
   trashListButton: {
+    marginRight: 15,
     padding: 10,
   },
+  hamburgerMenu: {
+    width: 24,
+    height: 18,
+    justifyContent: 'space-between',
+  },
+  hamburgerLine: {
+    height: 3,
+    backgroundColor: '#418663',
+    borderRadius: 2,
+  },
   trashText: {
-    fontFamily: 'Pretendard',
-    fontWeight: '600',
     fontSize: 16,
-    color: '#999999',
-    marginLeft: 8, // 아이콘과 텍스트 간격
+    color: '#2E2E2E',
+    fontWeight: '500',
   },
   trashCount: {
-    color: '#2E2E2E',
+    fontWeight: '700',
+    color: '#418663',
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 32, // 버튼 사이 간격
-    width: '100%',
+    justifyContent: 'space-between',
+    gap: 15,
   },
-  // 진행 중일 때의 '일시정지' 버튼
-  singleButton: {
-    width: 120,
-    height: 40,
+  primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2E2E2E',
-    borderRadius: 30,
-  },
-  // 일시정지 상태의 '종료' 버튼
-  secondaryButton: {
-    width: 100,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2E2E2E',
-    borderRadius: 30,
-  },
-  // 일시정지 상태의 '재시작' 버튼
-  primaryButton: {
-    width: 100,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#418663',
     borderRadius: 30,
+    paddingVertical: 5,
+    paddingHorizontal: 30,
+    flex: 1,
+    justifyContent: 'center',
+    gap: 8,
   },
-  buttonText: {
-    fontFamily: 'Pretendard',
-    fontWeight: '700',
-    fontSize: 20,
+  primaryButtonText: {
     color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2E2E2E',
+    borderRadius: 25,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    flex: 1,
+    justifyContent: 'center',
+    gap: 8,
+  },
+  secondaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '600',
   },
   buttonIcon: {
-    width: 24,
-    height: 24,
-    tintColor: '#FFFFFF',
-    marginLeft: 8,
-  },
+    width: 20,
+    height: 20,
+    tintColor: '#FFFFFF'
+  }
 });
