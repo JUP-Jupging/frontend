@@ -1,18 +1,29 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Modal,
-  ScrollView,
-  SafeAreaView,
-} from "react-native";
-import Icon from "react-native-vector-icons/MaterialIcons";
+import React from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native'
+import Icon from 'react-native-vector-icons/MaterialIcons'
 
-const { width: screenWidth } = Dimensions.get("window");
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window')
 
+/**
+ * 🎮 PloggingControls: 플로깅 제어 및 통계 표시 컴포넌트
+ * 
+ * 주요 기능:
+ * 1. 실시간 플로깅 통계 표시 (시간, 거리, 쓰레기 개수)
+ * 2. 플로깅 제어 버튼 (일시정지/재시작/종료)
+ * 3. 메인 화면으로 이동 (백그라운드 실행)
+ * 
+ * Props:
+ * - status: 플로깅 상태 ('idle' | 'running' | 'paused')
+ * - time: 경과 시간 (초)
+ * - trashCount: 수집한 쓰레기 개수
+ * - totalDistance: 총 이동 거리 (미터)
+ * - formatTime: 시간 포맷팅 함수
+ * - formatDistance: 거리 포맷팅 함수
+ * - onPause: 일시정지 핸들러
+ * - onResume: 재시작 핸들러
+ * - onEnd: 종료 핸들러
+ * - onGoToMain: 메인 화면 이동 핸들러
+ */
 export default function PloggingControls({
   status,
   time,
@@ -20,269 +31,207 @@ export default function PloggingControls({
   totalDistance,
   formatTime,
   formatDistance,
-  onStart,
   onPause,
   onResume,
   onEnd,
   onGoToMain,
-  collectedTrashList = [], // 수집된 쓰레기 목록
 }) {
-  const [showTrashList, setShowTrashList] = useState(false);
-
-  // 더미 쓰레기 목록 (실제로는 props로 받아올 데이터)
-  const dummyTrashList = [
-    { id: 1, type: "플라스틱 병", time: "10:30", location: "공원 입구" },
-    { id: 2, type: "캔", time: "10:45", location: "벤치 근처" },
-    { id: 3, type: "종이컵", time: "11:00", location: "산책로" },
-  ];
-
-  const trashListToShow =
-    collectedTrashList.length > 0
-      ? collectedTrashList
-      : dummyTrashList.slice(0, trashCount);
+  
+  console.log('[PloggingControls] 렌더링:', {
+    status,
+    time,
+    trashCount,
+    totalDistance,
+    formattedDistance: formatDistance ? formatDistance(totalDistance) : 'N/A',
+    formattedTime: formatTime ? formatTime(time) : 'N/A'
+  });
 
   return (
     <View style={styles.container}>
-      {/* 상단 흰색 배경 영역 */}
-      <View style={styles.topSection}>
-        {/* 플로깅 시간 */}
-        <View style={styles.timerSection}>
-          <Text style={styles.timerLabel}>플로깅 시간</Text>
-          <Text style={styles.timerText}>{formatTime(time)}</Text>
-        </View>
-
-        {/* 주운 쓰레기 정보 */}
-        <View style={styles.trashSection}>
-          <View style={styles.trashHeader}>
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => setShowTrashList(true)}
-            >
-              <View style={styles.menuIcon}>
-                <View style={styles.menuLine} />
-                <View style={styles.menuLine} />
-                <View style={styles.menuLine} />
-              </View>
-            </TouchableOpacity>
-            <Text style={styles.trashLabel}>현재 주운 쓰레기</Text>
-            <Text style={styles.trashCount}>{trashCount}개</Text>
+      {/* 📊 상단 통계 표시 영역 */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statsRow}>
+          {/* ⏱️ 경과 시간 */}
+          <View style={styles.statItem}>
+            <Icon name="access-time" size={20} color="#4CAF50" />
+            <Text style={styles.statLabel}>시간</Text>
+            <Text style={styles.statValue}>
+              {formatTime ? formatTime(time) : '00:00:00'}
+            </Text>
           </View>
-        </View>
 
-        {/* 컨트롤 버튼들 */}
-        <View style={styles.buttonRow}>
-          {status === "running" ? (
-            <>
-              <TouchableOpacity style={styles.pauseButton} onPress={onPause}>
-                <Icon name="pause" size={20} color="#FFFFFF" />
-                <Text style={styles.pauseButtonText}>일시정지</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.endButton} onPress={onEnd}>
-                <Icon name="stop" size={20} color="#FFFFFF" />
-                <Text style={styles.endButtonText}>종료</Text>
-              </TouchableOpacity>
-            </>
-          ) : status === "paused" ? (
-            <>
-              <TouchableOpacity style={styles.resumeButton} onPress={onResume}>
-                <Icon name="play-arrow" size={20} color="#FFFFFF" />
-                <Text style={styles.resumeButtonText}>재시작</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.endButton} onPress={onEnd}>
-                <Icon name="stop" size={20} color="#FFFFFF" />
-                <Text style={styles.endButtonText}>종료</Text>
-              </TouchableOpacity>
-            </>
-          ) : null}
+          {/* 📏 이동 거리 */}
+          <View style={styles.statItem}>
+            <Icon name="timeline" size={20} color="#4CAF50" />
+            <Text style={styles.statLabel}>거리</Text>
+            <Text style={styles.statValue}>
+              {formatDistance ? formatDistance(totalDistance) : '0km'}
+            </Text>
+          </View>
+
+          {/* 🗑️ 쓰레기 개수 */}
+          <View style={styles.statItem}>
+            <Icon name="delete-outline" size={20} color="#4CAF50" />
+            <Text style={styles.statLabel}>쓰레기</Text>
+            <Text style={styles.statValue}>{trashCount || 0}개</Text>
+          </View>
         </View>
       </View>
 
-      {/* 쓰레기 목록 모달 */}
-      <Modal
-        visible={showTrashList}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowTrashList(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>주운 쓰레기 목록</Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowTrashList(false)}
-            >
-              <Icon name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
+      {/* 🎮 하단 제어 버튼 영역 */}
+      <View style={styles.controlsContainer}>
+        <View style={styles.controlsRow}>
+          {/* 메인 화면 이동 버튼 */}
+          <TouchableOpacity 
+            style={styles.secondaryButton} 
+            onPress={onGoToMain}
+          >
+            <Icon name="home" size={20} color="#666666" />
+            <Text style={styles.secondaryButtonText}>메인</Text>
+          </TouchableOpacity>
 
-          <ScrollView style={styles.trashList}>
-            {trashListToShow.length > 0 ? (
-              trashListToShow.map((trash, index) => (
-                <View key={trash.id || index} style={styles.trashItem}>
-                  <View style={styles.trashIcon}>
-                    <Icon name="delete" size={20} color="#4CAF50" />
-                  </View>
-                  <View style={styles.trashInfo}>
-                    <Text style={styles.trashType}>{trash.type}</Text>
-                    <Text style={styles.trashDetails}>
-                      {trash.time} • {trash.location}
-                    </Text>
-                  </View>
-                  <Text style={styles.trashNumber}>#{index + 1}</Text>
-                </View>
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <Icon name="delete-outline" size={48} color="#CCC" />
-                <Text style={styles.emptyText}>아직 주운 쓰레기가 없습니다</Text>
-              </View>
-            )}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+          {/* 플로깅 제어 버튼 (일시정지/재시작) */}
+          {status === 'running' ? (
+            <TouchableOpacity 
+              style={styles.primaryButton} 
+              onPress={onPause}
+            >
+              <Icon name="pause" size={24} color="#FFFFFF" />
+              <Text style={styles.primaryButtonText}>일시정지</Text>
+            </TouchableOpacity>
+          ) : status === 'paused' ? (
+            <TouchableOpacity 
+              style={styles.primaryButton} 
+              onPress={onResume}
+            >
+              <Icon name="play-arrow" size={24} color="#FFFFFF" />
+              <Text style={styles.primaryButtonText}>재시작</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {/* 종료 버튼 */}
+          <TouchableOpacity 
+            style={styles.endButton} 
+            onPress={onEnd}
+          >
+            <Icon name="stop" size={20} color="#FFFFFF" />
+            <Text style={styles.endButtonText}>종료</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 30,
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: -2,
     },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 8,
+    elevation: 10,
   },
 
-  topSection: {
-    alignItems: "center",
-  },
-
-  // 타이머 섹션
-  timerSection: {
-    alignItems: "center",
+  // 📊 통계 표시 영역
+  statsContainer: {
     marginBottom: 20,
   },
-  timerLabel: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 4,
-    fontWeight: "500",
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
   },
-  timerText: {
-    fontSize: 36,
-    fontWeight: "300",
-    color: "#333",
-    letterSpacing: 1,
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 4,
+    marginBottom: 2,
+    fontWeight: '500',
+  },
+  statValue: {
+    fontSize: 16,
+    color: '#333333',
+    fontWeight: '700',
   },
 
-  // 쓰레기 섹션
-  trashSection: {
-    width: "100%",
-    marginBottom: 20,
+  // 🎮 제어 버튼 영역
+  controlsContainer: {
+    marginTop: 10,
   },
-  trashHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+  controlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  // 버튼 스타일들
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 25,
     paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
+    paddingHorizontal: 20,
+    flex: 2,
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  menuButton: {
-    padding: 4,
-    marginRight: 8,
-  },
-  menuIcon: {
-    width: 16,
-    height: 12,
-    justifyContent: "space-between",
-  },
-  menuLine: {
-    width: 16,
-    height: 2,
-    backgroundColor: "#666",
-    borderRadius: 1,
-  },
-  trashLabel: {
+  primaryButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
-    color: "#666",
-    fontWeight: "500",
-  },
-  trashCount: {
-    fontSize: 16,
-    color: "#333",
-    fontWeight: "700",
-    marginLeft: 8,
+    fontWeight: '600',
   },
 
-  // 버튼 행
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    paddingHorizontal: 20,
-  },
-  pauseButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFA500",
-    borderRadius: 20,
-    paddingVertical: 8,
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 25,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    flex: 1,
+    justifyContent: 'center',
+    gap: 6,
   },
-  pauseButtonText: {
-    color: "#FFFFFF",
+  secondaryButtonText: {
+    color: '#666666',
     fontSize: 14,
-    fontWeight: "600",
-    marginLeft: 6,
+    fontWeight: '600',
   },
-  resumeButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#4CAF50",
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  resumeButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-    marginLeft: 6,
-  },
+
   endButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F44336",
-    borderRadius: 20,
-    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF5722',
+    borderRadius: 25,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    shadowColor: "#000",
+    flex: 1,
+    justifyContent: 'center',
+    gap: 6,
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -292,80 +241,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   endButtonText: {
-    color: "#FFFFFF",
+    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: "600",
-    marginLeft: 6,
-  },
-
-  // 모달 스타일
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#333",
-  },
-  closeButton: {
-    padding: 8,
-  },
-  trashList: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  trashItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  trashIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E8F5E8",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 16,
-  },
-  trashInfo: {
-    flex: 1,
-  },
-  trashType: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 4,
-  },
-  trashDetails: {
-    fontSize: 14,
-    color: "#666",
-  },
-  trashNumber: {
-    fontSize: 14,
-    color: "#999",
-    fontWeight: "500",
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: "#999",
-    marginTop: 16,
+    fontWeight: '600',
   },
 });

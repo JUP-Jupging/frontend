@@ -25,366 +25,593 @@ import TrashInfoModal from "../components/Plogging/TrashInfoModal"  // 쓰레기
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 /**
- * 👉 기능 요약
- * - 현재 위치 권한 요청
- * - 시작 버튼: 타이머 시작 + onUserLocationChange로 좌표 수집
- * - 이동 경로를 Polyline으로 그림
- * - 일시정지/재시작/종료/리셋 제공
- * - (안드로이드) 권한 거부 시 안내
+ * 🗑️ 더미 쓰레기 위치 데이터
+ * - 실제 API가 연동되면 이 데이터는 서버에서 받아옴
+ * - 지도에 마커로 표시되며, 클릭 시 쓰레기 정보 모달 표시
  */
+const DUMMY_TRASH_LOCATIONS = [
+  {
+    id: 1,
+    coordinate: { latitude: 37.5665, longitude: 126.978 },
+    title: "마로니에 공원 쓰레기",
+    location: "마로니에 공원",
+    amount: "많음",
+    photos: [
+      { type: "유리병", count: 3, color: "#797982" },
+      { type: "플라스틱", count: 4, color: "#007AFF" },
+    ],
+  },
+  {
+    id: 2,
+    coordinate: { latitude: 37.5675, longitude: 126.979 },
+    title: "벤치 근처 쓰레기",
+    location: "마로니에 공원",
+    amount: "보통",
+    photos: [
+      { type: "캔", count: 2, color: "#797982" },
+      { type: "종이", count: 1, color: "#34C759" },
+    ],
+  },
+]
 
-const INITIAL_REGION = {
-  // 👉 초기 카메라(서울시청 근처). 첫 위치 이벤트 오면 자동으로 따라감
-  latitude: 37.5665,
-  longitude: 126.9780,
-  latitudeDelta: 0.01,
-  longitudeDelta: 0.01,
-};
-
-export default function PloggingStartScreen({ navigation }) {
-  // ✅ UI/상태
-  const [granted, setGranted] = useState(false);      // 위치 권한 여부
-  const [tracking, setTracking] = useState(false);    // 트래킹 중 여부
-  const [paused, setPaused] = useState(false);        // 일시정지 여부
-
-  const [elapsed, setElapsed] = useState(0);          // 경과 시간(초)
-  const [path, setPath] = useState([]);               // 지나간 좌표 배열 [{lat, lng}, ...]
-  const [current, setCurrent] = useState(null);       // 현재 좌표
-
-  // ✅ 타이머/맵 ref
-  const timerRef = useRef(null);
-  const startAtRef = useRef(null);
-  const mapRef = useRef(null);
-
-  // ---------------------------------------------
-  // 권한 요청 (Android용). iOS는 Info.plist 설정으로 충분
-  // ---------------------------------------------
-  const requestLocationPermission = useCallback(async () => {
-    if (Platform.OS !== "android") {
-      setGranted(true);
-      return;
-    }
-    try {
-      const fine = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: "위치 권한 요청",
-          message: "플로깅 경로를 기록하려면 위치 권한이 필요합니다.",
-          buttonPositive: "허용",
-          buttonNegative: "거부",
-        }
-      );
-      const coarse = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION
-      );
-      const ok =
-        fine === PermissionsAndroid.RESULTS.GRANTED &&
-        coarse === PermissionsAndroid.RESULTS.GRANTED;
-
-      setGranted(ok);
-
-      if (!ok) {
-        Alert.alert("권한 필요", "설정에서 위치 권한을 허용해주세요.");
-      }
-    } catch (e) {
-      console.warn("권한 요청 실패:", e);
-      setGranted(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    requestLocationPermission();
-    // 언마운트 시 타이머/상태 정리
-    return () => stopAll();
-  }, [requestLocationPermission]);
-
-  // ---------------------------------------------
-  // ---------------------------------------------
-  // 유틸리티 함수들
-  // ---------------------------------------------
+/**
+ * 🏃‍♂️ PloggingStartScreen: 플로깅 시작 및 진행 화면
+ * 
+ * 주요 기능:
+ * 1. 플로깅 시작/일시정지/재시작/종료 제어
+ * 2. 실시간 지도 표시 (현재 위치, 이동 경로, 쓰레기 위치)
+ * 3. 플로깅 통계 실시간 표시 (시간, 거리, 쓰레기 개수)
+ * 4. 백그라운드 실행 지원 (다른 화면으로 이동해도 플로깅 계속)
+ * 5. 쓰레기 마커 클릭 시 정보 모달 표시 및 수집 기능
+ * 6. 이동 경로 polyline 표시 및 종료 시 캡처 기능
+ * 
+ * 백그라운드 실행:
+ * - PloggingContext를 통해 전역 상태 관리
+ * - 화면을 벗어나도 위치 추적과 시간 측정 계속
+ * - FloatingPloggingIndicator를 통해 다른 화면에서도 진행 상황 확인 가능
+ */
+export default function PloggingStartScreen({ navigation, route }) {
+  console.log('[PloggingStartScreen] 컴포넌트 렌더링 시작');
+  console.log('[PloggingStartScreen] FloatingPloggingIndicator 숨김 처리 - 이 화면에서는 표시되지 않음');
   
-  // 시간 포맷팅 (초 → HH:MM:SS)
-  const formatTime = (seconds) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  
+  // 🎯 플로깅 전역 상태에서 필요한 데이터와 함수들 추출
+  const {
+    status,             // 플로깅 상태 (idle/running/paused)
+    time,               // 경과 시간 (초)
+    trashCount,         // 수집한 쓰레기 개수
+    formatTime,         // 시간 포맷팅 함수 (초 → HH:MM:SS)
+    currentLocation,    // 현재 위치 좌표
+    routeCoordinates,   // 이동 경로 좌표 배열
+    totalDistance,      // 총 이동 거리 (미터)
+    formatDistance,     // 거리 포맷팅 함수 (미터 → km)
+    mapRef,             // 지도 컴포넌트 참조
+    trashLocations,     // 쓰레기 위치 목록
+    isBackgroundMode,   // 백그라운드 모드 여부
+    startPlogging,      // 플로깅 시작 함수
+    pausePlogging,      // 플로깅 일시정지 함수
+    resumePlogging,     // 플로깅 재시작 함수
+    endPlogging,        // 플로깅 종료 함수
+    addTrash,           // 쓰레기 수집 카운트 증가 함수
+    setTrashLocations,  // 쓰레기 위치 설정 함수
+    removeTrash,        // 특정 쓰레기 위치 제거 함수
+    collectedTrash,     // 수집된 쓰레기 목록 (Context에서 관리)
+  } = usePloggingContext();
 
-  // 두 좌표 간의 거리 계산 (미터 단위)
-  const calculateDistance = (coord1, coord2) => {
-    const R = 6371e3; // 지구 반지름 (미터)
-    const φ1 = (coord1.latitude * Math.PI) / 180;
-    const φ2 = (coord2.latitude * Math.PI) / 180;
-    const Δφ = ((coord2.latitude - coord1.latitude) * Math.PI) / 180;
-    const Δλ = ((coord2.longitude - coord1.longitude) * Math.PI) / 180;
+  // 🗺️ 컴포넌트 내부 상태 관리 (UI 전용)
+  const [modalVisible, setModalVisible] = useState(false)               // 플로깅 종료 확인 모달
+  const [trashInfoModalVisible, setTrashInfoModalVisible] = useState(false) // 쓰레기 정보 모달
+  const [selectedTrash, setSelectedTrash] = useState(null)             // 선택된 쓰레기 정보
+  const [isLoading, setIsLoading] = useState(false)                    // 로딩 상태
+  const [mapReady, setMapReady] = useState(false)                      // 지도 초기화 완료 여부
+  const [capturedImage, setCapturedImage] = useState(null)            // 캡처된 지도 이미지
 
-    const a =
-      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c;
-  };
-
-  // 전체 경로의 총 거리 계산
-  const calculateTotalDistance = (coordinates) => {
-    if (coordinates.length < 2) return 0;
-    
-    let totalDistance = 0;
-    for (let i = 1; i < coordinates.length; i++) {
-      totalDistance += calculateDistance(coordinates[i - 1], coordinates[i]);
-    }
-    return totalDistance;
-  };
-
-  // 거리 포맷팅 (미터 → km 또는 m)
-  const formatDistance = (meters) => {
-    if (meters < 1000) {
-      return `${Math.round(meters)}m`;
-    } else {
-      return `${(meters / 1000).toFixed(2)}km`;
-    }
-  };
-
-  // ---------------------------------------------
-  // 타이머 제어
-  // ---------------------------------------------
-  const startTimer = () => {
-    // 👉 기준 시각 기록(일시정지 후 재시작도 누적되도록 보정)
-    startAtRef.current = Date.now() - elapsed * 1000;
-    timerRef.current = setInterval(() => {
-      const diff = Math.floor((Date.now() - startAtRef.current) / 1000);
-      setElapsed(diff);
-    }, 1000);
-  };
-
-  const clearTimer = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  };
-
-  // ---------------------------------------------
-  // 시작/일시정지/재시작/종료/리셋
-  // ---------------------------------------------
-  const onPressStart = async () => {
-    if (!granted) {
-      await requestLocationPermission();
-      if (!granted) return;
-    }
-    if (tracking && !paused) return; // 이미 진행 중이면 무시
-
-    setTracking(true);
-    setPaused(false);
-    startTimer();
-  };
-
-  const onPressPause = () => {
-    if (!tracking || paused) return;
-    setPaused(true);
-    clearTimer();
-  };
-
-  const onPressResume = () => {
-    if (!tracking || !paused) return;
-    setPaused(false);
-    startTimer();
-  };
-
-  const stopAll = () => {
-    setTracking(false);
-    setPaused(false);
-    clearTimer();
-  };
-
-  const onPressStop = () => {
-    // 플로깅 데이터 준비
-    const ploggingResult = {
-      id: Date.now(),
-      title: "플로깅 완료",
-      date: new Date().toLocaleDateString('ko-KR'),
-      time: new Date().toLocaleTimeString('ko-KR', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      }),
-      duration: formatTime(elapsed),
-      distance: calculateTotalDistance(path),
-      route: path,
-      trashCount: 0, // 기본값, 추후 쓰레기 수집 기능 연동
-      calories: Math.round(calculateTotalDistance(path) * 0.05), // 대략적인 칼로리 계산
-    };
-
-    console.log('[PloggingStartScreen] 플로깅 완료, 결과:', ploggingResult);
-    
-    // 플로깅 중지
-    stopAll();
-    
-    // 플로깅 기록 화면으로 이동
-    navigation.navigate('PloggingRecord', { 
-      result: ploggingResult 
+  // 🔍 백그라운드 모드에서 polyline 업데이트 디버깅
+  useEffect(() => {
+    console.log('[PloggingStartScreen] 🔍 경로 좌표 업데이트:', {
+      좌표개수: routeCoordinates?.length || 0,
+      총거리: formatDistance(totalDistance),
+      백그라운드모드: isBackgroundMode,
+      플로깅상태: status
     });
-  };
-
-  const onPressReset = () => {
-    stopAll();
-    setElapsed(0);
-    setPath([]);
-    setCurrent(null);
-    // 카메라도 초기 위치로
-    mapRef.current?.animateToRegion(INITIAL_REGION, 600);
-  };
-
-  // ---------------------------------------------
-  // 위치 이벤트 (react-native-maps)
-  // - showsUserLocation=true 일 때 onUserLocationChange가 주기적으로 발생
-  // - tracking 모드일 때만 path에 누적
-  // ---------------------------------------------
-  const handleUserLocationChange = (e) => {
-    const c = e?.nativeEvent?.coordinate;
-    if (!c) return;
-
-    const coord = { latitude: c.latitude, longitude: c.longitude };
-    setCurrent(coord);
-
-    // 👉 카메라를 따라가게(부드럽게)
-    mapRef.current?.animateCamera(
-      { center: { latitude: c.latitude, longitude: c.longitude }, zoom: 17 },
-      { duration: 600 }
-    );
-
-    // 👉 트래킹 중이며 일시정지 상태가 아닐 때만 경로 누적
-    if (tracking && !paused) {
-      setPath((prev) => {
-        // 중복 좌표/미세 좌표 변동 필터링(선택 로직)
-        const last = prev[prev.length - 1];
-        if (!last || last.latitude !== coord.latitude || last.longitude !== coord.longitude) {
-          return [...prev, coord];
-        }
-        return prev;
+    
+    if (routeCoordinates && routeCoordinates.length > 0) {
+      const lastCoordinate = routeCoordinates[routeCoordinates.length - 1];
+      console.log('[PloggingStartScreen] 🔍 최신 위치:', lastCoordinate);
+    }
+    
+    // 백그라운드에서도 polyline이 업데이트되는지 확인
+    if (isBackgroundMode && routeCoordinates && routeCoordinates.length > 1) {
+      console.log('[PloggingStartScreen] ✅ 백그라운드에서 경로 데이터 계속 업데이트됨');
+      console.log('[PloggingStartScreen] 📊 백그라운드 진행 상황:', {
+        경로점수: routeCoordinates.length,
+        총거리: formatDistance(totalDistance),
+        소요시간: formatTime(time)
       });
     }
+  }, [routeCoordinates, totalDistance, isBackgroundMode, status, formatDistance, formatTime, time]);
+
+  // ⬅️ 뒤로가기 버튼 처리 - 백그라운드 모드로 전환
+  // 플로깅 진행 중에도 다른 화면으로 이동 가능하도록 처리
+  useEffect(() => {
+    console.log('[PloggingStartScreen] 뒤로가기 핸들러 등록');
+    
+    const backAction = () => {
+      console.log('[PloggingStartScreen] 하드웨어 뒤로가기 버튼 클릭, 현재 상태:', status);
+      console.log('[PloggingStartScreen] 메인 화면으로 이동 시 FloatingPloggingIndicator 다시 표시');
+      
+      // 플로깅 상태와 관계없이 항상 메인 화면으로 이동
+      // 플로깅은 백그라운드에서 계속 실행되며, FloatingPloggingIndicator로 확인 가능
+      console.log('[PloggingStartScreen] 메인 화면으로 이동 (플로깅 세션 유지)');
+      navigation.navigate("Main");
+      return true; // 기본 뒤로가기 동작 방지 (앱 종료 방지)
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+    return () => {
+      console.log('[PloggingStartScreen] 뒤로가기 핸들러 해제');
+      backHandler.remove();
+    };
+  }, [status, navigation]);
+
+  // 컴포넌트 마운트 시 초기 데이터 로드
+  useEffect(() => {
+    console.log('[PloggingStartScreen] 컴포넌트 마운트');
+    
+    const initializeApp = async () => {
+      console.log('[PloggingStartScreen] 앱 초기화 시작');
+      await loadData()
+      setTimeout(() => {
+        console.log('[PloggingStartScreen] 맵 준비 완료 설정');
+        setMapReady(true)
+      }, 100)
+    }
+    
+    initializeApp()
+
+    // 컴포넌트 언마운트 시에는 위치 추적을 중지하지 않음 (백그라운드 실행 유지)
+    return () => {
+      console.log('[PloggingStartScreen] 컴포넌트 언마운트 - 플로깅 세션 유지');
+      // stopLocationTracking() - 제거됨: 백그라운드에서도 계속 실행되어야 함
+    }
+  }, [])
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true)
+      console.log('[PloggingStartScreen] 데이터 로딩 시작...')
+      
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // 더미 데이터 설정 (이미 쓰레기가 있는 경우 덮어쓰지 않음)
+      if (trashLocations.length === 0) {
+        setTrashLocations(DUMMY_TRASH_LOCATIONS)
+      }
+      
+      console.log('[PloggingStartScreen] 데이터 로딩 완료')
+    } catch (error) {
+      console.error('[PloggingStartScreen] 데이터 로딩 실패:', error)
+      if (trashLocations.length === 0) {
+        setTrashLocations([])
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // 플로깅 시작 핸들러
+  const handleStart = async () => {
+    console.log('[PloggingStartScreen] 플로깅 시작 시도...')
+    const success = await startPlogging();
+    if (!success) {
+      console.log('[PloggingStartScreen] 플로깅 시작 실패');
+    }
+  }
+
+  const handlePause = () => {
+    console.log('[PloggingStartScreen] 플로깅 일시정지')
+    pausePlogging();
+  }
+
+  const handleResume = () => {
+    console.log('[PloggingStartScreen] 플로깅 재시작')
+    resumePlogging();
+    
+    // 현재 위치로 맵 이동
+    if (mapRef.current && currentLocation) {
+      mapRef.current.animateToRegion({
+        ...currentLocation,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 1000);
+    }
+  }
+
+  const handleEnd = () => {
+    console.log('[PloggingStartScreen] 플로깅 종료 요청')
+    setModalVisible(true);
+  }
+
+  // 🗺️ 지도 캡처 함수 - 전체 polyline이 보이도록 자동 줌 조정
+  const captureMap = async () => {
+    try {
+      if (!mapRef.current) {
+        console.log('[PloggingStartScreen] ⚠️ 지도 참조가 없음');
+        return null;
+      }
+
+      if (!routeCoordinates || routeCoordinates.length === 0) {
+        console.log('[PloggingStartScreen] ⚠️ 경로 좌표가 없음');
+        return null;
+      }
+
+      console.log('[PloggingStartScreen] 📸 지도 캡처 시작...');
+      
+      // 전체 경로를 포함하는 영역 계산
+      const latitudes = routeCoordinates.map(coord => coord.latitude);
+      const longitudes = routeCoordinates.map(coord => coord.longitude);
+      
+      const minLat = Math.min(...latitudes);
+      const maxLat = Math.max(...latitudes);
+      const minLng = Math.min(...longitudes);
+      const maxLng = Math.max(...longitudes);
+      
+      // 경로 중심점 계산
+      const centerLat = (minLat + maxLat) / 2;
+      const centerLng = (minLng + maxLng) / 2;
+      
+      // 경로 범위에 패딩 추가 (20% 여유공간)
+      const latDelta = Math.max((maxLat - minLat) * 1.2, 0.005); // 최소 델타값 설정
+      const lngDelta = Math.max((maxLng - minLng) * 1.2, 0.005);
+
+      // 지도를 전체 경로가 보이도록 조정
+      await mapRef.current.animateToRegion({
+        latitude: centerLat,
+        longitude: centerLng,
+        latitudeDelta: latDelta,
+        longitudeDelta: lngDelta,
+      }, 1000);
+
+      console.log('[PloggingStartScreen] 🔍 지도 영역 조정 완료:', {
+        center: { lat: centerLat, lng: centerLng },
+        delta: { lat: latDelta, lng: lngDelta },
+        routePoints: routeCoordinates.length
+      });
+      
+      // 지도 애니메이션 완료 대기
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // 지도 캡처 실행
+      const snapshot = await mapRef.current.takeSnapshot({
+        width: Math.floor(screenWidth * 0.9),
+        height: Math.floor(screenHeight * 0.5),
+        format: 'png',
+        quality: 0.8,
+        result: 'base64'
+      });
+
+      if (snapshot) {
+        console.log('[PloggingStartScreen] ✅ 지도 캡처 완료');
+        return `data:image/png;base64,${snapshot}`;
+      } else {
+        console.log('[PloggingStartScreen] ⚠️ 지도 캡처 결과가 없음');
+        return null;
+      }
+    } catch (error) {
+      console.error('[PloggingStartScreen] ❌ 지도 캡처 실패:', error);
+      return null;
+    }
+  }
+
+  const confirmEnd = async () => {
+    console.log('[PloggingStartScreen] 플로깅 종료 확정')
+    try {
+      setModalVisible(false);
+      
+      // 지도 캡처
+      console.log('[PloggingStartScreen] 📸 지도 캡처 중...');
+      const capturedMapImage = await captureMap();
+      
+      // **수정: 플로깅 종료 전에 현재 상태 저장**
+      const currentStats = {
+        totalTime: time,
+        totalDistance: totalDistance,
+        trashCount: trashCount,
+        routeCoordinates: routeCoordinates,
+        collectedTrash: collectedTrash || []
+      };
+      
+      console.log('[PloggingStartScreen] 📊 종료 전 현재 통계:', currentStats);
+      
+      // 플로깅 종료 및 결과 데이터 생성
+      const ploggingResult = endPlogging();
+
+      // **수정: endPlogging에서 반환된 데이터가 비어있으면 현재 상태 사용**
+      const finalStats = {
+        totalTime: ploggingResult.totalTime || currentStats.totalTime,
+        totalDistance: ploggingResult.totalDistance || currentStats.totalDistance,
+        trashCount: ploggingResult.trashCount || currentStats.trashCount,
+        routeCoordinates: ploggingResult.routeCoordinates || currentStats.routeCoordinates,
+        collectedTrash: ploggingResult.collectedTrash || currentStats.collectedTrash
+      };
+
+      // 캡처된 이미지와 추가 정보를 결과에 추가
+      const finalResult = {
+        ...finalStats,
+        mapImage: capturedMapImage, // 캡처된 지도 이미지
+        routeImage: capturedMapImage, // 추후 별도 생성 가능
+        routeName: route?.params?.routeName || route?.params?.courseName || "자유 플로깅", // 선택한 산책로 이름
+        routeLocation: route?.params?.routeLocation || route?.params?.location || "플로깅 경로", // 산책로 위치
+      };
+
+      console.log('[PloggingStartScreen] 📈 최종 플로깅 결과:', {
+        ...finalResult,
+        mapImage: capturedMapImage ? '✅ 캡처됨' : '❌ 캡처 실패'
+      });
+
+      // 결과 화면으로 이동
+      navigation.navigate("PloggingRecord", {
+        result: finalResult,
+      });
+    } catch (error) {
+      console.error('[PloggingStartScreen] 플로깅 종료 처리 오류:', error);
+      
+      // 에러 발생시에도 결과 화면으로 이동 (이미지 없이)
+      const fallbackResult = {
+        totalTime: time,
+        totalDistance: totalDistance,
+        trashCount: trashCount,
+        routeCoordinates: routeCoordinates,
+        collectedTrash: collectedTrash || [],
+        routeName: "자유 플로깅",
+        routeLocation: "플로깅 경로",
+      };
+      
+      navigation.navigate("PloggingRecord", {
+        result: fallbackResult,
+      });
+    }
+  }
+
+  const handleTrashMarkerPress = (trash) => {
+    console.log('[PloggingStartScreen] 쓰레기 마커 클릭:', trash.id);
+    setSelectedTrash(trash);
+    setTrashInfoModalVisible(true);
+  }
+
+  const handlePickTrash = (trash) => {
+    console.log('[PloggingStartScreen] 쓰레기 줍기:', trash.id);
+    try {
+      addTrash();
+      setTrashInfoModalVisible(false);
+      
+      // 해당 쓰레기를 목록에서 제거
+      removeTrash(trash.id);
+      
+      Alert.alert('성공', '쓰레기를 주웠습니다!', [{ text: '확인' }]);
+    } catch (error) {
+      console.error('[PloggingStartScreen] 쓰레기 줍기 오류:', error);
+    }
+  }
+
+  const handleGoToMain = () => {
+    console.log('[PloggingStartScreen] 메인 화면으로 이동 버튼 클릭');
+    console.log('[PloggingStartScreen] FloatingPloggingIndicator가 메인 화면에서 활성화될 예정');
+    navigation.navigate("Main");
+  }
+
+  const handleBackPress = () => {
+    console.log('[PloggingStartScreen] 헤더 뒤로가기 버튼 클릭, 현재 상태:', status);
+    console.log('[PloggingStartScreen] 다른 화면으로 이동 시 FloatingPloggingIndicator가 다시 표시될 예정');
+    
+    // 플로깅 중이라면 백그라운드 실행 안내
+    if (status === "running" || status === "paused") {
+      console.log('[PloggingStartScreen] 플로깅 진행 중 - 백그라운드 실행 안내');
+      Alert.alert(
+        '플로깅 진행 중',
+        '플로깅이 백그라운드에서 계속 실행됩니다.\n언제든 다시 돌아올 수 있습니다.',
+        [
+          { text: '확인', onPress: () => {
+            console.log('[PloggingStartScreen] 메인 화면으로 이동 - FloatingPloggingIndicator 활성화됨');
+            navigation.navigate("Main");
+          }}
+        ]
+      );
+    } else {
+      // 플로깅 중이 아니면 바로 메인 화면으로 이동
+      console.log('[PloggingStartScreen] 메인 화면으로 이동');
+      navigation.navigate("Main");
+    }
+  };
+
+  const handleGoToMyPlogging = () => {
+    console.log('[PloggingStartScreen] 마이플로깅기록으로 이동');
+    navigation.navigate("내 플로깅 기록");
   };
 
   return (
-    <View style={styles.container}>
-      {/* ✅ 구글맵 */}
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFillObject}
-        provider={PROVIDER_GOOGLE}
-        initialRegion={INITIAL_REGION}
-        showsUserLocation={granted}
-        onUserLocationChange={handleUserLocationChange}
-        // compassEnabled, rotateEnabled 등 필요시 조정
-      >
-        {/* 경로 선 */}
-        {path.length > 1 && (
-          <Polyline
-            coordinates={path}
-            strokeWidth={6}
-            // 색상은 플랫폼 기본을 사용(디자인 확정 시 지정)
-          />
-        )}
-
-        {/* 출발/현재 마커(선택) */}
-        {path[0] && <Marker coordinate={path[0]} title="출발" />}
-        {current && <Marker coordinate={current} title="현재 위치" />}
-      </MapView>
-
-      {/* ✅ 상단 타이머 박스 */}
-      <View style={styles.timerBox}>
-        <Text style={styles.timerText}>{formatTime(elapsed)}</Text>
-        <Text style={styles.subText}>
-          {tracking ? (paused ? "일시정지" : "기록 중") : "대기 중"}
-        </Text>
+    <SafeAreaView style={styles.container}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          onPress={handleBackPress}
+        >
+          <Icon name="arrow-back" size={24} color="#418663" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>플로깅</Text>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.headerButton} onPress={handleGoToMyPlogging}>
+            <Icon name="person" size={24} color="#418663" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* ✅ 하단 컨트롤 버튼들 */}
-      <View style={styles.controls}>
-        {!tracking && (
-          <Button onPress={onPressStart} label="시작" />
+      {/* 전체 화면 지도 */}
+      <View style={styles.mapContainer}>
+        <PloggingMap
+          mapRef={mapRef}
+          currentLocation={currentLocation}
+          routeCoordinates={routeCoordinates}
+          trashLocations={trashLocations}
+          isLoading={isLoading}
+          mapReady={mapReady}
+          onTrashMarkerPress={handleTrashMarkerPress}
+        />
+        
+        {/* 지도 위 오버레이 컨트롤들 */}
+        {status === "idle" ? (
+          // 🎯 플로깅 시작 전 - 지도 위에 시작 버튼들 오버레이
+          <View style={styles.overlayControls}>
+            <TouchableOpacity 
+              style={styles.overlayStartButton} 
+              onPress={handleStart}
+            >
+              <Text style={styles.overlayStartButtonText}>시작</Text>
+            </TouchableOpacity>
+            
+            
+          </View>
+        ) : (
+          // 🎯 플로깅 진행 중 - 기존 하단 컨트롤 유지
+          <View style={styles.runningControls}>
+            <PloggingControls
+              status={status}
+              time={time}
+              trashCount={trashCount}
+              totalDistance={totalDistance}
+              formatTime={formatTime}
+              formatDistance={formatDistance}
+              onStart={handleStart}
+              onPause={handlePause}
+              onResume={handleResume}
+              onEnd={handleEnd}
+              onGoToMain={handleGoToMain}
+            />
+          </View>
         )}
-        {tracking && !paused && (
-          <>
-            <Button onPress={onPressPause} label="일시정지" />
-            <Button onPress={onPressStop} label="종료" type="danger" />
-          </>
-        )}
-        {tracking && paused && (
-          <>
-            <Button onPress={onPressResume} label="재시작" />
-            <Button onPress={onPressStop} label="종료" type="danger" />
-          </>
-        )}
-        <Button onPress={onPressReset} label="리셋" type="ghost" />
       </View>
-    </View>
-  );
-}
 
-/** 단순 버튼 컴포넌트(스타일 포함) */
-function Button({ onPress, label, type = "primary" }) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={[
-        styles.btn,
-        type === "danger" && styles.btnDanger,
-        type === "ghost" && styles.btnGhost,
-      ]}
-      activeOpacity={0.8}
-    >
-      <Text style={[
-        styles.btnText,
-        type === "ghost" && styles.btnTextGhost
-      ]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+      {/* 종료 확인 모달 */}
+      <CommonModal
+        visible={modalVisible}
+        title="플로깅 종료"
+        message={`플로깅을 종료하시겠습니까?\n주운 쓰레기: ${trashCount}개\n총 거리: ${formatDistance(totalDistance)}\n소요 시간: ${formatTime(time)}`}
+        onConfirm={confirmEnd}
+        onCancel={() => setModalVisible(false)}
+        confirmText="종료"
+        cancelText="취소"
+      />
+
+      {/* 쓰레기 정보 모달 */}
+      <TrashInfoModal
+        visible={trashInfoModalVisible}
+        trash={selectedTrash}
+        onClose={() => setTrashInfoModalVisible(false)}
+        onPickTrash={handlePickTrash}
+      />
+    </SafeAreaView>
+  )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
-
-  timerBox: {
-    position: "absolute",
-    top: 16,
-    left: 16,
-    right: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-  timerText: { fontSize: 28, fontWeight: "700", color: "#fff" },
-  subText: { marginTop: 4, color: "#ddd" },
-
-  controls: {
-    position: "absolute",
-    bottom: 24,
-    left: 16,
-    right: 16,
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-  },
-  btn: {
+  container: {
     flex: 1,
-    height: 48,
-    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  header: {
+
+        paddingTop: screenHeight * 0.05,
+
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#2e7d32",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    zIndex: 10, // 헤더가 지도 위에 표시되도록
   },
-  btnDanger: { backgroundColor: "#c62828" },
-  btnGhost: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: "#fff",
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#212529",
   },
-  btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  btnTextGhost: { color: "#fff" },
-});
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerButton: {
+    padding: 5,
+    marginLeft: 10,
+  },
+  
+  // 🗺️ 전체 화면 지도 컨테이너
+  mapContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  
+  // 🎯 지도 위 오버레이 컨트롤 (플로깅 시작 전)
+  overlayControls: {
+    position: 'absolute',
+    bottom: screenHeight * 0.1,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  overlayStartButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#418663",
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 32,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  overlayStartButtonText: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "500",
+  },
+  overlayMainButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderWidth: 2,
+    borderColor: "#418663",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  overlayMainButtonText: {
+    color: "#418663",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  
+  // 🎯 플로깅 진행 중 컨트롤 (기존 하단 위치)
+  runningControls: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
+})
