@@ -302,10 +302,10 @@ export default function PloggingRecordScreen() {
 
         {/* 하단 버튼들 */}
         <View style={styles.bottomButtons}>
-          <TouchableOpacity style={styles.ploggingButton} onPress={goToPloggingStart}>
+          {/* <TouchableOpacity style={styles.ploggingButton} onPress={goToPloggingStart}>
             <Icon name="add" size={24} color="#FFFFFF" />
             <Text style={styles.ploggingButtonText}>플로깅 더하기</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           
           <TouchableOpacity style={styles.trashCanButton} onPress={goToTrashCanInfo}>
             <Icon name="delete-outline" size={24} color="#333333" />

@@ -71,27 +71,25 @@ const PloggingMap = ({
     isLoading 
   });
 
-  if (!currentLocation || !mapReady) {
-    console.log('[PloggingMap] 맵 준비되지 않음 - 플레이스홀더 표시');
-    return (
-      <View style={styles.mapContainer}>
-        <View style={styles.mapPlaceholder}>
-          <Text style={styles.mapPlaceholderText}>
-            {isLoading ? "지도를 불러오는 중..." : "[지도 영역 - Google Map]"}
-          </Text>
-        </View>
-      </View>
-    );
-  }
+  // 기본 지역 설정 (서울 중심)
+  const defaultRegion = {
+    latitude: 37.5665,
+    longitude: 126.9780,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  };
 
-  console.log('[PloggingMap] 맵 렌더링 시작');
+  // 초기 지역은 현재 위치가 있으면 사용하고, 없으면 기본값 사용
+  const initialRegion = currentLocation || defaultRegion;
+
+  console.log('[PloggingMap] 맵 렌더링 시작 - 항상 MapView 렌더링');
 
   return (
     <View style={styles.mapContainer}>
       <MapView 
         ref={mapRef}
         style={styles.map}
-        initialRegion={currentLocation}
+        initialRegion={initialRegion}
         showsUserLocation={true}
         followsUserLocation={false} // 수동으로 카메라 제어
         showsMyLocationButton={false}
@@ -109,17 +107,19 @@ const PloggingMap = ({
         scrollEnabled={true}
         zoomEnabled={true}
       >
-        {/* 현재 위치 마커 (개선된 디자인) */}
-        <Marker 
-          coordinate={currentLocation} 
-          title="현재 위치"
-          anchor={{ x: 0.5, y: 0.5 }}
-        >
-          <CurrentLocationMarker />
-        </Marker>
+        {/* 현재 위치 마커 - 위치가 있고 맵이 준비되었을 때만 렌더링 */}
+        {mapReady && currentLocation && (
+          <Marker 
+            coordinate={currentLocation} 
+            title="현재 위치"
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <CurrentLocationMarker />
+          </Marker>
+        )}
         
-        {/* 경로 표시 - 더 부드럽고 예쁜 라인 */}
-        {routeCoordinates && routeCoordinates.length > 1 && (
+        {/* 경로 표시 - 맵이 준비되고 경로 데이터가 있을 때만 렌더링 */}
+        {mapReady && routeCoordinates && routeCoordinates.length > 1 && (
           (() => {
             console.log('[PloggingMap] 🗺️ Polyline 렌더링:', {
               좌표개수: routeCoordinates.length,
@@ -159,8 +159,8 @@ const PloggingMap = ({
           })()
         )}
         
-        {/* 쓰레기 위치 마커 */}
-        {trashLocations && trashLocations.length > 0 && trashLocations.map((trash) => {
+        {/* 쓰레기 위치 마커 - 맵이 준비되고 데이터가 있을 때만 렌더링 */}
+        {mapReady && trashLocations && trashLocations.length > 0 && trashLocations.map((trash) => {
           console.log('[PloggingMap] 쓰레기 마커 렌더링:', trash.id);
           return (
             <Marker
@@ -168,7 +168,7 @@ const PloggingMap = ({
               coordinate={trash.coordinate}
               onPress={() => {
                 console.log('[PloggingMap] 쓰레기 마커 클릭:', trash.id);
-                onTrashMarkerPress(trash);
+                onTrashMarkerPress && onTrashMarkerPress(trash);
               }}
             >
               <View style={styles.trashMarker}>
@@ -178,6 +178,15 @@ const PloggingMap = ({
           );
         })}
       </MapView>
+
+      {/* 로딩 오버레이 */}
+      {(isLoading || !mapReady) && (
+        <View style={styles.loadingOverlay}>
+          <Text style={styles.loadingText}>
+            {isLoading ? "지도를 불러오는 중..." : "지도 준비 중..."}
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -190,15 +199,20 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  mapPlaceholder: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#E0E0E0",
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(245, 245, 245, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  mapPlaceholderText: {
+  loadingText: {
     fontSize: 16,
     color: "#666",
+    textAlign: 'center',
   },
   currentLocationContainer: {
     alignItems: 'center',
