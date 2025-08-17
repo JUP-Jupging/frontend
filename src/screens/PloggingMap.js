@@ -3,8 +3,9 @@ import { View, StyleSheet, Dimensions } from 'react-native'
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window')
-
+const windowDimensions = Dimensions.get('window');
+const screenWidth = windowDimensions.width;
+const screenHeight = windowDimensions.height;
 /**
  * 🗺️ PloggingMap: 플로깅 지도 컴포넌트
  * 

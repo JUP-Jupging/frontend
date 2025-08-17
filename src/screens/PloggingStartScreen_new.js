@@ -252,15 +252,19 @@ export default function PloggingStartScreen({ navigation }) {
       </View>
 
       {/* 지도 영역 */}
-      <PloggingMap
-        mapRef={mapRef}
-        currentLocation={currentLocation}
-        routeCoordinates={routeCoordinates}
-        trashLocations={trashLocations}
-        isLoading={isLoading}
-        mapReady={mapReady}
-        onTrashMarkerPress={handleTrashMarkerPress}
-      />
+<View style={styles.mapContainer}>
+  {mapReady && currentLocation && (
+    <PloggingMap
+      mapRef={mapRef}
+      currentLocation={currentLocation}
+      routeCoordinates={routeCoordinates}
+      trashLocations={trashLocations}
+      isLoading={isLoading}
+      mapReady={mapReady}
+      onTrashMarkerPress={handleTrashMarkerPress}
+    />
+  )}
+</View>
 
       {/* 하단 컨트롤 */}
       <PloggingControls
