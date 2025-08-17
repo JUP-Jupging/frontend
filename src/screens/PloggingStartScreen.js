@@ -107,29 +107,27 @@ export default function PloggingStartScreen({ navigation, route }) {
   const [capturedImage, setCapturedImage] = useState(null)            // 캡처된 지도 이미지
 
   // 🔍 백그라운드 모드에서 polyline 업데이트 디버깅
-  useEffect(() => {
-    console.log('[PloggingStartScreen] 🔍 경로 좌표 업데이트:', {
-      좌표개수: routeCoordinates?.length || 0,
-      총거리: formatDistance(totalDistance),
-      백그라운드모드: isBackgroundMode,
-      플로깅상태: status
-    });
+// useEffect에서 지도 초기화 순서 조정
+useEffect(() => {
+  console.log('[PloggingStartScreen] 컴포넌트 마운트');
+  
+  const initializeApp = async () => {
+    console.log('[PloggingStartScreen] 앱 초기화 시작');
     
-    if (routeCoordinates && routeCoordinates.length > 0) {
-      const lastCoordinate = routeCoordinates[routeCoordinates.length - 1];
-      console.log('[PloggingStartScreen] 🔍 최신 위치:', lastCoordinate);
-    }
+    // 지도 준비 상태를 먼저 설정
+    setMapReady(false);
     
-    // 백그라운드에서도 polyline이 업데이트되는지 확인
-    if (isBackgroundMode && routeCoordinates && routeCoordinates.length > 1) {
-      console.log('[PloggingStartScreen] ✅ 백그라운드에서 경로 데이터 계속 업데이트됨');
-      console.log('[PloggingStartScreen] 📊 백그라운드 진행 상황:', {
-        경로점수: routeCoordinates.length,
-        총거리: formatDistance(totalDistance),
-        소요시간: formatTime(time)
-      });
-    }
-  }, [routeCoordinates, totalDistance, isBackgroundMode, status, formatDistance, formatTime, time]);
+    await loadData();
+    
+    // 더 긴 지연시간으로 지도 완전 로드 대기
+    setTimeout(() => {
+      console.log('[PloggingStartScreen] 맵 준비 완료 설정');
+      setMapReady(true);
+    }, 1000); // 100ms → 1000ms로 증가
+  };
+  
+  initializeApp();
+}, []);
 
   // ⬅️ 뒤로가기 버튼 처리 - 백그라운드 모드로 전환
   // 플로깅 진행 중에도 다른 화면으로 이동 가능하도록 처리
