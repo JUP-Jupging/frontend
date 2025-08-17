@@ -8,15 +8,13 @@ import { usePlogging } from '../hooks/usePlogging';
 const PloggingContext = createContext();
 
 export const PloggingProvider = ({ children }) => {
-  console.log('[PloggingContext] Provider 초기화');
-
   const ploggingHook = usePlogging();
   const locationHook = useLocation();
   
   const [trashLocations, setTrashLocations] = useState([]);
   const [isBackgroundMode, setIsBackgroundMode] = useState(false);
   
-  // [추가] 수집한 쓰레기 목록을 저장할 상태
+  // [로직 추가] 수집한 쓰레기 목록을 저장할 상태
   const [collectedTrash, setCollectedTrash] = useState([]);
   
   const contextRef = useRef({ isActive: true });
@@ -24,7 +22,6 @@ export const PloggingProvider = ({ children }) => {
   useEffect(() => {
     contextRef.current.isActive = true;
     return () => {
-      console.log('[PloggingContext] Context 정리 시작');
       contextRef.current.isActive = false;
       if (ploggingHook.status === "running" || ploggingHook.status === "paused") {
         locationHook.stopLocationTracking();
@@ -52,7 +49,6 @@ export const PloggingProvider = ({ children }) => {
 
   const actions = {
     startPlogging: async () => {
-      // (기존 코드와 동일)
       if (!contextRef.current.isActive) return false;
       try {
         const location = await locationHook.getCurrentLocation();
@@ -70,22 +66,19 @@ export const PloggingProvider = ({ children }) => {
       }
     },
     pausePlogging: () => {
-      // (기존 코드와 동일)
       if (!contextRef.current.isActive) return;
       ploggingHook.pausePlogging();
       locationHook.stopLocationTracking();
     },
     resumePlogging: () => {
-      // (기존 코드와 동일)
       if (!contextRef.current.isActive) return;
       ploggingHook.resumePlogging();
       locationHook.startLocationTracking(true);
     },
     endPlogging: () => {
       const result = {
-        // (기존 코드와 동일)
-        totalDistance: locationHook.totalDistance,
-        // [수정] 수집한 쓰레기 목록을 최종 결과에 포함
+        // ... (기존 데이터)
+        // [로직 수정] 수집한 쓰레기 목록을 최종 결과에 포함
         collectedTrash: [...collectedTrash],
       };
       
@@ -94,7 +87,7 @@ export const PloggingProvider = ({ children }) => {
       locationHook.setRouteCoordinates([]);
       locationHook.setTotalDistance(0);
       setTrashLocations([]);
-      // [추가] 플로깅 종료 시 수집한 쓰레기 목록 초기화
+      // [로직 추가] 플로깅 종료 시 수집한 쓰레기 목록 초기화
       setCollectedTrash([]);
 
       return result;
@@ -103,7 +96,7 @@ export const PloggingProvider = ({ children }) => {
         if (!contextRef.current.isActive) return;
         ploggingHook.pickTrash(); // 단순 카운트 증가
     },
-    // [추가] 수집한 쓰레기 객체를 목록에 추가하는 함수
+    // [로직 추가] 수집한 쓰레기 객체를 목록에 추가하는 함수
     addCollectedTrashItem: (trash) => {
         if (!contextRef.current.isActive) return;
         setCollectedTrash(prev => [...prev, trash]);
@@ -119,7 +112,6 @@ export const PloggingProvider = ({ children }) => {
   };
 
   const value = {
-    // (기존 value와 동일)
     status: ploggingHook.status,
     time: ploggingHook.time,
     trashCount: ploggingHook.trashCount,
@@ -133,7 +125,7 @@ export const PloggingProvider = ({ children }) => {
     isBackgroundMode,
     isContextActive: contextRef.current.isActive,
 
-    // [추가] 수집된 쓰레기 목록 상태를 외부로 노출
+    // [로직 추가] 수집된 쓰레기 목록 상태를 외부로 노출
     collectedTrash,
 
     ...actions,

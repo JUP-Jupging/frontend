@@ -16,8 +16,8 @@ import TrashInfoModal from "../components/Plogging/TrashInfoModal"
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 const DUMMY_TRASH_LOCATIONS = [
-    { id: 1, coordinate: { latitude: 37.5665, longitude: 126.978 }, title: "마로니에 공원 쓰레기", location: "마로니에 공원", amount: "많음", photos: [{ type: "유리병", count: 3, color: "#797982" }, { type: "플라스틱", count: 4, color: "#007AFF" }], },
-    { id: 2, coordinate: { latitude: 37.5675, longitude: 126.979 }, title: "벤치 근처 쓰레기", location: "마로니에 공원", amount: "보통", photos: [{ type: "캔", count: 2, color: "#797982" }, { type: "종이", count: 1, color: "#34C759" }], },
+  { id: 1, coordinate: { latitude: 37.5665, longitude: 126.978 }, title: "마로니에 공원 쓰레기", location: "마로니에 공원", amount: "많음", photos: [{ type: "유리병", count: 3, color: "#797982" }, { type: "플라스틱", count: 4, color: "#007AFF" }], },
+  { id: 2, coordinate: { latitude: 37.5675, longitude: 126.979 }, title: "벤치 근처 쓰레기", location: "마로니에 공원", amount: "보통", photos: [{ type: "캔", count: 2, color: "#797982" }, { type: "종이", count: 1, color: "#34C759" }], },
 ]
 
 export default function PloggingStartScreen({ navigation, route }) {
@@ -25,7 +25,7 @@ export default function PloggingStartScreen({ navigation, route }) {
     status, time, trashCount, formatTime, currentLocation, routeCoordinates,
     totalDistance, formatDistance, mapRef, trashLocations, startPlogging,
     pausePlogging, resumePlogging, endPlogging, addTrash, setTrashLocations,
-    removeTrash, 
+    removeTrash,
     // [로직 추가] Context에서 새로운 상태와 함수 가져오기
     collectedTrash, addCollectedTrashItem
   } = usePloggingContext();
@@ -39,7 +39,7 @@ export default function PloggingStartScreen({ navigation, route }) {
   useEffect(() => {
     const backAction = () => {
       navigation.navigate("Main");
-      return true; 
+      return true;
     };
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
@@ -58,18 +58,18 @@ export default function PloggingStartScreen({ navigation, route }) {
       setTrashLocations(DUMMY_TRASH_LOCATIONS);
     }
   };
-  
+
   const handleStart = async () => await startPlogging();
   const handlePause = () => pausePlogging();
   const handleResume = () => resumePlogging();
   const handleEnd = () => setModalVisible(true);
-  
+
   const confirmEnd = async () => {
     setModalVisible(false);
     const ploggingResult = endPlogging();
     navigation.navigate("PloggingRecord", { result: ploggingResult });
   };
-  
+
   const handleTrashMarkerPress = (trash) => {
     setSelectedTrash(trash);
     setTrashInfoModalVisible(true);
@@ -87,19 +87,19 @@ export default function PloggingStartScreen({ navigation, route }) {
       console.error('쓰레기 줍기 오류:', error);
     }
   };
-  
+
   // [로직 수정] 주운 쓰레기 목록 보기 핸들러
   const handleShowTrashList = () => {
-      const collectedItems = collectedTrash.map(item => 
-          `- ${item.title || '쓰레기'}: ${item.amount || '보통'}`
-      ).join('\n');
-      
-      Alert.alert(
-          "수집한 쓰레기 목록",
-          collectedTrash.length > 0 ? collectedItems : "아직 수집한 쓰레기가 없습니다."
-      );
+    const collectedItems = collectedTrash.map(item =>
+      `- ${item.title || '쓰레기'}: ${item.amount || '보통'}`
+    ).join('\n');
+
+    Alert.alert(
+      "수집한 쓰레기 목록",
+      collectedTrash.length > 0 ? collectedItems : "아직 수집한 쓰레기가 없습니다."
+    );
   };
-  
+
   const handleGoToMain = () => navigation.navigate("Main");
 
   return (
@@ -110,7 +110,7 @@ export default function PloggingStartScreen({ navigation, route }) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>플로깅</Text>
         <TouchableOpacity onPress={() => navigation.navigate("내 플로깅 기록")}>
-            <Icon name="person" size={24} color="#418663" />
+          <Icon name="person" size={24} color="#418663" />
         </TouchableOpacity>
       </View>
 
@@ -124,7 +124,7 @@ export default function PloggingStartScreen({ navigation, route }) {
           mapReady={mapReady}
           onTrashMarkerPress={handleTrashMarkerPress}
         />
-        
+
         {status === "idle" ? (
           <View style={styles.overlayControls}>
             <TouchableOpacity style={styles.overlayStartButton} onPress={handleStart}>
