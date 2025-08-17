@@ -51,20 +51,20 @@ function TabNavigator() {
     >
       {/* 🏠 홈 탭: HomeStackNavigator로 메인 화면과 플로깅 시작 화면을 관리 */}
       <Tab.Screen name="홈" component={HomeStackNavigator} options={{ headerShown: false }} />
-      
+
       {/* 🗺️ 추천 코스 탭 */}
       <Tab.Screen name="추천 코스" component={RecommendCourseStackNavigator} options={{ headerShown: false }} />
-      
+
       {/* 🔍 코스 검색 탭 */}
       <Tab.Screen
         name="코스 검색"
         component={WalkSearchScreen}
-        options={{ headerShown: false }} 
+        options={{ headerShown: false }}
       />
-      
+
       {/* 🗑️ 쓰레기 제보 탭 */}
-      <Tab.Screen name="쓰레기 제보" component={ReportTrashScreen} options={{ headerShown: false }}/>
-      
+      <Tab.Screen name="쓰레기 제보" component={ReportTrashScreen} options={{ headerShown: false }} />
+
       {/* 👤 마이페이지 탭 */}
       <Tab.Screen name="내 플로깅 기록" component={MyPageStackNavigator} options={{ headerShown: false }} />
     </Tab.Navigator>
@@ -87,11 +87,11 @@ function TabNavigator() {
  */
 export default function BottomTabNavigator() {
   const navigation = useNavigation();
-  
+
   // 현재 활성화된 화면 이름을 더 정확하게 가져오기
   const currentRouteName = useNavigationState(state => {
     if (!state || !state.routes || state.index === undefined) return null;
-    
+
     const currentRoute = state.routes[state.index];
     if (currentRoute.state) {
       // 스택 네비게이터 내부의 현재 화면 확인
@@ -100,19 +100,19 @@ export default function BottomTabNavigator() {
     }
     return currentRoute.name;
   });
-  
+
   // 현재 화면이 플로깅 관련 화면인지 확인 (인디케이터 표시 여부 결정)
   const isPloggingScreen = currentRouteName === "PloggingStart" || currentRouteName === "PloggingRecord";
-  
+
   return (
     <View style={{ flex: 1 }}>
       {/* 📱 하단 탭 네비게이터 */}
       <TabNavigator />
-      
+
       {/* 🎯 플로깅 진행 상황 인디케이터 (오버레이)
           - 플로깅 중일 때만 표시
           - 플로깅 시작 화면과 기록 화면에서는 숨김 */}
-      <FloatingPloggingIndicator 
+      <FloatingPloggingIndicator
         hideOnPlogging={isPloggingScreen}
       />
     </View>
