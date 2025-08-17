@@ -1,39 +1,34 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated, Platform, PanResponder } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useNavigationState } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { usePloggingContext } from '../contexts/PloggingContext'; // 플로깅 전역 상태 사용
+import { usePloggingContext } from '../contexts/PloggingContext';
 
+// 화면 크기를 최상단에서 정의
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-/**
- * 🎯 FloatingPloggingIndicator: 드래그 가능한 플로깅 진행 상황 인디케이터
- * 
- * 주요 기능:
- * 1. 플로깅 진행 중일 때 화면 위에 오버레이로 표시
- * 2. 실시간 플로깅 정보 표시 (시간, 거리, 쓰레기 개수)
- * 3. 드래그해서 화면 내 자유롭게 이동 가능
- * 4. 접기/펼치기 기능으로 공간 절약
- * 5. 플로깅 화면으로 빠른 이동 버튼
- * 
- * 표시 조건:
- * - 플로깅 상태가 "running" 또는 "paused"일 때만 표시
- * - hideOnPlogging=true일 때는 숨김 (플로깅 시작 화면에서 중복 방지)
- * 
- * @param {boolean} hideOnPlogging - 플로깅 화면에서 인디케이터를 숨길지 여부
- */
 const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
-  const insets = useSafeAreaInsets(); // 디바이스 안전 영역 정보
-  const navigation = useNavigation(); // 네비게이션 객체
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   
-  // 🔍 현재 활성화된 화면 감지
+  const isMounted = useRef(true);
+  
+  useEffect(() => {
+    isMounted.current = true;
+    
+    return () => {
+      console.log('[FloatingPloggingIndicator] 컴포넌트 언마운트 - 정리 작업');
+      isMounted.current = false;
+    };
+  }, []);
+  
   const navigationState = useNavigationState(state => state);
   
-  // 현재 화면이 PloggingStartScreen인지 확인하는 함수
   const isPloggingStartScreen = () => {
     try {
-      // 네비게이션 스택에서 현재 활성 화면 찾기
+      if (!navigationState || !isMounted.current) return false;
+      
       const getCurrentRouteName = (state) => {
         if (!state || !state.routes) return null;
         
@@ -45,10 +40,7 @@ const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
       };
       
       const currentRouteName = getCurrentRouteName(navigationState);
-      console.log('[FloatingPloggingIndicator] 현재 화면:', currentRouteName);
-      
       const isPloggingScreen = currentRouteName === 'PloggingStart';
-      console.log('[FloatingPloggingIndicator] PloggingStart 화면 여부:', isPloggingScreen);
       
       return isPloggingScreen;
     } catch (error) {
@@ -57,42 +49,39 @@ const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
     }
   };
   
-  // 플로깅 전역 상태에서 필요한 데이터 추출
   const { 
-    status,        // 플로깅 상태 (idle/running/paused)
-    time,          // 경과 시간 (초)
-    formatTime,    // 시간 포맷팅 함수
-    trashCount,    // 수집한 쓰레기 개수
-    totalDistance, // 총 이동 거리 (미터)
-    formatDistance // 거리 포맷팅 함수
+    status,
+    time,
+    formatTime,
+    trashCount,
+    totalDistance,
+    formatDistance,
+    isContextActive
   } = usePloggingContext();
 
-  // 컴포넌트 로컬 상태
-  const [isCollapsed, setIsCollapsed] = useState(false); // 접힘/펼침 상태
-  
-  // 드래그 기능을 위한 Animated Values
-  const pan = useRef(new Animated.ValueXY()).current;     // X, Y 위치 값
-  const opacity = useRef(new Animated.Value(1)).current;  // 투명도 값
+  if (!isContextActive || !isMounted.current) {
+    return null;
+  }
 
-  /**
-   * 🖱️ PanResponder: 드래그 제스처 처리
-   * - 작은 움직임은 버튼 클릭으로 인식하여 무시
-   * - 드래그 중에는 투명도 변경으로 시각적 피드백
-   * - 화면 경계를 벗어나지 않도록 제한
-   */
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  
+  const pan = useRef(new Animated.ValueXY()).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // 작은 움직임은 무시 (버튼 클릭과 구분)
+        if (!isMounted.current) return false;
         return Math.abs(gestureState.dx) > 10 || Math.abs(gestureState.dy) > 10;
       },
       onPanResponderGrant: () => {
-        // 드래그 시작 시 현재 위치를 offset으로 설정
+        if (!isMounted.current) return;
+        
         pan.setOffset({
           x: pan.x._value,
           y: pan.y._value,
         });
-        // 드래그 중에는 약간 투명하게
+        
         Animated.timing(opacity, {
           toValue: 0.8,
           duration: 100,
@@ -101,85 +90,109 @@ const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
       },
       onPanResponderMove: Animated.event(
         [null, { dx: pan.x, dy: pan.y }],
-        { useNativeDriver: false }
+        { 
+          useNativeDriver: false,
+          listener: (evt, gestureState) => {
+            if (!isMounted.current) return;
+          }
+        }
       ),
       onPanResponderRelease: (evt, gestureState) => {
-        // 드래그 종료 시 offset을 합침
+        if (!isMounted.current) return;
+        
         pan.flattenOffset();
         
-        // 화면 경계를 벗어나지 않도록 제한
-        const { dx, dy } = gestureState;
         let finalX = pan.x._value;
         let finalY = pan.y._value;
         
-        // X축 경계 체크 (좌우)
-        const maxX = screenWidth * 0.3; // 모달 너비의 절반 정도
+        const maxX = screenWidth * 0.3;
         const minX = -screenWidth * 0.3;
         finalX = Math.max(minX, Math.min(maxX, finalX));
         
-        // Y축 경계 체크 (상하)
         const maxY = screenHeight * 0.3;
         const minY = -screenHeight * 0.3;
         finalY = Math.max(minY, Math.min(maxY, finalY));
         
-        // 경계 내로 애니메이션
-        Animated.parallel([
-          Animated.spring(pan.x, {
-            toValue: finalX,
-            useNativeDriver: false,
-          }),
-          Animated.spring(pan.y, {
-            toValue: finalY,
-            useNativeDriver: false,
-          }),
-          Animated.timing(opacity, {
-            toValue: 1,
-            duration: 100,
-            useNativeDriver: false,
-          }),
-        ]).start();
+        if (isMounted.current) {
+          Animated.parallel([
+            Animated.spring(pan.x, {
+              toValue: finalX,
+              useNativeDriver: false,
+            }),
+            Animated.spring(pan.y, {
+              toValue: finalY,
+              useNativeDriver: false,
+            }),
+            Animated.timing(opacity, {
+              toValue: 1,
+              duration: 100,
+              useNativeDriver: false,
+            }),
+          ]).start();
+        }
       },
     })
   ).current;
 
-  // 플로깅 중이 아니면 렌더링하지 않음
   if (status !== "running" && status !== "paused") {
-    console.log('[FloatingPloggingIndicator] 플로깅 중이 아님 - 숨김, 상태:', status);
     return null;
   }
 
-  // PloggingStartScreen에서는 항상 숨김
   if (isPloggingStartScreen()) {
-    console.log('[FloatingPloggingIndicator] PloggingStartScreen에서 숨김');
     return null;
   }
 
-  // hideOnPlogging이 true이면 렌더링하지 않음 (추가 옵션)
   if (hideOnPlogging) {
-    console.log('[FloatingPloggingIndicator] hideOnPlogging=true로 숨김');
     return null;
   }
-
-  console.log('[FloatingPloggingIndicator] 인디케이터 표시, 상태:', status, '접힘 상태:', isCollapsed);
 
   const toggleCollapse = () => {
-    console.log('[FloatingPloggingIndicator] 접기/펼치기 버튼 클릭, 현재 상태:', isCollapsed);
+    if (!isMounted.current) return;
     setIsCollapsed(!isCollapsed);
   };
 
-  // 플로깅 화면으로 이동 (진행 중일 때)
   const goToPloggingScreen = () => {
-    console.log('[FloatingPloggingIndicator] 플로깅 화면으로 이동 버튼 클릭');
-    console.log('[FloatingPloggingIndicator] 현재 상태:', status);
-    console.log('[FloatingPloggingIndicator] PloggingStart 화면 진입 시 이 인디케이터는 숨겨질 예정');
+    if (!isMounted.current) return;
     
-    // 바텀탭 유지하면서 홈 탭의 PloggingStart로 이동
-    navigation.navigate("Main", {
-      screen: "홈",
-      params: { screen: "PloggingStart" }
-    });
-    console.log('[FloatingPloggingIndicator] 네비게이션 명령 전송 완료');
+    console.log('[FloatingPloggingIndicator] 플로깅 화면으로 이동');
+    
+    try {
+      const navigationTimer = setTimeout(() => {
+        if (isMounted.current) {
+          navigation.navigate("Main", {
+            screen: "홈",
+            params: { screen: "PloggingStart" }
+          });
+        }
+      }, 50);
+      
+      if (!isMounted.current) {
+        clearTimeout(navigationTimer);
+      }
+      
+    } catch (error) {
+      console.error('[FloatingPloggingIndicator] 네비게이션 오류:', error);
+    }
   };
+
+  const safeFormatTime = (time) => {
+    try {
+      return formatTime ? formatTime(time || 0) : '00:00:00';
+    } catch (error) {
+      console.error('[FloatingPloggingIndicator] 시간 포맷 오류:', error);
+      return '00:00:00';
+    }
+  };
+
+  const safeFormatDistance = (distance) => {
+    try {
+      return formatDistance ? formatDistance(distance || 0) : '0km';
+    } catch (error) {
+      console.error('[FloatingPloggingIndicator] 거리 포맷 오류:', error);
+      return '0km';
+    }
+  };
+
   if (isCollapsed) {
     return (
       <Animated.View 
@@ -196,11 +209,12 @@ const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
         <TouchableOpacity 
           style={styles.collapsedIndicator}
           onPress={toggleCollapse}
+          activeOpacity={0.8}
         >
           <View style={[styles.statusDot, { 
             backgroundColor: status === "running" ? "#4CAF50" : "#FFC107" 
           }]} />
-          <Text style={styles.collapsedTime}>{formatTime(time)}</Text>
+          <Text style={styles.collapsedTime}>{safeFormatTime(time)}</Text>
           <Icon name="keyboard-arrow-up" size={screenWidth * 0.05} color="#666" />
         </TouchableOpacity>
       </Animated.View>
@@ -220,12 +234,14 @@ const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
       {...panResponder.panHandlers}
     >
       <View style={styles.indicatorCard}>
-        {/* 드래그 핸들 */}
         <View style={styles.dragHandle} />
         
-        {/* 헤더 */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={goToPloggingScreen} style={styles.headerLeft}>
+          <TouchableOpacity 
+            onPress={goToPloggingScreen} 
+            style={styles.headerLeft}
+            activeOpacity={0.8}
+          >
             <View style={[styles.statusDot, { 
               backgroundColor: status === "running" ? "#4CAF50" : "#FFC107" 
             }]} />
@@ -234,33 +250,36 @@ const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
             </Text>
           </TouchableOpacity>
           
-          <TouchableOpacity onPress={toggleCollapse} style={styles.closeButton}>
+          <TouchableOpacity 
+            onPress={toggleCollapse} 
+            style={styles.closeButton}
+            activeOpacity={0.8}
+          >
             <Icon name="keyboard-arrow-down" size={screenWidth * 0.05} color="#666" />
           </TouchableOpacity>
         </View>
 
-        {/* 진행 상황 */}
         <View style={styles.progressContainer}>
           <View style={styles.progressItem}>
             <Text style={styles.progressLabel}>시간</Text>
-            <Text style={styles.progressValue}>{formatTime(time)}</Text>
+            <Text style={styles.progressValue}>{safeFormatTime(time)}</Text>
           </View>
           
           <View style={styles.progressItem}>
             <Text style={styles.progressLabel}>거리</Text>
-            <Text style={styles.progressValue}>{formatDistance(totalDistance)}</Text>
+            <Text style={styles.progressValue}>{safeFormatDistance(totalDistance)}</Text>
           </View>
           
           <View style={styles.progressItem}>
             <Text style={styles.progressLabel}>쓰레기</Text>
-            <Text style={styles.progressValue}>{trashCount}개</Text>
+            <Text style={styles.progressValue}>{trashCount || 0}개</Text>
           </View>
         </View>
 
-        {/* 플로깅 화면으로 이동 버튼 */}
         <TouchableOpacity 
           style={styles.goButton}
           onPress={goToPloggingScreen}
+          activeOpacity={0.8}
         >
           <Text style={styles.goButtonText}>플로깅 화면으로</Text>
           <Icon name="arrow-forward" size={screenWidth * 0.04} color="#FFFFFF" />
@@ -362,7 +381,6 @@ const styles = StyleSheet.create({
     marginRight: screenWidth * 0.01,
   },
   
-  // 접힌 상태 스타일
   collapsedContainer: {
     position: 'absolute',
     bottom: screenWidth * 0.04,
