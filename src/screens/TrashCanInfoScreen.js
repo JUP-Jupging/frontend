@@ -1,8 +1,8 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, StyleSheet, Modal, Text, TouchableOpacity, Image, Dimensions, SafeAreaView } from 'react-native';
+import { View, StyleSheet, Modal, Text, TouchableOpacity, Image, Dimensions, SafeAreaView, Linking } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useLocation } from '../hooks/useLocation';
-import Icon from "react-native-vector-icons/MaterialIcons"
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -62,11 +62,11 @@ export default function TrashCanMapScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.headerWrapper}>
         <TouchableOpacity onPress={goBack}>
-          <Icon name="arrow-back" size={24} color="#333" />
+          <Icon name="arrow-left" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>내 주변 쓰레기통</Text>
         <TouchableOpacity onPress={goToProfile}>
-            <Icon name="person" size={24} color="#333" />
+          <Icon name="account-circle" size={24} color="#333" />
         </TouchableOpacity>
       </View>
 
@@ -105,9 +105,17 @@ export default function TrashCanMapScreen({ navigation }) {
             <View style={styles.infoRow}><Text style={styles.label}>세부위치</Text><Text style={styles.value}>{selectedTrashCan?.details}</Text></View>
             <View style={styles.infoRow}><Text style={styles.label}>관리기관 전화번호</Text><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.phone}>{selectedTrashCan?.phone}</Text></View></View>
             <View style={styles.divider} />
-            {/* <TouchableOpacity style={styles.navigateBtn}>
+            <TouchableOpacity
+              style={styles.navigateBtn}
+              onPress={() => {
+                if (currentLocation && selectedTrashCan) {
+                  const url = `https://www.google.com/maps/dir/?api=1&origin=${currentLocation.latitude},${currentLocation.longitude}&destination=${selectedTrashCan.latitude},${selectedTrashCan.longitude}&travelmode=walking`;
+                  Linking.openURL(url);
+                }
+              }}
+            >
               <Text style={styles.navigateText}>길찾기 안내</Text>
-            </TouchableOpacity> */}
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -118,8 +126,6 @@ export default function TrashCanMapScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   headerWrapper: {
-    paddingTop: screenHeight * 0.05,
-
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
