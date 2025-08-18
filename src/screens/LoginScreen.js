@@ -1,7 +1,4 @@
-// src/screens/LoginScreen.js
-"use client";
-
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -11,36 +8,39 @@ import {
   Image,
   Dimensions,
   SafeAreaView,
-  Linking,
+  NativeModules,
 } from "react-native";
-import { getKakaoAuthUrl } from "../api/auth";          // ✅ API만 호출
-import useOAuthCallback from "../hooks/useOAathCallback"; // ✅ 딥링크/토큰 처리는 훅에서
+import { kakaoLogin } from "../api/auth";
+import { useAuth } from "../stores/useAuth";
+import { printAndroidKeyHash } from "../utils/printKeyHash"; // 해시키 출력 함수 경로에 맞게 수정
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
-
+console.log("RNKakaoLogins:", NativeModules.RNKakaoLogins);
 export default function LoginScreen({ navigation }) {
-  // ✅ 로그인 성공/실패 후 처리만 화면에서 담당
-  useOAuthCallback({
-    onSuccess: () => {
+  const setTokens = useAuth((s) => s.setTokens);
+  const setUser = useAuth((s) => s.setUser);
+  useEffect(() => {
+    printAndroidKeyHash();
+  }, []);
+  const handleKakaoLogin = async () => {
+    try {
+      // 카카오 네이티브 로그인 및 백엔드 인증
+      const result = await kakaoLogin();
+      setTokens({
+        accessToken: result.jwtAccessToken,
+        refreshToken: result.jwtRefreshToken,
+      });
+      console.log("저장된 accessToken:", useAuth.getState().accessToken);
+      console.log("저장된 refreshToken:", useAuth.getState().refreshToken);
+      setUser(result.profile); // 프로필 정보 저장 (선택)
       Alert.alert("로그인 성공", "카카오 로그인이 완료되었습니다.", [
         { text: "확인", onPress: () => navigation.replace("Main") },
       ]);
-    },
-    onError: (msg) => {
-      Alert.alert("로그인 실패", typeof msg === "string" ? msg : "로그인 처리 중 오류가 발생했습니다.");
-    },
-  });
-
-  const handleKakaoLogin = async () => {
-    try {
-      const url = await getKakaoAuthUrl(); // ex) https://kauth.kakao.com/oauth/authorize?...
-      await Linking.openURL(url);
-      // 이후 흐름은 useOAuthCallback 훅에서 처리
     } catch (e) {
-      Alert.alert("로그인 오류", e?.message || "인증 URL 요청에 실패했습니다.");
+      Alert.alert("로그인 실패", e?.message || "카카오 로그인 오류");
     }
   };
-
+  
   const handleGoToMain = () => navigation.navigate("Main");
 
   return (
