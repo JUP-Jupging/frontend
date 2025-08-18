@@ -86,8 +86,10 @@ defaultConfig {
     versionName "1.0"
 
     // ✅ 여기에 Google Maps API 키를 전달할 placeholder 추가
-    manifestPlaceholders = [ MAPS_API_KEY: env.REACT_APP_GOOGLE_MAPS_API_KEY ]
-}
+        manifestPlaceholders = [
+            MAPS_API_KEY: env.REACT_APP_GOOGLE_MAPS_API_KEY,
+            KAKAO_APP_KEY: env.REACT_APP_KAKAO_NATIVE_KEY // .env에서 불러오기
+        ]}
     signingConfigs {
         debug {
             storeFile file('debug.keystore')

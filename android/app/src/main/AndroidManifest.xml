@@ -1,20 +1,15 @@
-<!-- android/app/src/main/AndroidManifest.xml -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.frontendapp">
 
-    <!-- ▶ 인터넷 권한 (필수) -->
+    <!-- 인터넷, 위치, 카메라, 앨범 권한 등 기존 권한 유지 -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- ▶ 위치 권한 (선택) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- (백그라운드 추적도 고려 시) -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    <!-- ▶ 카메라 권한 (선택) -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- ▶ 앨범 권한 (선택) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-        <application
+    <application
         android:name=".MainApplication"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
@@ -32,23 +27,33 @@
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize"
             android:exported="true">
+            <!-- 딥링크 관련 intent-filter 삭제 -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity 
+            android:name="com.kakao.sdk.auth.AuthCodeHandlerActivity"
+            android:exported="true">
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="jupging"
-                    android:host="oauth"
-                    android:path="/kakao" />
+                
+                <!-- 리다이렉트 URI: "kakao${NATIVE_APP_KEY}://oauth" -->
+                <data android:host="oauth"
+                        android:scheme="kakao${KAKAO_APP_KEY}" />
             </intent-filter>
         </activity>
-
-        <!-- ▶ Google Maps API Key 설정 -->
+        <!-- Google Maps API Key 설정 등 기존 설정 유지 -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
+        <!-- 카카오 네이티브 앱 키 메타데이터 추가 -->
+        <meta-data
+            android:name="com.kakao.sdk.AppKey"
+            android:value="@string/kakao_app_key" />
         <uses-library android:name="org.apache.http.legacy" android:required="false" />
     </application>
 </manifest>
