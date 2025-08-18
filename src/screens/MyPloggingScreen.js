@@ -1,16 +1,58 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { View, Text, StyleSheet, TouchableOpacity, Image, SafeAreaView, ScrollView, Dimensions } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import Icon from "react-native-vector-icons/MaterialIcons"
+import { getMyPage } from "../api/mypage";
+import { getMyReports } from "../api/report";
+import { getMyPloggingRecords } from "../api/plog"; // ✅ 플로깅 기록 API import
+import { useAuth } from "../stores/useAuth";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 export default function MyPloggingScreen() {
   const navigation = useNavigation()
   const [activeTab, setActiveTab] = useState("줍깅")
-
+  const [user, setUser] = useState(null);
+  const [reports, setReports] = useState([]);
+  const [ploggingRecords, setPloggingRecords] = useState([]); // ✅ 플로깅 기록 상태
+  const accessToken = useAuth((s) => s.accessToken);
+  useEffect(() => {
+    async function fetchUser() {
+      try {
+        const data = await getMyPage(accessToken);
+        setUser(data);
+      } catch (e) {
+        console.error("마이페이지 정보 불러오기 실패:", e);
+      }
+    }
+    if (accessToken) fetchUser();
+  }, [accessToken]);
+  useEffect(() => {
+    async function fetchReports() {
+      try {
+        const data = await getMyReports(accessToken);
+        setReports(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error("제보 기록 불러오기 실패:", e);
+        setReports([]);
+      }
+    }
+    if (accessToken && activeTab === "신고") fetchReports();
+  }, [accessToken, activeTab]);
+    useEffect(() => {
+    async function fetchPloggingRecords() {
+      try {
+        const data = await getMyPloggingRecords(accessToken);
+        setPloggingRecords(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error("플로깅 기록 불러오기 실패:", e);
+        setPloggingRecords([]);
+      }
+    }
+    if (accessToken && activeTab === "줍깅") fetchPloggingRecords();
+  }, [accessToken, activeTab]);
   return (
     <SafeAreaView style={styles.container}>
       {/* 헤더 */}
@@ -23,10 +65,15 @@ export default function MyPloggingScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* 프로필 상단 영역 */}
         <View style={styles.profileSection}>
-          <Image source={require("../assets/profile.png")} style={styles.profileImage} />
+          {user?.profileImageUrl ? (
+            <Image source={{ uri: user.profileImageUrl }} style={styles.profileImage} />
+          ) : (
+            <Image source={require("../assets/profile.png")} style={styles.profileImage} />
+          )}          
           <View style={styles.profileInfo}>
-            <Text style={styles.nickname}>쓰레기줍기장인</Text>
-          </View>
+            <Text style={styles.nickname}>
+              {user?.appnickname ? user.appnickname : "닉네임 없음"}
+            </Text>          </View>
           <TouchableOpacity onPress={() => navigation.navigate("MyPageMain")}>
             <Icon name="chevron-right" size={24} color="#131214" />
           </TouchableOpacity>
@@ -45,7 +92,13 @@ export default function MyPloggingScreen() {
 
           {/* 탭 인디케이터 */}
           <View style={styles.tabIndicatorContainer}>
-            <View style={[styles.tabIndicator, { left: activeTab === "줍깅" ? 0 : (screenWidth - 40) / 2 }]} />            <View style={styles.tabUnderline} />
+            <View
+              style={[
+                styles.tabIndicator,
+                { left: activeTab === "줍깅" ? 0 : (screenWidth - 40) / 2 },
+              ]}
+            />
+            <View style={styles.tabUnderline} />
           </View>
         </View>
 
@@ -61,22 +114,41 @@ export default function MyPloggingScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* 플로깅 기록 */}
+            {/* 플로깅 기록 리스트 */}
             <View style={styles.recordSection}>
               <Text style={styles.recordTitle}>플로깅 기록</Text>
-              <View style={styles.recordCard}>
-                <View style={styles.recordContent}>
-                  <Text style={styles.recordMainTitle}>쓰줍장의 쓰레기 기록</Text>
-                  <Text style={styles.recordDate}>2024.10.24 ~ 2024.10.26</Text>
-                  <Text style={styles.recordLocation}>국립 중앙 박물관</Text>
-                </View>
-                <View style={styles.recordImageContainer}>
-                  <Image source={require("../assets/map-image.png")} style={styles.recordMapImage} />
-                  <TouchableOpacity style={styles.trashIcon}>
-                    <Image source={require("../assets/trash-02.png")} style={styles.trashIconImage} />
-                  </TouchableOpacity>
-                </View>
-              </View>
+              {ploggingRecords.length === 0 ? (
+                <Text style={{ color: "#999", textAlign: "center", marginTop: 20 }}>플로깅 기록이 없습니다.</Text>
+              ) : (
+                ploggingRecords.map((record) => (
+                  <View key={record.ploggingId} style={styles.recordCard}>
+                    <View style={styles.recordContent}>
+                      <Text style={styles.recordMainTitle}>
+                        {record.trailTypeName || "코스 정보 없음"}
+                      </Text>
+                      <Text style={styles.recordDate}>
+                        {record.ploggingDate || "날짜 없음"}
+                      </Text>
+                      <Text style={styles.recordLocation}>
+                        {`거리: ${record.distance || 0}m / 시간: ${record.ploggingTime || "정보 없음"}`}
+                      </Text>
+                    </View>
+                    <View style={styles.recordImageContainer}>
+                      <Image
+                        source={
+                          record.imageUrl
+                            ? { uri: record.imageUrl }
+                            : require("../assets/map-image.png")
+                        }
+                        style={styles.recordMapImage}
+                      />
+                      <TouchableOpacity style={styles.trashIcon}>
+                        <Image source={require("../assets/trash-02.png")} style={styles.trashIconImage} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
             </View>
           </>
         ) : (
@@ -90,22 +162,39 @@ export default function MyPloggingScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* 제보 기록 */}
+            {/* 제보 기록 리스트 */}
             <View style={styles.recordSection}>
               <Text style={styles.recordTitle}>제보 기록</Text>
-              <View style={styles.recordCard}>
-                <View style={styles.recordContent}>
-                  <Text style={styles.recordMainTitle}>쓰줍장의 쓰레기 제보</Text>
-                  <Text style={styles.recordDate}>2024.10.24 ~ 2024.10.26</Text>
-                  <Text style={styles.recordLocation}>국립 중앙 박물관</Text>
-                </View>
-                <View style={styles.recordImageContainer}>
-                  <Image source={require("../assets/map-image.png")} style={styles.recordMapImage} />
-                  <TouchableOpacity style={styles.trashIcon}>
-                    <Image source={require("../assets/trash-02.png")} style={styles.trashIconImage} />
-                  </TouchableOpacity>
-                </View>
-              </View>
+              {reports.length === 0 ? (
+                <Text style={{ color: "#999", textAlign: "center", marginTop: 20 }}>제보 기록이 없습니다.</Text>
+              ) : (
+                reports.map((report) => (
+                  <View key={report.reportId} style={styles.recordCard}>
+                    <View style={styles.recordContent}>
+                      <Text style={styles.recordMainTitle}>{report.title || "제목 없음"}</Text>
+                      <Text style={styles.recordDate}>
+                        {report.createdAt
+                          ? report.createdAt.split("T")[0]
+                          : new Date().toISOString().split("T")[0]}
+                      </Text>
+                      <Text style={styles.recordLocation}>{report.trailTypeName || "장소 정보 없음"}</Text>
+                    </View>
+                    <View style={styles.recordImageContainer}>
+                      <Image
+                        source={
+                          report.imageUrl
+                            ? { uri: report.imageUrl }
+                            : require("../assets/map-image.png")
+                        }
+                        style={styles.recordMapImage}
+                      />
+                      <TouchableOpacity style={styles.trashIcon}>
+                        <Image source={require("../assets/trash-02.png")} style={styles.trashIconImage} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
             </View>
           </>
         )}
