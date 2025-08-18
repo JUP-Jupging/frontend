@@ -16,6 +16,7 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons"
 // 제대로 작동하는 지도를 위해 MapView만 import
 import MapView, { Marker } from "react-native-maps"
 import { getTrailDetail } from "../API/trails"
+import { useLocation } from "../hooks/useLocation" // useLocation 훅 가져오기
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -296,7 +297,12 @@ export default function CourseDetailScreen({ navigation, route }) {
 
   const startPlogging = () => {
     if (courseData) {
+      // API에서 실제 경로 데이터를 가져오도록 수정해야 합니다.
+      // 지금은 courseData에 path가 있다고 가정합니다.
+      const trailPath = courseData.path || []; 
+      
       navigation.navigate("PloggingStart", {
+        // 👇 기존에 넘기던 데이터
         selectedRoute: {
           id: courseData.id,
           name: courseData.name,
@@ -304,15 +310,20 @@ export default function CourseDetailScreen({ navigation, route }) {
           difficulty: courseData.level,
           distance: courseData.length,
           duration: courseData.duration,
-          latitude: courseData.spotLatitude || 37.5665, // 기본값 설정
-          longitude: courseData.spotLongitude || 126.978, // 기본값 설정
+          latitude: courseData.spotLatitude || 37.5665,
+          longitude: courseData.spotLongitude || 126.978,
         },
-        routeName: courseData.name,
-        routeLocation: courseData.address,
+        // 👇 새로 추가하는 데이터
+        trailStartCoords: { // 산책로 시작점 좌표
+          latitude: courseData.spotLatitude,
+          longitude: courseData.spotLongitude,
+        },
+        trailFullPath: trailPath, // 산책로 전체 경로
         courseName: courseData.name,
-      })
+      });
     }
-  }
+  };
+
 
   // DB에서 매점/화장실 정보 로드 (추후 구현)
   const loadNearbyFacilities = () => {
@@ -507,7 +518,7 @@ export default function CourseDetailScreen({ navigation, route }) {
               <Text style={styles.detailLabel}>매점 정보</Text>
             </View>
             <Text style={styles.detailText}>
-              {nearbyPlaces.restaurants || "식수보급처가 없으니 매점에서 구입하거나 사전준비"}
+              {courseData.sunsetInfo || "식수보급처가 없으니 매점에서 구입하거나 사전준비"}
             </Text>
           </View>
 
@@ -517,7 +528,8 @@ export default function CourseDetailScreen({ navigation, route }) {
               <Icon name="human-male-female" size={20} color="#797982" />
               <Text style={styles.detailLabel}>화장실 정보</Text>
             </View>
-            <Text style={styles.detailText}>{nearbyPlaces.toilets || "생태공원, 적누리 마을회관, 벚꽃길 사격장"}</Text>
+            <Text style={styles.detailText}>{courseData.toilet || "생태공원, 적누리 마을회관, 벚꽃길 사격장"}</Text>
+            console.log("화장실 정보:", courseData.toiletDescription);  
           </View>
         </View>
 
@@ -557,10 +569,7 @@ export default function CourseDetailScreen({ navigation, route }) {
             <Text style={styles.startPloggingButtonText}>이 코스로 플로깅 시작하기</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.trashBinButton} onPress={goToTrashInfo}>
-            <Text style={styles.trashBinButtonText}>근처 쓰레기통 찾기</Text>
-            <Image source={require("../assets/Vector.png")} style={styles.vectorIcon} />
-          </TouchableOpacity>
+
         </View>
       </ScrollView>
     </View>

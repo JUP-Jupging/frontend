@@ -118,7 +118,8 @@ export default function WalkSearchScreen({ navigation }) {
   }, [searchQuery])
 
   const handleTrailPress = (trailId) => {
-    navigation.navigate("CourseDetailScreen", { trailId });
+    // ❗️StackNavigator에 등록한 이름("CourseDetail")으로 수정합니다.
+    navigation.navigate("CourseDetail", { trailId });
   };
 
   const getDifficultyColor = (difficulty) => {
