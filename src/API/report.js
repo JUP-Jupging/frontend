@@ -1,6 +1,6 @@
 // src/api/report.js
 import axios from "axios";
-import BASE_URL from "../apiconfig";
+import BASE_URL from "./apiconfig";
 
 /**
  * 신고 생성
