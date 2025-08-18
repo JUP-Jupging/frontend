@@ -274,7 +274,7 @@ const PloggingMap = ({
   routeCoordinates, 
   trashLocations, 
   isLoading, 
-  mapReady, 
+  mapReady,
   onTrashMarkerPress,
   nearbyCourses,
   onCourseMarkerPress,
@@ -285,7 +285,7 @@ const PloggingMap = ({
   const defaultRegion = {
     latitude: 37.5665,
     longitude: 126.9780,
-    latitudeDelta: 0.008, // 더 확대된 뷰
+    latitudeDelta: 0.008,
     longitudeDelta: 0.008,
   };
 
@@ -297,105 +297,85 @@ const PloggingMap = ({
 
   return (
     <View style={styles.mapContainer}>
-      <MapView 
+      <MapView
         ref={mapRef}
         style={styles.map}
         initialRegion={initialRegion}
-        showsUserLocation={false} // 커스텀 마커 사용
-        showsMyLocationButton={false}
-        showsCompass={true}
-        showsScale={false}
-        rotateEnabled={true}
-        pitchEnabled={true}
-        scrollEnabled={true}
-        zoomEnabled={true}
-        mapType="standard"
         onMapReady={() => console.log('지도 준비 완료')}
-        loadingEnabled={true}
         loadingIndicatorColor="#418663"
         loadingBackgroundColor="#F5F5F5"
       >
-        {/* 현재 위치 커스텀 마커 */}
-        {mapReady && currentLocation && (
-          <Marker 
-            coordinate={currentLocation} 
-            anchor={{ x: 0.5, y: 0.5 }}
-            zIndex={1000}
-          >
-            <CurrentLocationMarker />
-          </Marker>
-        )}
-        
-        {/* 선택된 산책로의 전체 경로 표시 (점선) */}
-        {mapReady && initialTrailPath && initialTrailPath.length > 1 && (
-          <Polyline
-            coordinates={initialTrailPath}
-            strokeColor="rgba(65, 134, 99, 0.6)"
-            strokeWidth={5}
-            lineDashPattern={[10, 5]} // 점선 패턴
-            lineJoin="round"
-            lineCap="round"
-          />
-        )}
+        {mapReady && (
+          <>
+            {/* 현재 위치 커스텀 마커 */}
+            {currentLocation && (
+              <Marker
+                coordinate={currentLocation}
+                anchor={{ x: 0.5, y: 0.5 }}
+                zIndex={1000}
+              >
+                <CurrentLocationMarker />
+              </Marker>
+            )}
 
-        {/* 사용자가 이동한 경로 (플로깅 중) - 실선 */}
-        {mapReady && routeCoordinates && routeCoordinates.length > 1 && (
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeColor="#418663" // 앱 메인 컬러
-            strokeWidth={7}
-            lineJoin="round"
-            lineCap="round"
-          />
-        )}
-        
-        {/* 쓰레기 위치 마커 (개선된 디자인) */}
-        {mapReady && trashLocations && trashLocations.map((trash) => (
-          <Marker 
-            key={`trash-${trash.id}`} 
-            coordinate={trash.coordinate}
-            anchor={{ x: 0.5, y: 0.5 }}
-            zIndex={100}
-          >
-            <TrashMarker 
-              trash={trash} 
-              onPress={onTrashMarkerPress} 
-            />
-          </Marker>
-        ))}
-
-        {/* 근처 산책로 마커 (개선된 디자인) */}
-        {mapReady && nearbyCourses && nearbyCourses.map((course) => (
-          <Marker 
-            key={`course-${course.id}`} 
-            coordinate={course.coordinate}
-            anchor={{ x: 0.5, y: 0.5 }}
-            zIndex={selectedCourseId === course.id ? 200 : 50}
-          >
-            <CourseMarker 
-              course={course} 
-              isSelected={selectedCourseId === course.id}
-              onPress={onCourseMarkerPress} 
-            />
-          </Marker>
-        ))}
-
-        {/* 선택된 산책로 주변 반경 표시 */}
-        {mapReady && selectedCourseId && nearbyCourses && (
-          (() => {
-            const selectedCourse = nearbyCourses.find(c => c.id === selectedCourseId);
-            return selectedCourse ? (
-              <Circle
-                center={selectedCourse.coordinate}
-                radius={500} // 500미터 반경
-                strokeColor="rgba(65, 134, 99, 0.3)"
-                fillColor="rgba(65, 134, 99, 0.1)"
-                strokeWidth={2}
+            {/* 선택된 산책로의 전체 경로 표시 (점선) */}
+            {initialTrailPath && initialTrailPath.length > 1 && (
+              <Polyline
+                coordinates={initialTrailPath}
+                strokeColor="rgba(65, 134, 99, 0.6)"
+                strokeWidth={5}
+                lineDashPattern={[10, 5]}
+                lineJoin="round"
+                lineCap="round"
               />
-            ) : null;
-          })()
-        )}
+            )}
 
+            {/* 사용자가 이동한 경로 (플로깅 중) - 실선 */}
+            {routeCoordinates && routeCoordinates.length > 1 && (
+              <Polyline
+                coordinates={routeCoordinates}
+                strokeColor="#418663"
+                strokeWidth={7}
+                lineJoin="round"
+                lineCap="round"
+              />
+            )}
+
+            {/* 쓰레기 위치 마커 */}
+            {trashLocations && trashLocations.map((trash) => (
+              <Marker key={`trash-${trash.id}`} coordinate={trash.coordinate}>
+                <TrashMarker trash={trash} onPress={onTrashMarkerPress} />
+              </Marker>
+            ))}
+
+            {/* 근처 산책로 마커 */}
+            {nearbyCourses && nearbyCourses.map((course) => (
+              <Marker key={`course-${course.id}`} coordinate={course.coordinate}>
+                <CourseMarker
+                  course={course}
+                  isSelected={selectedCourseId === course.id}
+                  onPress={onCourseMarkerPress}
+                />
+              </Marker>
+            ))}
+
+            {/* 선택된 산책로 주변 반경 표시 */}
+            {selectedCourseId && nearbyCourses && (
+              (() => {
+                const selectedCourse = nearbyCourses.find(c => c.id === selectedCourseId);
+                return selectedCourse ? (
+                  <Circle
+                    center={selectedCourse.coordinate}
+                    radius={500}
+                    strokeColor="rgba(65, 134, 99, 0.3)"
+                    fillColor="rgba(65, 134, 99, 0.1)"
+                    strokeWidth={2}
+                  />
+                ) : null;
+              })()
+            )}
+          </>
+        )}
       </MapView>
 
       {/* 로딩 오버레이 */}
@@ -428,7 +408,7 @@ const PloggingMap = ({
       )}
     </View>
   );
-};
+}; // <--- 🔥 이 부분이 수정되었습니다.
 
 const styles = StyleSheet.create({
   // 기본 맵 컨테이너
@@ -625,4 +605,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default PloggingMap;
+export default React.memo(PloggingMap);

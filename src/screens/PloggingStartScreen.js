@@ -1,10 +1,10 @@
-// PloggingStartScreen.js
+// PloggingStartScreen.js - getNearestTrail 사용 버전
 
 "use client"
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions,
-  Alert, SafeAreaView, BackHandler,
+  Alert, SafeAreaView, BackHandler, Modal,
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
@@ -12,7 +12,7 @@ import { usePloggingContext } from "../contexts/PloggingContext"
 import PloggingMap from "../components/Plogging/PloggingMap"
 import PloggingControls from "../components/Plogging/PloggingControls"
 import TrashInfoModal from "../components/Plogging/TrashInfoModal"
-import { getNearbyTrails } from "../API/trails"
+import { getNearestTrail, getTrailDetail } from "../API/trails" // 🔥 변경: getNearbyTrails 제거
 import BASE_URL from '../API/apiconfig'
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
@@ -36,27 +36,107 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 // 🔧 설정: 플로깅 시작 가능한 최대 거리 (미터)
 const MAX_DISTANCE_TO_START = 500;
 
-export default function PloggingStartScreen({ navigation, route }) {
+// 🔥 산책로 정보 모달 컴포넌트 - 단일 산책로용으로 단순화
+const TrailInfoModal = React.memo(({ visible, trail, onClose, onConfirm }) => {
+  if (!trail) return null;
+
+  return (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{trail.trailName}</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Icon name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.modalContent}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>📍 위치:</Text>
+              <Text style={styles.infoValue}>{trail.lotNumberAddress || '주소 정보 없음'}</Text>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>📏 총 길이:</Text>
+              <Text style={styles.infoValue}>{trail.length || '정보 없음'}</Text>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>⏱️ 소요시간:</Text>
+              <Text style={styles.infoValue}>{trail.trackTime || '정보 없음'}</Text>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>🏔️ 난이도:</Text>
+              <Text style={styles.infoValue}>{trail.difficultyLevel || '보통'}</Text>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>🗑️ 쓰레기 신고:</Text>
+              <Text style={styles.infoValue}>{trail.reportCount || 0}개</Text>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>📏 현재 위치에서:</Text>
+              <Text style={styles.infoValue}>{trail.distanceToUser ? `${trail.distanceToUser.toFixed(0)}m` : '거리 계산 중'}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.modalButtons}>
+            <TouchableOpacity 
+              style={styles.cancelButton} 
+              onPress={onClose}
+            >
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.confirmButton} 
+              onPress={() => onConfirm(trail)}
+            >
+              <Text style={styles.confirmButtonText}>이 코스로 플로깅 시작</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+});
+
+function PloggingStartScreen({ navigation, route }) {
   console.log("🚀 [PloggingStart] 컴포넌트 시작");
 
-  // Context에서 필요한 값들 가져오기
-  const {
-    status, time, trashCount, formatTime, currentLocation, routeCoordinates,
-    totalDistance, formatDistance, mapRef, trashLocations, startPlogging,
-    pausePlogging, resumePlogging, endPlogging, addTrash, setTrashLocations,
-    removeTrash, collectedTrash, addCollectedTrashItem
-  } = usePloggingContext();
-
-  // 로컬 상태들
+  // Context에서 필요한 값들만 가져오기
+// PloggingStartScreen.js
+const context = usePloggingContext(); // 컨텍스트 조회
+if (!context) {
+  console.error('❌ PloggingContext가 없습니다. Provider로 감싸져 있는지 확인하세요.');
+  return null; // 또는 로딩/에러 UI
+}
+// 이후에 구조 분해
+const {
+  status, time, trashCount, formatTime, currentLocation, routeCoordinates,
+  totalDistance, formatDistance, mapRef, trashLocations, startPlogging,
+  pausePlogging, resumePlogging, endPlogging, addTrash, setTrashLocations,
+  removeTrash, collectedTrash, addCollectedTrashItem
+} = context;
+  // 로컬 상태들 - 단순화
   const [modalVisible, setModalVisible] = useState(false)
   const [trashInfoModalVisible, setTrashInfoModalVisible] = useState(false)
+  const [trailInfoModalVisible, setTrailInfoModalVisible] = useState(false)
   const [selectedTrash, setSelectedTrash] = useState(null)
+  const [selectedTrailForModal, setSelectedTrailForModal] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [mapReady, setMapReady] = useState(false)
   
-  // 산책로 관련 상태들
-  const [nearbyCourses, setNearbyCourses] = useState([])
-  const [selectedCourseId, setSelectedCourseId] = useState(null)
+  // 🔥 단일 산책로 관련 상태들 - 배열에서 단일 객체로 변경
+  const [nearestTrail, setNearestTrail] = useState(null) // 🔥 변경: nearbyCourses → nearestTrail
   const [canStartPlogging, setCanStartPlogging] = useState(false)
   const [distanceToTrail, setDistanceToTrail] = useState(null)
   const [selectedRoute, setSelectedRoute] = useState(null)
@@ -64,14 +144,12 @@ export default function PloggingStartScreen({ navigation, route }) {
   const [initialTrailPath, setInitialTrailPath] = useState(null)
   const [distanceModalVisible, setDistanceModalVisible] = useState(false)
   const [courseInfo, setCourseInfo] = useState(null)
-
-  console.log("📊 [PloggingStart] 현재 상태:", {
-    status,
-    currentLocation: !!currentLocation,
-    nearbyCourses: nearbyCourses.length,
-    canStartPlogging,
-    mapReady
-  });
+  
+  // 진입 모드 구분
+  const [entryMode, setEntryMode] = useState('main') // 'main' 또는 'courseDetail'
+  
+  // 🔥 중복 실행 방지를 위한 ref
+  const searchInProgress = useRef(false);
 
   // 뒤로 가기 처리
   useEffect(() => {
@@ -82,27 +160,36 @@ export default function PloggingStartScreen({ navigation, route }) {
     };
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
-  }, [status, navigation]);
+  }, [navigation]);
 
-  // 초기화
+  // 초기화 - 한 번만 실행
   useEffect(() => {
     console.log("🎬 [PloggingStart] 초기화 useEffect 시작");
     initializeScreen();
   }, []);
 
-  // 위치 변경 감지 (중복 실행 방지)
-  useEffect(() => {
-    console.log("📍 [PloggingStart] 위치 변경 useEffect 실행");
-    
-    // 이미 처리된 위치인지 확인하는 ref 추가가 필요하지만, 
-    // 일단 간단하게 currentLocation이 유효할 때만 실행
-    if (currentLocation?.latitude && currentLocation?.longitude) {
-      console.log("📍 [PloggingStart] 유효한 위치 정보로 처리 시작");
-      handleLocationChange();
-    } else {
-      console.log("📍 [PloggingStart] 위치 정보 없음 - 처리 건너뜀");
+  // 🔥 위치 변경 감지 - 메모이제이션된 함수 사용
+  const handleLocationChange = useCallback(() => {
+    if (!currentLocation?.latitude || !currentLocation?.longitude) {
+      console.log("📍 [PloggingStart] 위치 정보 없음");
+      return;
     }
-  }, [currentLocation]);
+
+    console.log("📍 [PloggingStart] 위치 정보 확인됨");
+
+    if (entryMode === 'courseDetail' && trailStartCoords) {
+      handleDistanceCheck();
+    } else if (entryMode === 'main' && !searchInProgress.current) {
+      handleNearestSearch(); // 🔥 변경: handleNearbySearch → handleNearestSearch
+    }
+  }, [currentLocation?.latitude, currentLocation?.longitude, entryMode, trailStartCoords]);
+
+  // 위치 변경 감지 useEffect
+  useEffect(() => {
+    if (currentLocation?.latitude && currentLocation?.longitude) {
+      handleLocationChange();
+    }
+  }, [handleLocationChange]);
 
   // 초기화 함수
   const initializeScreen = async () => {
@@ -111,14 +198,16 @@ export default function PloggingStartScreen({ navigation, route }) {
       
       // route params 확인
       const routeParams = route?.params || {};
-      console.log("📋 [PloggingStart] Route params:", routeParams);
+      console.log("📋 [PloggingStart] Route params 확인");
       
       // CourseDetailScreen에서 넘어온 경우
       if (routeParams.selectedRoute) {
         console.log("🎯 [PloggingStart] CourseDetail에서 진입");
+        setEntryMode('courseDetail');
         handleCourseDetailEntry(routeParams);
       } else {
         console.log("🏠 [PloggingStart] 메인에서 진입");
+        setEntryMode('main');
       }
 
       // 기본 데이터 초기화
@@ -132,7 +221,7 @@ export default function PloggingStartScreen({ navigation, route }) {
       
     } catch (error) {
       console.error("❌ [PloggingStart] 초기화 오류:", error);
-      setMapReady(true); // 오류 시에도 지도는 준비된 것으로 처리
+      setMapReady(true);
     }
   };
 
@@ -148,7 +237,6 @@ export default function PloggingStartScreen({ navigation, route }) {
         distance: selectedRoute.distance,
         duration: selectedRoute.duration
       });
-      setSelectedCourseId(selectedRoute.id);
     }
     
     if (trailStartCoords) {
@@ -176,33 +264,11 @@ export default function PloggingStartScreen({ navigation, route }) {
     }
   };
 
-  // 위치 변경 처리
-  const handleLocationChange = () => {
-    if (!currentLocation) {
-      console.log("📍 [PloggingStart] 위치 정보 없음");
-      return;
-    }
-
-    console.log("📍 [PloggingStart] 위치 정보 확인됨:", {
-      latitude: currentLocation.latitude,
-      longitude: currentLocation.longitude,
-      hasTrailCoords: !!trailStartCoords
-    });
-
-    if (trailStartCoords) {
-      // CourseDetail에서 온 경우 - 거리 체크
-      console.log("🎯 [PloggingStart] CourseDetail 모드 - 거리 체크");
-      handleDistanceCheck();
-    } else {
-      // 메인에서 온 경우 - 근처 산책로 검색 (단, 중복 방지)
-      console.log("🏠 [PloggingStart] 메인 모드 - 근처 산책로 검색");
-      handleNearbySearch();
-    }
-  };
-
   // 거리 체크 (CourseDetail에서 온 경우)
-  const handleDistanceCheck = () => {
+  const handleDistanceCheck = useCallback(() => {
     try {
+      if (!currentLocation || !trailStartCoords) return;
+      
       const distance = calculateDistance(
         currentLocation.latitude,
         currentLocation.longitude,
@@ -218,121 +284,196 @@ export default function PloggingStartScreen({ navigation, route }) {
     } catch (error) {
       console.error("❌ [PloggingStart] 거리 계산 오류:", error);
     }
-  };
+  }, [currentLocation, trailStartCoords]);
 
-  // 근처 산책로 검색 (메인에서 온 경우)
-  const handleNearbySearch = async () => {
-    // 이미 로딩 중이거나 데이터가 있으면 건너뛰기
-    if (isLoading || nearbyCourses.length > 0) {
-      console.log("🔍 [PloggingStart] 이미 로딩 중이거나 데이터 존재, 건너뜀");
+  // 🔥 가장 가까운 산책로 검색 - 단일 객체로 변경
+  // PloggingStartScreen.js
+
+  // 🔥 [최종] 가장 가까운 산책로 검색 - 데이터 검증 및 디버깅 로직 포함
+  const handleNearestSearch = useCallback(async () => {
+    // --- 중복 실행 방지 ---
+    if (searchInProgress.current || isLoading || nearestTrail) {
+      return;
+    }
+    if (!currentLocation?.latitude || !currentLocation?.longitude) {
+      console.log("❌ [PloggingStart] 현재 위치 정보가 없어 검색을 시작할 수 없습니다.");
       return;
     }
 
     try {
-      console.log("🔍 [PloggingStart] 근처 산책로 검색 시작");
-      
-      if (!currentLocation?.latitude || !currentLocation?.longitude) {
-        console.log("❌ [PloggingStart] 유효하지 않은 위치 정보");
-        return;
-      }
-
+      searchInProgress.current = true;
       setIsLoading(true);
-      setCanStartPlogging(true); // 메인에서 온 경우 기본적으로 시작 가능
+      console.log("📍 [PloggingStart] 가장 가까운 산책로 검색 시작...");
 
-      console.log("📡 [PloggingStart] API 호출 시도 중...");
-      
-      const nearbyTrails = await getNearbyTrails(
+      // --- 1. API 호출 ---
+      const nearestTrailData = await getNearestTrail(
         currentLocation.latitude,
         currentLocation.longitude
       );
 
-      console.log("✅ [PloggingStart] 근처 산책로 검색 성공:", nearbyTrails?.length);
+      // --- 2. API 응답 원본 확인 (가장 중요!) ---
+      // 이 로그를 통해 서버가 정확히 어떤 데이터를 주는지 확인해야 합니다.
+      console.log("📬 [Debug] API 원본 응답:", JSON.stringify(nearestTrailData, null, 2));
 
-      if (Array.isArray(nearbyTrails)) {
-        const formattedCourses = nearbyTrails.map(trail => ({
-          id: trail.trailId,
-          name: trail.trailName,
-          coordinate: {
-            latitude: parseFloat(trail.spotLatitude),
-            longitude: parseFloat(trail.spotLongitude)
-          },
-          distance: trail.length,
-          difficulty: trail.difficultyLevel,
-          reportCount: trail.reportCount || 0,
-          address: trail.lotNumberAddress,
-          duration: trail.trackTime || "정보 없음"
-        }));
-
-        setNearbyCourses(formattedCourses);
-        console.log(`🎯 [PloggingStart] ${formattedCourses.length}개 산책로 로드 완료`);
+      if (!nearestTrailData || typeof nearestTrailData !== 'object') {
+        console.log("🤷‍♂️ [PloggingStart] 주변에 검색된 산책로가 없습니다 (API 응답 없음).");
+        setNearestTrail(null);
+        return; // 여기서 함수를 안전하게 종료합니다.
       }
 
+      // --- 3. 좌표 데이터 파싱 및 유효성 검사 (충돌 방지 핵심) ---
+      const lat = parseFloat(nearestTrailData.spotLatitude);
+      const lon = parseFloat(nearestTrailData.spotLongitude);
+
+      if (isNaN(lat) || !isFinite(lat) || isNaN(lon) || !isFinite(lon)) {
+        // 좌표가 숫자가 아니거나 유효하지 않으면 여기서 앱 충돌을 막습니다.
+        console.error("🔥🔥🔥 [치명적 오류] API 응답의 좌표 데이터가 유효하지 않아 렌더링을 중단합니다!");
+        setNearestTrail(null);
+        return; // 여기서 함수를 안전하게 종료합니다.
+      }
+      
+      console.log("✅ [PloggingStart] 좌표 데이터 유효성 검사 통과!");
+
+      // --- 4. 최종 데이터 가공 ---
+      const distance = calculateDistance(currentLocation.latitude, currentLocation.longitude, lat, lon);
+      const formattedTrail = {
+        id: nearestTrailData.trailId,
+        name: nearestTrailData.trailName || '이름 없는 산책로',
+        coordinate: { latitude: lat, longitude: lon }, // 검증된 안전한 값만 사용
+        distance: String(nearestTrailData.lengthDetail) || '정보 없음', // 🔥 "1~5Km미만" 대신 숫자 값을 문자열로 변환하여 사용
+        difficulty: nearestTrailData.difficultyLevel || '보통',
+        reportCount: nearestTrailData.reportCount || 0,
+        address: nearestTrailData.lotNumberAddress || '주소 정보 없음',
+        duration: nearestTrailData.trackTime || "정보 없음",
+        distanceToUser: distance,
+        originalData: nearestTrailData
+      };
+      
+      // --- 5. 가공된 데이터 확인 ---
+      console.log("🗺️ [Debug] 지도에 표시될 최종 데이터:", JSON.stringify(formattedTrail, null, 2));
+
+      // --- 6. 상태 업데이트 (리렌더링 트리거) ---
+      setNearestTrail(formattedTrail);
+      setDistanceToTrail(distance);
+      setCanStartPlogging(distance <= MAX_DISTANCE_TO_START);
+      
     } catch (error) {
-      console.error("❌ [PloggingStart] 근처 산책로 검색 실패:", error);
-      
-      // 502 오류의 경우 더 친숙한 메시지 표시
-      if (error.message.includes('502')) {
-        console.log("🔄 [PloggingStart] 서버 연결 문제 감지 - 사용자에게 알림");
-        Alert.alert(
-          "서버 연결 오류",
-          "서버에 일시적으로 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
-          [
-            { text: "확인", onPress: () => {
-              // 기본 더미 데이터라도 제공하거나 다른 처리
-              console.log("사용자가 서버 오류 알림 확인");
-            }}
-          ]
-        );
-      }
-      
-      setNearbyCourses([]);
+      console.error("❌ [PloggingStart] 산책로 검색 중 전체 오류 발생:", error.message);
+      setNearestTrail(null);
     } finally {
       setIsLoading(false);
+      searchInProgress.current = false;
     }
-  };
+  }, [currentLocation?.latitude, currentLocation?.longitude, isLoading, nearestTrail]);
 
-  // 플로깅 시작
-  const handleStart = async () => {
+  // 🔥 산책로 마커 클릭 처리 - 단일 산책로용으로 단순화
+  const handleTrailMarkerPress = useCallback(async () => {
+    if (!nearestTrail) return;
+    
+    console.log("🎯 [PloggingStart] 산책로 마커 클릭:", nearestTrail.name);
+    
+    try {
+      const trailDetail = await getTrailDetail(nearestTrail.id);
+      // 거리 정보 추가
+      const detailWithDistance = {
+        ...trailDetail,
+        distanceToUser: nearestTrail.distanceToUser
+      };
+      setSelectedTrailForModal(detailWithDistance);
+      setTrailInfoModalVisible(true);
+      
+    } catch (error) {
+      console.error("❌ [PloggingStart] 산책로 정보 가져오기 실패:", error);
+      
+      // API 실패 시 기본 정보로 모달 표시
+      setSelectedTrailForModal({
+        ...nearestTrail.originalData,
+        distanceToUser: nearestTrail.distanceToUser
+      });
+      setTrailInfoModalVisible(true);
+    }
+  }, [nearestTrail]);
+
+  // 🔥 산책로 선택 확인 - 단일 산책로용으로 단순화
+  const handleTrailSelection = useCallback((trail) => {
+    console.log("✅ [PloggingStart] 산책로 선택 확인:", trail.trailName);
+    
+    try {
+      // 선택된 산책로 정보 설정
+      setSelectedRoute({
+        id: trail.trailId,
+        name: trail.trailName,
+        location: trail.lotNumberAddress,
+        difficulty: trail.difficultyLevel,
+        distance: trail.length,
+        duration: trail.trackTime
+      });
+      
+      // 산책로 좌표 설정
+      if (nearestTrail) {
+        setTrailStartCoords(nearestTrail.coordinate);
+        setCourseInfo({
+          name: trail.trailName,
+          difficulty: trail.difficultyLevel,
+          distance: trail.length,
+          duration: trail.trackTime,
+          reportCount: trail.reportCount
+        });
+      }
+      
+      setTrailInfoModalVisible(false);
+      console.log("🎯 [PloggingStart] 산책로 선택 완료");
+    } catch (error) {
+      console.error("❌ [PloggingStart] 산책로 선택 처리 오류:", error);
+      setTrailInfoModalVisible(false);
+    }
+  }, [nearestTrail]);
+
+  // 🔥 자동 선택 기능 - 가까운 거리면 자동으로 선택
+  useEffect(() => {
+    if (nearestTrail && !selectedRoute && entryMode === 'main') {
+      if (nearestTrail.distanceToUser <= MAX_DISTANCE_TO_START) {
+        // 500m 이내면 자동 선택
+        console.log("🎯 [PloggingStart] 가까운 산책로 자동 선택");
+        handleTrailSelection(nearestTrail.originalData);
+      }
+    }
+  }, [nearestTrail, selectedRoute, entryMode]);
+
+  // 기타 핸들러들 - 메모이제이션
+  const handleStart = useCallback(async () => {
     try {
       console.log("🚀 [PloggingStart] 플로깅 시작 요청");
 
-      // 거리 체크 (CourseDetail에서 온 경우)
-      if (!canStartPlogging && trailStartCoords) {
-        console.log("⚠️ [PloggingStart] 거리가 너무 멀음");
+      if (entryMode === 'courseDetail' && !canStartPlogging && trailStartCoords) {
         setDistanceModalVisible(true);
         return;
       }
 
-      // 메인에서 온 경우 산책로 선택 확인
-      if (!trailStartCoords && !selectedRoute) {
+      if (entryMode === 'main' && !selectedRoute) {
         Alert.alert("알림", "먼저 지도에서 산책로를 선택해주세요.");
         return;
       }
 
-      // 플로깅 시작 API 호출
       await callPloggingStartAPI();
-
-      // Context 플로깅 시작
       const result = await startPlogging();
-      console.log("✅ [PloggingStart] 플로깅 시작 완료:", result);
+      console.log("✅ [PloggingStart] 플로깅 시작 완료");
 
     } catch (error) {
       console.error("❌ [PloggingStart] 플로깅 시작 실패:", error);
-      
       Alert.alert(
         "알림",
         "서버 연결에 실패했지만 로컬에서 플로깅을 시작합니다.",
         [{ text: "확인", onPress: () => startPlogging() }]
       );
     }
-  };
+  }, [entryMode, canStartPlogging, trailStartCoords, selectedRoute, startPlogging]);
 
-  // 플로깅 시작 API 호출
-  const callPloggingStartAPI = async () => {
+  const callPloggingStartAPI = useCallback(async () => {
     try {
       const ploggingData = {
         memberId: 1,
-        trailId: selectedRoute?.id || selectedCourseId,
+        trailId: selectedRoute?.id || nearestTrail?.id,
         startLat: currentLocation?.latitude || 0,
         startLng: currentLocation?.longitude || 0,
         ploggingTime: new Date().toISOString(),
@@ -340,7 +481,7 @@ export default function PloggingStartScreen({ navigation, route }) {
         reportIds: []
       };
 
-      console.log("📡 [PloggingStart] API 호출:", ploggingData);
+      console.log("📡 [PloggingStart] API 호출");
 
       const response = await fetch(`${BASE_URL}/plogging`, {
         method: 'POST',
@@ -353,68 +494,31 @@ export default function PloggingStartScreen({ navigation, route }) {
       }
 
       const result = await response.json();
-      console.log("✅ [PloggingStart] API 호출 성공:", result);
+      console.log("✅ [PloggingStart] API 호출 성공");
 
     } catch (error) {
       console.error("❌ [PloggingStart] API 호출 실패:", error);
       throw error;
     }
-  };
-
-  // 산책로 마커 클릭 처리
-  const handleCourseMarkerPress = (course) => {
-    console.log("🎯 [PloggingStart] 산책로 선택:", course.name);
-    
-    setSelectedCourseId(course.id);
-    setCourseInfo({
-      name: course.name,
-      difficulty: course.difficulty,
-      distance: course.distance,
-      duration: course.duration,
-      reportCount: course.reportCount
-    });
-    
-    Alert.alert(
-      course.name,
-      `거리: ${course.distance}\n난이도: ${course.difficulty}\n소요시간: ${course.duration}\n쓰레기 신고: ${course.reportCount}개\n\n이 산책로로 플로깅을 시작하시겠습니까?`,
-      [
-        { text: "취소", style: "cancel", onPress: () => {
-          setSelectedCourseId(null);
-          setCourseInfo(null);
-        }},
-        { text: "선택", onPress: () => {
-          setSelectedRoute({
-            id: course.id,
-            name: course.name,
-            location: course.address,
-            difficulty: course.difficulty,
-            distance: course.distance,
-            duration: course.duration
-          });
-          setTrailStartCoords(course.coordinate);
-          console.log("✅ [PloggingStart] 산책로 선택 완료");
-        }}
-      ]
-    );
-  };
+  }, [selectedRoute, nearestTrail, currentLocation]);
 
   // 기타 핸들러들
-  const handlePause = () => pausePlogging();
-  const handleResume = () => resumePlogging();
-  const handleEnd = () => setModalVisible(true);
+  const handlePause = useCallback(() => pausePlogging(), [pausePlogging]);
+  const handleResume = useCallback(() => resumePlogging(), [resumePlogging]);
+  const handleEnd = useCallback(() => setModalVisible(true), []);
 
-  const confirmEnd = async () => {
+  const confirmEnd = useCallback(async () => {
     setModalVisible(false);
     const ploggingResult = endPlogging();
     navigation.navigate("PloggingRecord", { result: ploggingResult });
-  };
+  }, [endPlogging, navigation]);
 
-  const handleTrashMarkerPress = (trash) => {
+  const handleTrashMarkerPress = useCallback((trash) => {
     setSelectedTrash(trash);
     setTrashInfoModalVisible(true);
-  };
+  }, []);
 
-  const handlePickTrash = (trash) => {
+  const handlePickTrash = useCallback((trash) => {
     try {
       addTrash();
       addCollectedTrashItem(trash);
@@ -424,9 +528,9 @@ export default function PloggingStartScreen({ navigation, route }) {
     } catch (error) {
       console.error('쓰레기 줍기 오류:', error);
     }
-  };
+  }, [addTrash, addCollectedTrashItem, removeTrash]);
 
-  const handleShowTrashList = () => {
+  const handleShowTrashList = useCallback(() => {
     const collectedItems = collectedTrash.map(item =>
       `- ${item.title || '쓰레기'}: ${item.amount || '보통'}`
     ).join('\n');
@@ -435,10 +539,10 @@ export default function PloggingStartScreen({ navigation, route }) {
       "수집한 쓰레기 목록",
       collectedTrash.length > 0 ? collectedItems : "아직 수집한 쓰레기가 없습니다."
     );
-  };
+  }, [collectedTrash]);
 
-  // 거리 텍스트 생성
-  const getDistanceText = () => {
+  // 🔥 거리 텍스트 생성 - 메모이제이션
+  const distanceText = useMemo(() => {
     if (!distanceToTrail) return "";
     
     if (distanceToTrail <= MAX_DISTANCE_TO_START) {
@@ -446,7 +550,158 @@ export default function PloggingStartScreen({ navigation, route }) {
     } else {
       return `⚠️ 산책로와 ${distanceToTrail.toFixed(0)}m 거리 (너무 멀음)`;
     }
-  };
+  }, [distanceToTrail]);
+
+  // 🔥 메인 모드 안내 렌더링 - 단일 산책로용으로 단순화
+  const mainModeInstructions = useMemo(() => {
+    if (entryMode !== 'main') return null;
+    
+    if (isLoading) {
+      return (
+        <View style={styles.loadingCard}>
+          <Text style={styles.loadingTitle}>🔍 가장 가까운 산책로 검색 중...</Text>
+          <Text style={styles.loadingText}>잠시만 기다려주세요</Text>
+        </View>
+      );
+    }
+    
+    if (nearestTrail && !selectedRoute) {
+      const distance = nearestTrail.distanceToUser;
+      const isNear = distance <= MAX_DISTANCE_TO_START;
+      
+      return (
+        <View style={styles.instructionCard}>
+          <Text style={styles.instructionTitle}>🎯 가장 가까운 산책로</Text>
+          <Text style={styles.instructionText}>
+            {nearestTrail.name}{"\n"}
+            거리: {distance.toFixed(0)}m
+          </Text>
+          <Text style={[
+            styles.instructionSubText,
+            { color: isNear ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 193, 7, 0.9)" }
+          ]}>
+            {isNear ? "플로깅 시작 가능한 거리입니다" : "조금 더 가까이 이동해주세요"}
+          </Text>
+          {!isNear && (
+            <TouchableOpacity 
+              style={styles.selectTrailButton}
+              onPress={handleTrailMarkerPress}
+            >
+              <Text style={styles.selectTrailButtonText}>산책로 정보 보기</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
+    }
+    
+    if (!nearestTrail && !isLoading) {
+      return (
+        <View style={styles.noDataCard}>
+          <Text style={styles.noDataTitle}>🔍 주변 산책로 없음</Text>
+          <Text style={styles.noDataText}>
+            현재 위치 주변에{"\n"}등록된 산책로가 없습니다
+          </Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => {
+              console.log("🔄 [PloggingStart] 재검색 요청");
+              setNearestTrail(null);
+              searchInProgress.current = false;
+              handleNearestSearch();
+            }}
+          >
+            <Text style={styles.retryButtonText}>다시 검색</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    
+    return null;
+  }, [entryMode, isLoading, nearestTrail, selectedRoute, handleTrailMarkerPress, handleNearestSearch]);
+
+  // 🔥 코스 정보 카드 - 메모이제이션
+  const courseInfoCard = useMemo(() => {
+    if (!courseInfo) return null;
+    
+    return (
+      <View style={styles.courseInfoCard}>
+        <Text style={styles.courseInfoTitle}>{courseInfo.name}</Text>
+        <View style={styles.courseInfoDetails}>
+          <Text style={styles.courseInfoText}>난이도: {courseInfo.difficulty}</Text>
+          <Text style={styles.courseInfoText}>거리: {courseInfo.distance}</Text>
+          {courseInfo.duration && (
+            <Text style={styles.courseInfoText}>소요시간: {courseInfo.duration}</Text>
+          )}
+          {courseInfo.reportCount !== undefined && (
+            <Text style={styles.courseInfoText}>쓰레기 신고: {courseInfo.reportCount}개</Text>
+          )}
+        </View>
+      </View>
+    );
+  }, [courseInfo]);
+
+  // 🔥 시작 버튼 - 메모이제이션
+  const startButton = useMemo(() => {
+    const isDisabled = (!canStartPlogging && trailStartCoords) || (entryMode === 'main' && !selectedRoute);
+    const buttonText = (!canStartPlogging && trailStartCoords) ? "거리가 너무 멀어요" : 
+                     (entryMode === 'main' && !selectedRoute) ? "산책로를 선택해주세요" : "시작";
+    
+    return (
+      <TouchableOpacity 
+        style={[
+          styles.overlayStartButton, 
+          isDisabled && styles.overlayStartButtonDisabled
+        ]} 
+        onPress={handleStart}
+        disabled={isDisabled}
+      >
+        <Text style={[
+          styles.overlayStartButtonText,
+          isDisabled && styles.overlayStartButtonTextDisabled
+        ]}>
+          {buttonText}
+        </Text>
+      </TouchableOpacity>
+    );
+  }, [canStartPlogging, trailStartCoords, entryMode, selectedRoute, handleStart]);
+
+  // 🔥 오버레이 컨트롤 - 메모이제이션
+  const overlayControls = useMemo(() => {
+    if (status !== "idle") return null;
+    
+    return (
+      <View style={styles.overlayControls}>
+        {mainModeInstructions}
+        {courseInfoCard}
+        {startButton}
+      </View>
+    );
+  }, [status, mainModeInstructions, courseInfoCard, startButton]);
+
+  // 🔥 러닝 컨트롤 - 메모이제이션
+  const runningControls = useMemo(() => {
+    if (status === "idle") return null;
+    
+    return (
+      <View style={styles.runningControls}>
+        <PloggingControls
+          status={status}
+          time={time}
+          trashCount={trashCount}
+          formatTime={formatTime}
+          onPause={handlePause}
+          onResume={handleResume}
+          onEnd={handleEnd}
+          onShowTrashList={handleShowTrashList}
+        />
+      </View>
+    );
+  }, [status, time, trashCount, formatTime, handlePause, handleResume, handleEnd, handleShowTrashList]);
+
+  // 🔥 지도에 표시할 산책로 데이터 - 단일 객체를 배열로 변환
+  const mapTrails = useMemo(() => {
+    return nearestTrail ? [nearestTrail] : [];
+  }, [nearestTrail]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -462,10 +717,10 @@ export default function PloggingStartScreen({ navigation, route }) {
       </View>
 
       {/* 거리 정보 표시 */}
-      {trailStartCoords && (
+      {trailStartCoords && distanceToTrail !== null && (
         <View style={[styles.distanceInfo, !canStartPlogging && styles.distanceInfoWarning]}>
           <Text style={[styles.distanceText, !canStartPlogging && styles.distanceTextWarning]}>
-            {getDistanceText()}
+            {distanceText}
           </Text>
         </View>
       )}
@@ -480,111 +735,15 @@ export default function PloggingStartScreen({ navigation, route }) {
           isLoading={isLoading}
           mapReady={mapReady}
           onTrashMarkerPress={handleTrashMarkerPress}
-          nearbyCourses={nearbyCourses || []}
-          onCourseMarkerPress={handleCourseMarkerPress}
-          selectedCourseId={selectedCourseId}
+          nearbyCourses={mapTrails} // 🔥 변경: 단일 객체를 배열로 전달
+          onCourseMarkerPress={handleTrailMarkerPress} // 🔥 변경: 매개변수 없는 함수로 변경
+          selectedCourseId={nearestTrail?.id} // 🔥 변경: nearestTrail의 id 사용
           initialTrailPath={initialTrailPath || []}
         />
 
-        {/* 오버레이 컨트롤 */}
-        {status === "idle" ? (
-          <View style={styles.overlayControls}>
-  // 메인에서 진입 시 안내 (서버 오류 상황도 고려)
-  const renderMainModeInstructions = () => {
-    if (trailStartCoords) return null; // CourseDetail 모드면 표시 안함
-    
-    if (isLoading) {
-      return (
-        <View style={styles.loadingCard}>
-          <Text style={styles.loadingTitle}>🔍 근처 산책로 검색 중...</Text>
-          <Text style={styles.loadingText}>잠시만 기다려주세요</Text>
-        </View>
-      );
-    }
-    
-    if (nearbyCourses.length > 0) {
-      return (
-        <View style={styles.instructionCard}>
-          <Text style={styles.instructionTitle}>🗺️ 주변 산책로 선택</Text>
-          <Text style={styles.instructionText}>
-            지도에서 산책로 마커를 터치하여{"\n"}플로깅할 코스를 선택해주세요
-          </Text>
-          <Text style={styles.instructionSubText}>
-            반경 5km 내 {nearbyCourses.length}개 산책로 발견
-          </Text>
-        </View>
-      );
-    }
-    
-    // 검색 완료했지만 결과가 없거나 오류가 있는 경우
-    return (
-      <View style={styles.noDataCard}>
-        <Text style={styles.noDataTitle}>📍 주변 산책로 없음</Text>
-        <Text style={styles.noDataText}>
-          현재 위치 주변 5km 내에{"\n"}등록된 산책로가 없습니다
-        </Text>
-        <TouchableOpacity 
-          style={styles.retryButton}
-          onPress={() => {
-            console.log("🔄 [PloggingStart] 재검색 요청");
-            setNearbyCourses([]);
-            handleNearbySearch();
-          }}
-        >
-          <Text style={styles.retryButtonText}>다시 검색</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-            {/* 선택된 코스 정보 */}
-            {courseInfo && (
-              <View style={styles.courseInfoCard}>
-                <Text style={styles.courseInfoTitle}>{courseInfo.name}</Text>
-                <View style={styles.courseInfoDetails}>
-                  <Text style={styles.courseInfoText}>난이도: {courseInfo.difficulty}</Text>
-                  <Text style={styles.courseInfoText}>거리: {courseInfo.distance}</Text>
-                  {courseInfo.duration && (
-                    <Text style={styles.courseInfoText}>소요시간: {courseInfo.duration}</Text>
-                  )}
-                  {courseInfo.reportCount !== undefined && (
-                    <Text style={styles.courseInfoText}>쓰레기 신고: {courseInfo.reportCount}개</Text>
-                  )}
-                </View>
-              </View>
-            )}
-
-            {/* 시작 버튼 */}
-            <TouchableOpacity 
-              style={[
-                styles.overlayStartButton, 
-                !canStartPlogging && styles.overlayStartButtonDisabled
-              ]} 
-              onPress={handleStart}
-              disabled={!canStartPlogging && trailStartCoords}
-            >
-              <Text style={[
-                styles.overlayStartButtonText,
-                !canStartPlogging && styles.overlayStartButtonTextDisabled
-              ]}>
-                {canStartPlogging ? "시작" : "거리가 너무 멀어요"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.runningControls}>
-            <PloggingControls
-              status={status}
-              time={time}
-              trashCount={trashCount}
-              formatTime={formatTime}
-              onPause={handlePause}
-              onResume={handleResume}
-              onEnd={handleEnd}
-              onShowTrashList={handleShowTrashList}
-            />
-          </View>
-        )}
+        {/* 컨트롤 렌더링 */}
+        {overlayControls}
+        {runningControls}
       </View>
 
       {/* 모달들 */}
@@ -605,6 +764,13 @@ export default function PloggingStartScreen({ navigation, route }) {
         onConfirm={() => setDistanceModalVisible(false)}
         confirmText="확인"
         showCancel={false}
+      />
+
+      <TrailInfoModal
+        visible={trailInfoModalVisible}
+        trail={selectedTrailForModal}
+        onClose={() => setTrailInfoModalVisible(false)}
+        onConfirm={handleTrailSelection}
       />
 
       <TrashInfoModal
@@ -708,6 +874,21 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "rgba(255, 255, 255, 0.8)",
     textAlign: "center",
+  },
+
+  // 🔥 새로운 버튼 스타일
+  selectTrailButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    alignSelf: "center",
+  },
+  selectTrailButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
   },
 
   // 로딩 카드
@@ -842,4 +1023,99 @@ const styles = StyleSheet.create({
     right: 0, 
     zIndex: 100 
   },
+
+  // 산책로 정보 모달
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 0,
+    margin: 20,
+    maxHeight: screenHeight * 0.8,
+    width: screenWidth * 0.9,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+    flex: 1,
+  },
+  closeButton: {
+    padding: 5,
+  },
+  modalContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  infoRow: {
+    marginBottom: 12,
+  },
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 4,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    lineHeight: 22,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    gap: 10,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  confirmButton: {
+    flex: 2,
+    backgroundColor: '#418663',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
 });
+
+// 🔥 React.memo로 컴포넌트 메모이제이션하여 불필요한 리렌더링 방지
+export default React.memo(PloggingStartScreen);
