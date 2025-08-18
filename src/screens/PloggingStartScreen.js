@@ -12,8 +12,8 @@ import { usePloggingContext } from "../contexts/PloggingContext"
 import PloggingMap from "../components/Plogging/PloggingMap"
 import PloggingControls from "../components/Plogging/PloggingControls"
 import TrashInfoModal from "../components/Plogging/TrashInfoModal"
-import { getNearestTrail, getTrailDetail } from "../API/trails" // 🔥 변경: getNearbyTrails 제거
-import BASE_URL from '../API/apiconfig'
+import { getNearestTrail, getTrailDetail } from "../api/trails" // 🔥 변경: getNearbyTrails 제거
+import BASE_URL from '../api/apiconfig'
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 

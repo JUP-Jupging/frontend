@@ -3,9 +3,25 @@ import axios from "axios";
 import BASE_URL from "./apiconfig";
 
 /**
- * 근처 휴지통 위치 목록 조회
+ * 전체 휴지통 목록 조회 (쿼리 파라미터 없이 요청)
+ * GET /trash-can
+ */
+export const getAllTrashCans = async () => {
+  try {
+    const { data } = await axios.get(`${BASE_URL}/trash-can`, {
+      timeout: 15000,
+    });
+    console.log("전체 휴지통 데이터 조회 성공:", data.items.length);
+    return data; // { items: [...] }
+  } catch (error) {
+    console.error("getAllTrashCans Error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+/**
+ * 근처 휴지통 위치 목록 조회 (기존 API - 필요시 사용)
  * GET /trash-can?userLatitude=...&userLongitude=...
- * 응답 예시의 필드 중 경도는 lot 로 내려오니 주의(lat: 위도, lot: 경도)
  */
 export const getNearbyTrashCans = async (userLatitude, userLongitude) => {
   try {
