@@ -1,6 +1,6 @@
 // src/api/trashcan.js
 import axios from "axios";
-import BASE_URL from "../apiconfig";
+import BASE_URL from "./apiconfig";
 
 /**
  * 근처 휴지통 위치 목록 조회
