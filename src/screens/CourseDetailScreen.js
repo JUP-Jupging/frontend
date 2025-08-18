@@ -11,20 +11,41 @@ import {
   Dimensions,
   ActivityIndicator,
   FlatList,
+  Alert,
+  PermissionsAndroid,
+  Platform,
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
-// 제대로 작동하는 지도를 위해 MapView만 import
 import MapView, { Marker } from "react-native-maps"
+import Geolocation from 'react-native-geolocation-service'
 import { getTrailDetail } from "../API/trails"
-import { useLocation } from "../hooks/useLocation" // useLocation 훅 가져오기
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
-// 더미 이미지 배열 (여러 이미지 지원)
+// 거리 계산 함수 (haversine formula)
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371e3; // 지구 반지름 (미터)
+  const φ1 = lat1 * Math.PI/180;
+  const φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180;
+  const Δλ = (lon2-lon1) * Math.PI/180;
+
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+          Math.cos(φ1) * Math.cos(φ2) *
+          Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  return R * c; // 미터 단위
+};
+
+// 🔧 설정: 플로깅 시작 가능한 최대 거리 (미터)
+const MAX_DISTANCE_TO_START = 500; // 500미터 이내에서만 플로깅 시작 가능
+
+// 더미 이미지 배열 (이미지가 없을 때만 사용)
 const DUMMY_IMAGES = [
-  "https://via.placeholder.com/360x200/4CAF50/FFFFFF?text=남산1",
-  "https://via.placeholder.com/360x200/2196F3/FFFFFF?text=남산2",
-  "https://via.placeholder.com/360x200/FF9800/FFFFFF?text=남산3",
+  "https://via.placeholder.com/360x200/4CAF50/FFFFFF?text=산책로1",
+  "https://via.placeholder.com/360x200/2196F3/FFFFFF?text=산책로2",
+  "https://via.placeholder.com/360x200/FF9800/FFFFFF?text=산책로3",
 ]
 
 // Responsive size constants
@@ -33,165 +54,87 @@ const HEADER_HEIGHT = screenHeight * 0.08
 const IMAGE_HEIGHT = screenHeight * 0.3
 const MAP_HEIGHT = screenHeight * 0.2
 
-// 더미 코스 데이터 - 실제 좌표 추가
-const DUMMY_COURSES_DATA = {
-  1: {
-    id: "1",
-    name: "국립 중앙 박물관",
-    address: "서울 용산구 서빙고로 137 국립중앙박물관",
-    region: "서울",
-    duration: "1시간30분",
-    length: "7.1km",
-    level: "쉬움",
-    images: ["../assets/course_detail1.jpg"],
-    mapImage: "../assets/course_map.jpg",
-    toilet: "박물관 내부, 어린이박물관, 야외 정원",
-    sunsetInfo: "한강이 내려다보이는 전망대에서 석양을 감상할 수 있습니다",
-    tip: "박물관 내부에 카페와 레스토랑이 있어 휴식하기 좋습니다",
-    description:
-      "국립중앙박물관을 중심으로 한 문화와 자연이 어우러진 산책로입니다. 박물관 정원과 한강 조망 포인트를 지나며, 도심 속에서 여유로운 플로깅을 즐길 수 있습니다.\n\n①박물관 정원길(2.5km) : 사계절 아름다운 조경과 야외 전시물을 감상할 수 있습니다.\n\n②한강 전망길(3.1km) : 한강과 도심의 파노라마 뷰를 즐길 수 있는 구간입니다.\n\n③문화거리(1.5km) : 주변 문화시설과 카페거리를 둘러보는 코스입니다.",
-    // 실제 국립중앙박물관 좌표 추가
-    spotLatitude: 37.524,
-    spotLongitude: 126.9803,
-    trashReports: [
-      {
-        id: 1,
-        title: "정원 벤치 주변 쓰레기",
-        detail: "음료수병, 과자봉지 외 3개",
-        location: "박물관 정원 2구역",
-        reportedAt: "2024-01-15",
-      },
-      {
-        id: 2,
-        title: "전망대 쓰레기",
-        detail: "담배꽁초, 휴지 외 2개",
-        location: "한강 전망 포인트",
-        reportedAt: "2024-01-14",
-      },
-    ],
-  },
-  2: {
-    id: "2",
-    name: "남산",
-    address: "서울 중구 회현동1가",
-    region: "서울",
-    duration: "2시간",
-    length: "5.2km",
-    level: "어려움",
-    images: ["../assets/course_detail2.jpg"],
-    mapImage: "../assets/course_map2.jpg",
-    toilet: "남산공원 관리사무소, N서울타워 주변, 팔각정",
-    sunsetInfo: "N서울타워 전망대에서 서울 전경과 함께 석양을 감상할 수 있습니다",
-    tip: "경사가 있는 구간이 많으니 편한 운동화 착용을 권장합니다",
-    description:
-      "서울의 대표적인 산책로인 남산을 중심으로 한 플로깅 코스입니다. 도심 속 자연을 만끽하며 서울 전경을 감상할 수 있는 특별한 경험을 제공합니다.\n\n①순환로(2.2km) : 남산공원의 아름다운 자연길을 따라 걷는 구간입니다.\n\n②타워길(1.8km) : N서울타워까지 이어지는 약간의 경사가 있는 구간입니다.\n\n③전망길(1.2km) : 서울 시내를 한눈에 볼 수 있는 전망 포인트들을 지나는 구간입니다.",
-    // 남산 좌표 추가
-    spotLatitude: 37.5512,
-    spotLongitude: 126.9882,
-    trashReports: [
-      {
-        id: 1,
-        title: "등산로 쓰레기",
-        detail: "플라스틱병, 에너지바 포장지 외 5개",
-        location: "남산 순환로 중간 지점",
-        reportedAt: "2024-01-16",
-      },
-    ],
-  },
-  3: {
-    id: "3",
-    name: "한강공원 여의도",
-    address: "서울 영등포구 여의동로 330",
-    region: "서울",
-    duration: "2시간30분",
-    length: "8.5km",
-    level: "쉬움",
-    images: ["../assets/course_detail3.jpg"],
-    mapImage: "../assets/course_map3.jpg",
-    toilet: "한강공원 화장실 여러 곳, 여의도 공원 내부",
-    sunsetInfo: "한강을 바라보며 감상하는 석양이 매우 아름답습니다",
-    tip: "자전거 도로와 구분되어 있으니 안전에 주의하세요. 편의점과 카페가 많아 휴식하기 좋습니다",
-    description:
-      "한강을 따라 이어지는 대표적인 도심 속 자연 산책로입니다. 넓은 강변과 여의도공원을 함께 즐길 수 있는 평탄한 코스로 초보자에게 추천합니다.\n\n①강변길(4.2km) : 한강을 바라보며 걷는 시원한 구간입니다.\n\n②여의도공원(2.8km) : 계절별 꽃과 나무를 감상할 수 있는 공원 구간입니다.\n\n③선착장길(1.5km) : 유람선과 카페가 있는 활기찬 구간입니다.",
-    // 여의도 한강공원 좌표 추가
-    spotLatitude: 37.5286,
-    spotLongitude: 126.9334,
-    trashReports: [
-      {
-        id: 1,
-        title: "피크닉 쓰레기",
-        detail: "일회용 그릇, 비닐봉지 외 8개",
-        location: "여의도공원 잔디광장",
-        reportedAt: "2024-01-17",
-      },
-      {
-        id: 2,
-        title: "강변 쓰레기",
-        detail: "캔, 페트병 외 6개",
-        location: "한강공원 벤치 구역",
-        reportedAt: "2024-01-16",
-      },
-    ],
-  },
-  4: {
-    id: "4",
-    name: "청계천 산책로",
-    address: "서울 중구 청계천로 1",
-    region: "서울",
-    duration: "1시간45분",
-    length: "6.3km",
-    level: "쉬움",
-    images: ["../assets/course_detail4.jpg"],
-    mapImage: "../assets/course_map4.jpg",
-    toilet: "청계천 곳곳의 공중화장실, 주변 상가 화장실 이용 가능",
-    sunsetInfo: "도심 속 하천에서 감상하는 특별한 석양 풍경",
-    tip: "주변에 맛집과 카페가 많아 플로깅 후 식사하기 좋습니다",
-    description:
-      "서울 도심을 가로지르는 청계천을 따라 걷는 도시형 산책로입니다. 역사와 현대가 공존하는 독특한 풍경을 감상하며 여유로운 플로깅을 즐길 수 있습니다.\n\n①광교구간(2.1km) : 청계천 복원의 시작점부터 시작하는 역사적 구간입니다.\n\n②문화구간(2.8km) : 다양한 조형물과 문화시설을 지나는 구간입니다.\n\n③자연구간(1.4km) : 상대적으로 녹지가 많은 상류 구간입니다.",
-    // 청계천 좌표 추가
-    spotLatitude: 37.5694,
-    spotLongitude: 126.9785,
-    trashReports: [
-      {
-        id: 1,
-        title: "하천변 쓰레기",
-        detail: "음식 포장지, 일회용컵 외 4개",
-        location: "청계천 3교 근처",
-        reportedAt: "2024-01-15",
-      },
-    ],
-  },
-}
-
 export default function CourseDetailScreen({ navigation, route }) {
   const [courseData, setCourseData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [nearbyPlaces, setNearbyPlaces] = useState({ restaurants: "", toilets: "" }) // DB에서 불러올 매점/화장실 정보
+  const [currentLocation, setCurrentLocation] = useState(null)
+  const [locationLoading, setLocationLoading] = useState(false)
 
-  // DB에서 코스 상세 데이터 가져오기
+  // 위치 권한 요청
+  const requestLocationPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: "위치 권한 요청",
+            message: "플로깅을 위해 위치 권한이 필요합니다.",
+            buttonNeutral: "나중에",
+            buttonNegative: "거부",
+            buttonPositive: "허용",
+          }
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // 현재 위치 가져오기
+  const getCurrentLocation = async () => {
+    const hasPermission = await requestLocationPermission();
+    if (!hasPermission) {
+      Alert.alert("위치 권한이 필요합니다", "설정에서 위치 권한을 허용해주세요.");
+      return;
+    }
+
+    setLocationLoading(true);
+    
+    Geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setCurrentLocation({ latitude, longitude });
+        setLocationLoading(false);
+        console.log("📍 현재 위치:", { latitude, longitude });
+      },
+      (error) => {
+        console.error("위치 가져오기 실패:", error);
+        setLocationLoading(false);
+        Alert.alert("위치 오류", "현재 위치를 가져올 수 없습니다.");
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 10000,
+      }
+    );
+  };
+
+  // 코스 상세 정보 가져오기
   const fetchCourseDetail = async () => {
     try {
       setLoading(true)
       const courseId = route.params?.courseId || route.params?.trailId
-      const fallbackData = route.params?.courseData // 추천 화면에서 전달받은 더미 데이터
+      const fallbackData = route.params?.courseData
 
       console.log("📋 [CourseDetailScreen] 코스 상세 정보 로드 시작:")
-      console.log("- route.params:", route.params)
       console.log("- courseId:", courseId)
 
       if (!courseId) {
-        console.error("❌ [CourseDetailScreen] 코스 ID가 없습니다")
+        console.error("⌛ [CourseDetailScreen] 코스 ID가 없습니다")
         setCourseData(null)
         return
       }
 
       try {
-        // 먼저 API에서 데이터 시도
+        // API에서 데이터 시도
         const data = await getTrailDetail(courseId)
 
         console.log("✅ [CourseDetailScreen] API에서 코스 상세 정보 로드 성공!")
-        console.log("- 원본 데이터:", data)
 
         // API 응답 데이터를 화면에서 사용할 형태로 변환
         const transformedData = {
@@ -203,73 +146,50 @@ export default function CourseDetailScreen({ navigation, route }) {
           length: data.length || "거리 정보 없음",
           level: data.difficultyLevel || "난이도 정보 없음",
           images: [], // 이미지는 별도 처리 필요
-          mapImage: null, // 지도 이미지는 별도 처리 필요
           toilet: data.toiletDescription || "화장실 정보 없음",
-          sunsetInfo: data.optionDescription || "추가 정보 없음",
           tip: data.amenityDescription || "편의시설 정보 없음",
           description: data.descriptionDetail || "상세 설명 없음",
           trashReports: [], // 쓰레기 신고는 별도 API 필요
-          // 추가 정보
           trailTypeName: data.trailTypeName,
-          spotLatitude: data.spotLatitude,
-          spotLongitude: data.spotLongitude,
-          reportCount: data.reportCount,
+          spotLatitude: parseFloat(data.spotLatitude),
+          spotLongitude: parseFloat(data.spotLongitude),
+          reportCount: data.reportCount || 0,
         }
 
         console.log("🔄 [CourseDetailScreen] API 데이터 변환 완료:", transformedData)
         setCourseData(transformedData)
+        
       } catch (apiError) {
-        console.log("⚠️ [CourseDetailScreen] API 호출 실패, 더미 데이터 사용:")
+        console.log("⚠️ [CourseDetailScreen] API 호출 실패:")
         console.log("- API 에러:", apiError?.message)
 
-        // API 실패 시 더미 데이터 사용
-        let dummyData = null
-
-        // 1. 먼저 더미 데이터베이스에서 찾기
-        if (DUMMY_COURSES_DATA[courseId]) {
-          dummyData = DUMMY_COURSES_DATA[courseId]
-          console.log("✅ [CourseDetailScreen] 더미 데이터베이스에서 데이터 발견:", dummyData.name)
-        }
-        // 2. 추천 화면에서 전달받은 데이터 사용
-        else if (fallbackData) {
-          dummyData = {
+        // API 실패 시 fallback 데이터 사용
+        if (fallbackData) {
+          const dummyData = {
             id: fallbackData.id,
             name: fallbackData.name,
-            address: fallbackData.address,
-            region: fallbackData.region,
-            duration: fallbackData.duration,
-            length: fallbackData.distance,
-            level: fallbackData.difficulty,
-            images: [fallbackData.image],
-            mapImage: "../assets/course_map.jpg",
+            address: fallbackData.address || "주소 정보 없음",
+            region: fallbackData.region || "지역 정보 없음",
+            duration: fallbackData.duration || "소요시간 정보 없음",
+            length: fallbackData.distance || "거리 정보 없음",
+            level: fallbackData.difficulty || "난이도 정보 없음",
+            images: [],
             toilet: "화장실 정보가 제공되지 않습니다.",
-            sunsetInfo: "석양 감상 포인트 정보가 제공되지 않습니다.",
             tip: "편의시설 정보가 제공되지 않습니다.",
             description: `${fallbackData.name}에서 즐기는 플로깅 코스입니다. 아름다운 자연 경관과 함께 건강한 운동을 즐겨보세요.`,
-            trashReports: [
-              {
-                id: 1,
-                title: "일반 쓰레기",
-                detail: `쓰레기 ${fallbackData.reportCount}개 신고됨`,
-                location: fallbackData.name,
-                reportedAt: "2024-01-15",
-              },
-            ],
-            reportCount: fallbackData.reportCount,
+            trashReports: [],
+            spotLatitude: fallbackData.latitude || 37.5665,
+            spotLongitude: fallbackData.longitude || 126.978,
+            reportCount: fallbackData.reportCount || 0,
           }
-          console.log("✅ [CourseDetailScreen] 추천 화면 데이터 사용:", dummyData.name)
+          console.log("✅ [CourseDetailScreen] fallback 데이터 사용:", dummyData.name)
+          setCourseData(dummyData)
+        } else {
+          setCourseData(null)
         }
-        // 3. 기본 더미 데이터 사용
-        else {
-          dummyData = DUMMY_COURSES_DATA["1"] // 기본값으로 첫 번째 코스 사용
-          console.log("✅ [CourseDetailScreen] 기본 더미 데이터 사용:", dummyData.name)
-        }
-
-        setCourseData(dummyData)
       }
     } catch (error) {
-      console.error("❌ [CourseDetailScreen] 전체 처리 실패:")
-      console.error("- 에러:", error)
+      console.error("⌛ [CourseDetailScreen] 전체 처리 실패:", error)
       setCourseData(null)
     } finally {
       setLoading(false)
@@ -281,83 +201,93 @@ export default function CourseDetailScreen({ navigation, route }) {
     if (courseData && courseData.images.length > 1) {
       const interval = setInterval(() => {
         setCurrentImageIndex((prev) => (prev + 1) % courseData.images.length)
-      }, 4000) // 4초마다 이미지 변경
-
+      }, 4000)
       return () => clearInterval(interval)
     }
   }, [courseData])
 
   useEffect(() => {
     fetchCourseDetail()
+    getCurrentLocation() // 컴포넌트 마운트 시 현재 위치 가져오기
   }, [])
 
-  const goToTrashInfo = () => navigation.navigate("TrashCanInfo")
   const goBack = () => navigation.goBack()
   const goToMyPloggingRecords = () => navigation.navigate("내 플로깅 기록")
 
-  const startPlogging = () => {
-    if (courseData) {
-      // API에서 실제 경로 데이터를 가져오도록 수정해야 합니다.
-      // 지금은 courseData에 path가 있다고 가정합니다.
-      const trailPath = courseData.path || []; 
-      
-      navigation.navigate("PloggingStart", {
-        // 👇 기존에 넘기던 데이터
-        selectedRoute: {
-          id: courseData.id,
-          name: courseData.name,
-          location: courseData.address,
-          difficulty: courseData.level,
-          distance: courseData.length,
-          duration: courseData.duration,
-          latitude: courseData.spotLatitude || 37.5665,
-          longitude: courseData.spotLongitude || 126.978,
-        },
-        // 👇 새로 추가하는 데이터
-        trailStartCoords: { // 산책로 시작점 좌표
-          latitude: courseData.spotLatitude,
-          longitude: courseData.spotLongitude,
-        },
-        trailFullPath: trailPath, // 산책로 전체 경로
-        courseName: courseData.name,
-      });
+  // 플로깅 시작 함수 (거리 체크 포함)
+  const startPlogging = async () => {
+    if (!courseData) {
+      Alert.alert("오류", "코스 정보를 불러올 수 없습니다.")
+      return
     }
-  };
 
+    // 현재 위치 확인
+    if (!currentLocation) {
+      Alert.alert(
+        "위치 정보 필요",
+        "현재 위치를 확인해주세요.",
+        [
+          { text: "위치 새로고침", onPress: getCurrentLocation },
+          { text: "취소", style: "cancel" }
+        ]
+      )
+      return
+    }
 
-  // DB에서 매점/화장실 정보 로드 (추후 구현)
-  const loadNearbyFacilities = () => {
-    // TODO: DB에서 매점/화장실 정보를 불러오는 API 호출
-    setNearbyPlaces({
-      restaurants: "식수보급처가 없으니 매점에서 구입하거나 사전준비",
-      toilets: "생태공원, 적누리 마을회관, 벚꽃길 사격장",
+    // 거리 계산
+    const distance = calculateDistance(
+      currentLocation.latitude,
+      currentLocation.longitude,
+      courseData.spotLatitude,
+      courseData.spotLongitude
+    )
+
+    console.log(`🎯 [CourseDetailScreen] 산책로와의 거리: ${distance.toFixed(0)}m`)
+
+    // 거리 체크
+    if (distance > MAX_DISTANCE_TO_START) {
+      Alert.alert(
+        "산책로와 거리가 너무 멉니다",
+        `현재 산책로에서 ${distance.toFixed(0)}m 떨어져 있습니다.\n${MAX_DISTANCE_TO_START}m 이내로 가까이 이동해주세요.`,
+        [{ text: "확인" }]
+      )
+      return
+    }
+
+    // 거리가 적절하면 플로깅 시작 화면으로 이동
+    navigation.navigate("PloggingStart", {
+      selectedRoute: {
+        id: courseData.id,
+        name: courseData.name,
+        location: courseData.address,
+        difficulty: courseData.level,
+        distance: courseData.length,
+        duration: courseData.duration,
+        latitude: courseData.spotLatitude,
+        longitude: courseData.spotLongitude,
+      },
+      trailStartCoords: {
+        latitude: courseData.spotLatitude,
+        longitude: courseData.spotLongitude,
+      },
+      courseName: courseData.name,
+      // 추후 API에서 실제 경로 데이터를 가져와야 함
+      trailFullPath: [], // TODO: API에서 실제 경로 데이터 가져오기
     })
   }
 
-  // 코스 데이터가 로드된 후 주변 시설 정보 로드
-  useEffect(() => {
-    if (courseData) {
-      loadNearbyFacilities()
-    }
-  }, [courseData])
-
   // 이미지 렌더링 함수
   const renderImageItem = ({ item, index }) => (
-    <Image source={{ uri: item || DUMMY_IMAGES[index % DUMMY_IMAGES.length] }} style={styles.courseImage} />
+    <Image 
+      source={{ uri: item || DUMMY_IMAGES[index % DUMMY_IMAGES.length] }} 
+      style={styles.courseImage} 
+    />
   )
 
-  // 구글맵 컴포넌트 - 산책로 위치만 표시
+  // 지도 렌더링 함수
   const renderMap = () => {
-    // DB에서 받은 좌표 또는 기본 좌표 사용
-    const latitude = courseData?.spotLatitude ? Number.parseFloat(courseData.spotLatitude) : 37.5665
-    const longitude = courseData?.spotLongitude ? Number.parseFloat(courseData.spotLongitude) : 126.978
-
-    console.log("[CourseDetailScreen] 지도 렌더링:", {
-      latitude,
-      longitude,
-      spotLatitude: courseData?.spotLatitude,
-      spotLongitude: courseData?.spotLongitude,
-    })
+    const latitude = courseData?.spotLatitude || 37.5665
+    const longitude = courseData?.spotLongitude || 126.978
 
     return (
       <MapView
@@ -368,20 +298,14 @@ export default function CourseDetailScreen({ navigation, route }) {
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         }}
-        showsUserLocation={false}
+        showsUserLocation={true}
         showsMyLocationButton={false}
         scrollEnabled={true}
         zoomEnabled={true}
         pitchEnabled={false}
         rotateEnabled={false}
-        onMapReady={() => {
-          console.log("[CourseDetailScreen] 지도 준비 완료")
-        }}
-        onError={(error) => {
-          console.error("[CourseDetailScreen] 지도 오류:", error)
-        }}
       >
-        {/* 산책로 위치 마커 (메인) */}
+        {/* 산책로 위치 마커 */}
         <Marker
           coordinate={{
             latitude: latitude,
@@ -418,12 +342,6 @@ export default function CourseDetailScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      {/* Status Bar */}
-      <View style={styles.statusBar}>
-        <Text style={styles.statusTime}>9:41</Text>
-        <View style={styles.statusIcons}>{/* Status bar icons would go here */}</View>
-      </View>
-
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={goBack}>
@@ -436,7 +354,7 @@ export default function CourseDetailScreen({ navigation, route }) {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Course Images with Horizontal Scroll */}
+        {/* Course Images */}
         <View style={styles.imageContainer}>
           <FlatList
             data={courseData.images.length > 0 ? courseData.images : DUMMY_IMAGES}
@@ -461,11 +379,6 @@ export default function CourseDetailScreen({ navigation, route }) {
                 ]}
               />
             ))}
-          </View>
-
-          {/* Image Counter */}
-          <View style={styles.imageCounter}>
-            <Text style={styles.imageCounterText}>{currentImageIndex + 1}</Text>
           </View>
         </View>
 
@@ -511,25 +424,22 @@ export default function CourseDetailScreen({ navigation, route }) {
             <Text style={styles.detailText}>{courseData.address}</Text>
           </View>
 
-          {/* Amenity Info */}
-          <View style={styles.detailItem}>
-            <View style={styles.detailHeader}>
-              <Icon name="cube" size={20} color="#797982" />
-              <Text style={styles.detailLabel}>매점 정보</Text>
-            </View>
-            <Text style={styles.detailText}>
-              {courseData.sunsetInfo || "식수보급처가 없으니 매점에서 구입하거나 사전준비"}
-            </Text>
-          </View>
-
           {/* Toilet Info */}
           <View style={styles.detailItem}>
             <View style={styles.detailHeader}>
               <Icon name="human-male-female" size={20} color="#797982" />
               <Text style={styles.detailLabel}>화장실 정보</Text>
             </View>
-            <Text style={styles.detailText}>{courseData.toilet || "생태공원, 적누리 마을회관, 벚꽃길 사격장"}</Text>
-            console.log("화장실 정보:", courseData.toiletDescription);  
+            <Text style={styles.detailText}>{courseData.toilet}</Text>
+          </View>
+
+          {/* Amenity Info */}
+          <View style={styles.detailItem}>
+            <View style={styles.detailHeader}>
+              <Icon name="cube" size={20} color="#797982" />
+              <Text style={styles.detailLabel}>편의시설 정보</Text>
+            </View>
+            <Text style={styles.detailText}>{courseData.tip}</Text>
           </View>
         </View>
 
@@ -544,19 +454,13 @@ export default function CourseDetailScreen({ navigation, route }) {
           <View style={styles.trashHeader}>
             <Icon name="menu" size={24} color="#418663" />
             <Text style={styles.trashTitle}>제보된 쓰레기</Text>
-            <Text style={styles.trashCount}>{courseData.trashReports?.length || 0}개</Text>
+            <Text style={styles.trashCount}>{courseData.reportCount}개</Text>
           </View>
 
-          {courseData.trashReports && courseData.trashReports.length > 0 ? (
-            <View style={styles.trashCard}>
-              {courseData.trashReports.map((report) => (
-                <View key={report.id} style={styles.trashItem}>
-                  <Text style={styles.trashItemTitle}>{report.title}</Text>
-                  <Text style={styles.trashItemDetail}>{report.detail}</Text>
-                  <Text style={styles.trashItemLocation}>📍 {report.location}</Text>
-                </View>
-              ))}
-            </View>
+          {courseData.reportCount > 0 ? (
+            <Text style={styles.trashDescription}>
+              이 산책로에 총 {courseData.reportCount}개의 쓰레기가 신고되었습니다.
+            </Text>
           ) : (
             <Text style={styles.noTrashText}>현재 등록된 쓰레기 신고가 없습니다.</Text>
           )}
@@ -564,12 +468,23 @@ export default function CourseDetailScreen({ navigation, route }) {
 
         {/* Action Buttons */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.startPloggingButton} onPress={() => startPlogging()}>
+          {/* 위치 새로고침 버튼 */}
+          <TouchableOpacity 
+            style={styles.locationButton} 
+            onPress={getCurrentLocation}
+            disabled={locationLoading}
+          >
+            <Icon name="crosshairs-gps" size={20} color="#418663" />
+            <Text style={styles.locationButtonText}>
+              {locationLoading ? "위치 확인중..." : "내 위치 새로고침"}
+            </Text>
+          </TouchableOpacity>
+
+          {/* 플로깅 시작 버튼 */}
+          <TouchableOpacity style={styles.startPloggingButton} onPress={startPlogging}>
             <Icon name="play" size={20} color="#fff" />
             <Text style={styles.startPloggingButtonText}>이 코스로 플로깅 시작하기</Text>
           </TouchableOpacity>
-
-
         </View>
       </ScrollView>
     </View>
@@ -582,26 +497,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 
-  // Status Bar Styles
-  statusBar: {
-    height: 44,
-    backgroundColor: "#FFFFFF",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 30,
-  },
-  statusTime: {
-    fontFamily: "Inter",
-    fontWeight: "500",
-    fontSize: 16,
-    color: "#090A0A",
-  },
-  statusIcons: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
   // Header Styles
   header: {
     height: HEADER_HEIGHT,
@@ -610,7 +505,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: PADDING_H,
-    borderBottomWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+    paddingTop: screenHeight * 0.05,
   },
   backButton: {
     width: 24,
@@ -668,22 +565,6 @@ const styles = StyleSheet.create({
   },
   inactiveIndicator: {
     backgroundColor: "#C8DECB",
-  },
-  imageCounter: {
-    position: "absolute",
-    top: 20,
-    left: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  imageCounterText: {
-    fontFamily: "Inter",
-    fontWeight: "400",
-    fontSize: 14,
-    color: "#FFFFFF",
-    textAlign: "center",
   },
 
   // Course Info Styles
@@ -773,7 +654,7 @@ const styles = StyleSheet.create({
   detailText: {
     fontFamily: "Pretendard Variable",
     fontWeight: "500",
-    fontSize: 10,
+    fontSize: 14,
     lineHeight: 20,
     color: "#333333",
     marginTop: 8,
@@ -800,7 +681,7 @@ const styles = StyleSheet.create({
   description: {
     fontFamily: "Pretendard Variable",
     fontWeight: "500",
-    fontSize: 10,
+    fontSize: 14,
     lineHeight: 20,
     color: "#333333",
   },
@@ -831,47 +712,14 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: "#2E2E2E",
   },
-  trashCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: "rgba(190, 190, 190, 0.25)",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  trashItem: {
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(170, 178, 200, 0.2)",
-  },
-  trashItemTitle: {
+  trashDescription: {
     fontFamily: "Pretendard Variable",
-    fontWeight: "600",
+    fontWeight: "500",
     fontSize: 14,
     lineHeight: 20,
-    color: "#333333",
-    marginBottom: 4,
-  },
-  trashItemDetail: {
-    fontFamily: "Pretendard Variable",
-    fontWeight: "500",
-    fontSize: 12,
-    lineHeight: 18,
     color: "#666666",
-    marginBottom: 4,
-  },
-  trashItemLocation: {
-    fontFamily: "Pretendard Variable",
-    fontWeight: "500",
-    fontSize: 11,
-    lineHeight: 16,
-    color: "#999999",
+    textAlign: "center",
+    paddingVertical: 20,
   },
   noTrashText: {
     fontFamily: "Pretendard Variable",
@@ -889,6 +737,26 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     paddingBottom: 40,
   },
+  locationButton: {
+    backgroundColor: "#F5F5F5",
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#418663",
+  },
+  locationButtonText: {
+    fontFamily: "Pretendard Variable",
+    fontWeight: "600",
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#418663",
+    marginLeft: 8,
+  },
   startPloggingButton: {
     backgroundColor: "#418663",
     borderRadius: 30,
@@ -897,7 +765,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
     shadowColor: "rgba(65, 134, 99, 0.3)",
     shadowOffset: {
       width: 0,
@@ -914,29 +781,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: "#FFFFFF",
     marginLeft: 8,
-  },
-  trashBinButton: {
-    backgroundColor: "#333333",
-    borderRadius: 30,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  trashBinButtonText: {
-    fontFamily: "Pretendard Variable",
-    fontWeight: "700",
-    fontSize: 16,
-    lineHeight: 20,
-    color: "#FFFFFF",
-    flex: 1,
-    textAlign: "center",
-  },
-  vectorIcon: {
-    width: 24,
-    height: 18,
-    tintColor: "#FFFFFF",
   },
 
   // Loading and Error States
@@ -980,25 +824,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#FFFFFF",
   },
-
-  // Responsive adjustments for different screen sizes
-  "@media (max-width: 375)": {
-    courseName: {
-      fontSize: 20,
-    },
-    headerTitle: {
-      fontSize: 18,
-    },
-    sectionTitle: {
-      fontSize: 18,
-    },
-  },
-  "@media (min-width: 414)": {
-    courseInfoContainer: {
-      paddingVertical: 24,
-    },
-    detailSection: {
-      paddingVertical: 28,
-    },
-  },
-})
+});
