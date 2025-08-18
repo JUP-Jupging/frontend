@@ -1,6 +1,6 @@
 // src/api/mypage.js
 import axios from "axios";
-import BASE_URL from "../apiconfig";
+import BASE_URL from "./apiconfig";
 
 /**
  * 마이페이지 조회

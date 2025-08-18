@@ -1,6 +1,6 @@
 // api/authapi.js
 import axios from "axios";
-import BASE_URL from "../api/apiconfig";
+import BASE_URL from "./apiconfig";
 import { useAuth } from "../stores/useAuth"; // Zustand에서 토큰 읽기
 
 // ✅ 앱 전역에서 쓸 공용 axios 인스턴스

@@ -12,7 +12,9 @@ import {
   ActivityIndicator,
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
-import { getTrails, searchTrails, testConnection } from "../api/trails"
+// 🔥 trails.js에서 올바른 함수들 import
+import { getTrailList, searchTrails } from "../api/trails"
+import { useLocation } from "../hooks/useLocation"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -43,11 +45,13 @@ export default function WalkSearchScreen({ navigation }) {
     return R * c;
   }
 
+  // 🔥 trails.js의 getTrailList 함수 사용
   const loadTrailsWithFilters = async (filterParams = {}) => {
     let isMounted = true
     try {
       setLoading(true)
-      const data = await TrailAPI.getTrailList(filterParams)
+      // trails.js의 getTrailList 함수 호출
+      const data = await getTrailList(filterParams)
 
       let sortedData = Array.isArray(data) ? data : []
 
@@ -86,6 +90,7 @@ export default function WalkSearchScreen({ navigation }) {
     setShowFilters(false)
   }
 
+  // 🔥 trails.js의 searchTrails 함수 사용
   const performSearch = async (query) => {
     const q = query.trim()
     if (!q) {
@@ -96,7 +101,8 @@ export default function WalkSearchScreen({ navigation }) {
     try {
       setLoading(true)
       setShowResults(true)
-      const data = await TrailAPI.searchTrails(q)
+      // trails.js의 searchTrails 함수 호출
+      const data = await searchTrails(q)
       setSearchResults(Array.isArray(data) ? data : [])
     } catch (e) {
       console.error("❌ 검색 실패:", e)
@@ -105,6 +111,11 @@ export default function WalkSearchScreen({ navigation }) {
       setLoading(false)
     }
   }
+
+  // 🔥 초기 로드 시 모든 트레일 불러오기
+  useEffect(() => {
+    loadTrailsWithFilters()
+  }, [])
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -117,7 +128,7 @@ export default function WalkSearchScreen({ navigation }) {
   }, [searchQuery])
 
   const handleTrailPress = (trailId) => {
-    // ❗️StackNavigator에 등록한 이름("CourseDetail")으로 수정합니다.
+    // StackNavigator에 등록한 이름("CourseDetail")으로 수정합니다.
     navigation.navigate("CourseDetail", { trailId });
   };
 
@@ -131,7 +142,7 @@ export default function WalkSearchScreen({ navigation }) {
   }
 
   const renderSearchItem = ({ item }) => (
-<TouchableOpacity style={styles.searchItem} onPress={() => handleTrailPress(item.trailId)}>
+    <TouchableOpacity style={styles.searchItem} onPress={() => handleTrailPress(item.trailId)}>
       <View style={styles.itemContent}>
         <Text style={styles.itemName}>{item.trailName || item.name || "산책로 이름"}</Text>
         <Text style={styles.itemAddress}>{item.cityName || item.address || "위치 정보 없음"}</Text>
@@ -189,6 +200,7 @@ export default function WalkSearchScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </View>
+      
       {/* 필터 영역 */}
       {showFilters && (
         <View style={styles.filterContainer}>

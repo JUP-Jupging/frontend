@@ -1,6 +1,6 @@
 // src/api/plogging.js
 import axios from "axios";
-import BASE_URL from "../apiconfig";
+import BASE_URL from "./apiconfig";
 
 // 📌 플로깅 시작
 export const startPlogging = async (formData, accessToken) => {
