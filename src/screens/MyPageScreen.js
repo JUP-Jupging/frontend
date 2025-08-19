@@ -8,6 +8,7 @@ import CommonModal from "../components/CommonModal"
 import { launchImageLibrary } from 'react-native-image-picker'
 import { getMyPage, updateProfileImage, updateNickname, updateActivityRegion } from "../api/mypage";
 import { useAuth } from "../stores/useAuth";
+import { forceClearAuth } from '../utils/forceClearAuth'; // 함수 경로에 맞게 수정
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 const REGION_LIST = [
@@ -44,6 +45,7 @@ export default function MyPageScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
+      console.log("마이페이지 Access Token:", accessToken);
       async function fetchUser() {
         try {
           const data = await getMyPage(accessToken);
@@ -58,15 +60,49 @@ export default function MyPageScreen({ navigation }) {
     }, [accessToken])
   );
 
-  const handleDeleteAccount = () => {
-    // 실제 삭제 API 호출 위치
-    console.log("계정 삭제 처리됨")
-    setModalVisible(false)
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "Login" }],
-    })
-  }
+ useFocusEffect(
+    useCallback(() => {
+      async function fetchUser() {
+        try {
+           const data = await getMyPage(accessToken);
+           setUser(data);
+          setProfileImage(data.profileImageUrl ? { uri: data.profileImageUrl } : require("../assets/profile.png"));
+          setRegion(data.activityRegion || "지역을 선택하세요");
+     } catch (e) {
+          console.error("유저 정보 불러오기 실패:", e);
+          // 401, 403 같은 인증 에러 발생 시 강제 로그아웃 처리도 가능
+          // if (e.response?.status === 401) {
+          //   await forceClearAuth();
+          //   navigation.reset({ index: 0, routes: [{ name: "Login" }] });
+          // }
+        }
+      }
+      if (accessToken) fetchUser();
+    }, [accessToken])
+  );
+
+  // 2. handleDeleteAccount 함수를 async로 변경하고 로직을 수정합니다.
+  const handleDeleteAccount = async () => {
+    try {
+      // 서버에 회원탈퇴 API 호출
+      await withdraw(accessToken); 
+      console.log("계정 삭제 API 호출 성공");
+    } catch (error) {
+      // API 호출이 실패하더라도(예: 이미 DB에서 삭제된 유저) 에러만 기록합니다.
+      // 어차피 finally에서 로그아웃 처리는 동일하게 진행됩니다.
+      console.error("계정 삭제 API 호출 실패:", error);
+    } finally {
+      // API 성공/실패와 관계없이 항상 실행됩니다.
+      setModalVisible(false); // 모달 닫기
+      await forceClearAuth(); // 로컬 데이터(AsyncStorage, Zustand) 삭제
+      
+      // 로그인 화면으로 리셋
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Login" }],
+      });
+    }
+  };
 
   // 프로필 사진 선택
   const handleChangeProfilePhoto = () => {
@@ -223,7 +259,7 @@ export default function MyPageScreen({ navigation }) {
         onConfirm={handleConfirmRegionChange}
       />
       {/* 계정 삭제 확인 모달 */}
-      <CommonModal
+<CommonModal
         visible={modalVisible}
         message="정말 계정을 삭제하시겠습니까?"
         onCancel={() => setModalVisible(false)}
