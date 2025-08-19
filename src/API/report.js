@@ -56,3 +56,36 @@ export const getReportDetail = async (accessToken, reportId) => {
     throw error;
   }
 };
+// ...existing code...
+
+/**
+ * AI 기반 쓰레기 분석
+ * POST https://ai.jupging.store/detect
+ * Form-Data: imageFiles (1장)
+ * 반환: 분석 결과(JSON)
+ */
+export const analyzeTrashImage = async (imageFile) => {
+  try {
+    const formData = new FormData();
+    formData.append("imageFiles", {
+      uri: imageFile.uri,
+      name: imageFile.name || "photo.jpg",
+      type: imageFile.type || "image/jpeg",
+    });
+
+    const { data } = await axios.post(
+      "https://ai.jupging.store/detect",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 20000,
+      }
+    );
+    return data;
+  } catch (error) {
+    console.error("analyzeTrashImage Error:", error.response?.data || error.message);
+    throw error;
+  }
+};

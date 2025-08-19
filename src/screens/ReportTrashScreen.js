@@ -12,10 +12,12 @@ import {
   SafeAreaView,
   Alert,
   Dimensions,
+  Platform,               
+  PermissionsAndroid, 
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
-import { launchImageLibrary } from "react-native-image-picker"
+import { launchImageLibrary, launchCamera } from "react-native-image-picker";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -92,34 +94,116 @@ export default function ReportTrashScreen({ navigation }) {
       setIsLoading(false)
     }
   }
+  // 권한 요청
+  async function ensureCameraPermissions() {
+    if (Platform.OS !== "android") return true;
 
+    const perms = [PermissionsAndroid.PERMISSIONS.CAMERA];
+    if (Platform.Version >= 33) {
+      perms.push(PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES);
+    } else {
+      perms.push(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE);
+    }
+
+    const results = await PermissionsAndroid.requestMultiple(perms);
+    return perms.every(p => results[p] === PermissionsAndroid.RESULTS.GRANTED);
+  }
+
+  async function ensureCameraPermissions() {
+    if (Platform.OS !== "android") return true
+
+    const perms = [PermissionsAndroid.PERMISSIONS.CAMERA]
+
+    if (Platform.Version >= 33) {
+      // Android 13+
+      perms.push(PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES)
+    } else {
+      // Android 12 이하
+      perms.push(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE)
+    }
+
+    const results = await PermissionsAndroid.requestMultiple(perms)
+    const granted = perms.every(p => results[p] === PermissionsAndroid.RESULTS.GRANTED)
+    return granted
+  }
+
+  // ✅ 사진 추가(카메라/앨범 선택)
   const handleImagePicker = () => {
-    if (imageUris.length >= 5) {
-      Alert.alert("알림", "최대 5장까지만 업로드할 수 있습니다.")
+    if (imageUris.length >= 1) { // ✅ 최대 1장
+      Alert.alert("알림", "최대 1장까지만 업로드할 수 있습니다.")
       return
     }
 
-    const options = {
-      mediaType: "photo",
-      includeBase64: false,
-      maxHeight: 2000,
-      maxWidth: 2000,
-    }
+    Alert.alert(
+      "사진 선택",
+      "사진을 어떻게 추가할까요?",
+      [
+        {
+          text: "카메라로 찍기",
+          onPress: async () => {                 // ✅ 권한 먼저
+            const ok = await ensureCameraPermissions()
+            if (!ok) {
+              Alert.alert("권한 필요", "카메라/사진 권한을 허용해주세요.")
+              return
+            }
 
-    launchImageLibrary(options, (response) => {
-      if (response.didCancel || response.errorMessage) {
-        return
-      }
+            const cameraOptions = {
+              mediaType: "photo",
+              saveToPhotos: false,    // ✅ 갤러리에 저장하지 않음
+              maxHeight: 2000,
+              maxWidth: 2000,
+            }
 
-      if (response.assets && response.assets[0]) {
-        const newImageUri = response.assets[0].uri
-        setImageUris((prev) => [...prev, newImageUri])
-      }
-    })
+            launchCamera(cameraOptions, (response) => {
+              if (response?.errorMessage) {
+                console.log("launchCamera error:", response.errorMessage)
+                return
+              }
+              if (response?.didCancel) {
+                return
+              }
+              const uri = response?.assets?.[0]?.uri
+              if (uri) setImageUris([uri])       // ✅ 상태에만 보관
+            })
+          },
+        },
+        {
+          text: "앨범에서 선택",
+          onPress: async () => {
+            // 앨범 접근도 OS 버전에 따라 READ 권한 필요할 수 있음
+            const ok = Platform.OS === "android" ? await ensureCameraPermissions() : true
+            if (!ok) {
+              Alert.alert("권한 필요", "사진 접근 권한을 허용해주세요.")
+              return
+            }
+
+            const libraryOptions = {
+              mediaType: "photo",
+              selectionLimit: 1,      // ✅ 한 장만
+              maxHeight: 2000,
+              maxWidth: 2000,
+            }
+
+            launchImageLibrary(libraryOptions, (response) => {
+              if (response?.errorMessage) {
+                console.log("launchImageLibrary error:", response.errorMessage)
+                return
+              }
+              if (response?.didCancel) {
+                return
+              }
+              const uri = response?.assets?.[0]?.uri
+              if (uri) setImageUris([uri])
+            })
+          },
+        },
+        { text: "취소", style: "cancel" },
+      ]
+    )
   }
 
-  const handleDeleteImage = (indexToDelete) => {
-    setImageUris((prev) => prev.filter((_, index) => index !== indexToDelete))
+  const handleDeleteImage = () => {
+    setImageUris([]);
   }
 
   const handleAIAnalysis = () => {
@@ -229,23 +313,21 @@ export default function ReportTrashScreen({ navigation }) {
         {/* 사진 업로드 영역 */}
         <View style={styles.imageSection}>
           <TouchableOpacity style={styles.imageUploadBox} onPress={handleImagePicker}>
-            <Text style={styles.imageCount}>{imageUris.length}/5</Text>
+            <View style={styles.cameraBoxInner}>
+              <Icon name="camera-alt" size={24} color="#418663" />
+              <Text style={styles.imageCount}>{imageUris.length}/1</Text>
+            </View>
           </TouchableOpacity>
-
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScrollView}>
             {imageUris.map((uri, index) => (
               <View key={index} style={styles.imageContainer}>
                 <Image source={{ uri }} style={styles.uploadedImage} />
-                <TouchableOpacity style={styles.imageDeleteButton} onPress={() => handleDeleteImage(index)}>
+                <TouchableOpacity style={styles.imageDeleteButton} onPress={handleDeleteImage}>
                   <Icon name="close" size={18} color="#fff" />
                 </TouchableOpacity>
               </View>
             ))}
           </ScrollView>
-
-          <TouchableOpacity style={styles.cameraButton} onPress={handleImagePicker}>
-            <Icon name="camera-alt" size={24} color="#418663" />
-          </TouchableOpacity>
         </View>
 
         {/* 입력 폼 */}
@@ -433,14 +515,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#418663",
     borderRadius: 5,
-    justifyContent: "flex-end",
+    justifyContent: "center",
     alignItems: "center",
-    paddingBottom: 5,
+    position: "relative",
+  },
+  cameraBoxInner: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   imageCount: {
     fontSize: 10,
     fontWeight: "600",
     color: "#418663",
+    marginTop: 2,
+    textAlign: "center",
+  },
+  cameraIconInBox: {
+    position: "absolute",
+    bottom: 8,
+    alignSelf: "center",
   },
   imageScrollView: {
     flexDirection: "row",
