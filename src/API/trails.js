@@ -86,10 +86,108 @@ export const searchTrails = async (keyword) => {
   }
 };
 
-// 🔥 이제 사용하지 않음 - 성능상 문제로 제거
+// 🔥 재추가 - 가까운 산책로 여러개 반환 (백엔드에서 거리순 정렬해서 보내줌)
 export const getNearbyTrails = async (latitude, longitude) => {
-  console.warn('⚠️ getNearbyTrails는 성능상 문제로 사용 중단됨. getNearestTrail 사용을 권장');
-  throw new Error('getNearbyTrails는 성능상 문제로 사용 중단됨');
+  try {
+    console.log('📡 [API] getNearbyTrails 호출 시작');
+    console.log('- latitude:', latitude);
+    console.log('- longitude:', longitude);
+    
+    // 파라미터 유효성 검사
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+      throw new Error('위도와 경도는 숫자여야 합니다');
+    }
+    
+    if (isNaN(latitude) || isNaN(longitude)) {
+      throw new Error('위도와 경도가 유효하지 않습니다');
+    }
+    
+    // 스웨거 문서에 따라 userLatitude, userLongitude 파라미터 사용
+    const url = `${BASE_URL}/trails/nearby?userLat=${latitude}&userLong=${longitude}`;
+    console.log('- 요청 URL:', url);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    console.log('📨 [API] getNearbyTrails 응답 받음 - 상태:', response.status);
+    
+    if (!response.ok) {
+      console.error('❌ [API] getNearbyTrails HTTP 오류:', response.status);
+      
+      // 응답 본문 확인
+      try {
+        const errorText = await response.text();
+        console.error('- 오류 응답 본문:', errorText.substring(0, 200));
+      } catch (textError) {
+        console.error('- 오류 응답 본문 읽기 실패:', textError);
+      }
+      
+      throw new Error(`HTTP error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('✅ [API] getNearbyTrails 성공');
+    console.log('- 응답 데이터 타입:', typeof data);
+    
+    // 🔥 응답 구조 확인을 위한 상세 로깅
+    if (data && data.items && Array.isArray(data.items)) {
+      console.log('- 📦 items 배열 형태로 응답 받음');
+      console.log('- 📊 총 산책로 수:', data.items.length);
+      
+      // 첫 3개 산책로 정보 출력
+      data.items.slice(0, 3).forEach((trail, index) => {
+        console.log(`- 🚶 산책로 ${index + 1}:`, {
+          trailId: trail.trailId,
+          trailName: trail.trailName || trail.instlPlcNm,
+          distance: trail.lengthDetail ? `${trail.lengthDetail}m` : trail.length,
+          difficulty: trail.difficultyLevel,
+          reportCount: trail.reportCount,
+          lat: trail.spotLatitude,
+          lng: trail.spotLongitude
+        });
+      });
+      
+      return data.items;
+    } else if (Array.isArray(data)) {
+      console.log('- 📦 직접 배열 형태로 응답 받음');
+      console.log('- 📊 총 산책로 수:', data.length);
+      
+      // 첫 3개 산책로 정보 출력
+      data.slice(0, 3).forEach((trail, index) => {
+        console.log(`- 🚶 산책로 ${index + 1}:`, {
+          trailId: trail.trailId,
+          trailName: trail.trailName || trail.instlPlcNm,
+          distance: trail.lengthDetail ? `${trail.lengthDetail}m` : trail.length,
+          difficulty: trail.difficultyLevel,
+          reportCount: trail.reportCount,
+          lat: trail.spotLatitude,
+          lng: trail.spotLongitude
+        });
+      });
+      
+      return data;
+    } else {
+      console.log('- ⚠️ 예상치 못한 응답 형식:', data);
+      return [];
+    }
+    
+  } catch (error) {
+    console.error('❌ [API] getNearbyTrails 실패');
+    console.error('- 오류 타입:', error.constructor.name);
+    console.error('- 오류 메시지:', error.message);
+    
+    // 네트워크 오류인지 확인
+    if (error.message.includes('fetch') || error.message.includes('Network request failed')) {
+      console.error('- 🌐 네트워크 연결 문제로 추정됨');
+    }
+    
+    throw error;
+  }
 };
 
 // 🔥 메인 API - 가장 가까운 산책로 1개만 반환
@@ -177,5 +275,6 @@ export default {
   getTrailDetail,
   getTrailList,
   searchTrails,
-  getNearestTrail, // 🔥 nearest만 export
+  getNearbyTrails, // 🔥 nearby 다시 추가
+  getNearestTrail,
 };
