@@ -170,7 +170,7 @@ const CourseMarker = ({ course, isSelected, onPress }) => {
   );
 };
 
-// 개선된 쓰레기 마커 컴포넌트
+// 🔥 개선된 쓰레기 마커 컴포넌트 - 디버깅 추가
 const TrashMarker = ({ trash, onPress }) => {
   const bounceAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -229,10 +229,31 @@ const TrashMarker = ({ trash, onPress }) => {
     outputRange: [1, 2],
   });
 
+  // 🔥 클릭 핸들러에 디버깅 추가
+  const handlePress = () => {
+    console.log("🎯 [TrashMarker] === 마커 클릭됨 ===");
+    console.log("🎯 [TrashMarker] 클릭된 쓰레기:", trash);
+    console.log("🎯 [TrashMarker] 쓰레기 ID:", trash?.id);
+    console.log("🎯 [TrashMarker] 쓰레기 키들:", trash ? Object.keys(trash) : 'null');
+    console.log("🎯 [TrashMarker] onPress 함수:", typeof onPress);
+    
+    if (onPress && typeof onPress === 'function') {
+      console.log("🎯 [TrashMarker] onPress 호출 시작");
+      onPress(trash);
+      console.log("🎯 [TrashMarker] onPress 호출 완료");
+    } else {
+      console.warn("⚠️ [TrashMarker] onPress 함수가 없거나 함수가 아닙니다");
+    }
+  };
+
   return (
-    <TouchableOpacity onPress={() => onPress(trash)} activeOpacity={0.7}>
+    <TouchableOpacity 
+      onPress={handlePress} 
+      activeOpacity={0.7}
+      style={styles.trashMarkerContainer} // 🔥 스타일을 TouchableOpacity로 이동
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} // 🔥 터치 영역 확대
+    >
       <Animated.View style={[
-        styles.trashMarkerContainer,
         { transform: [{ scale: bounceAnim }] }
       ]}>
         {/* 펄스 효과 */}
@@ -282,6 +303,16 @@ const PloggingMap = ({
   initialTrailPath 
 }) => {
 
+  // 🔥 디버깅 로그 추가
+  console.log("🗺️ [PloggingMap] === 렌더링 ===");
+  console.log("🗺️ [PloggingMap] 쓰레기 위치 개수:", trashLocations?.length || 0);
+  console.log("🗺️ [PloggingMap] onTrashMarkerPress 함수:", typeof onTrashMarkerPress);
+  
+  if (trashLocations && trashLocations.length > 0) {
+    console.log("🗺️ [PloggingMap] 첫 번째 쓰레기 데이터:", trashLocations[0]);
+    console.log("🗺️ [PloggingMap] 쓰레기 데이터 키들:", Object.keys(trashLocations[0]));
+  }
+
   const defaultRegion = {
     latitude: 37.5665,
     longitude: 126.9780,
@@ -301,7 +332,7 @@ const PloggingMap = ({
         ref={mapRef}
         style={styles.map}
         initialRegion={initialRegion}
-        onMapReady={() => console.log('지도 준비 완료')}
+        onMapReady={() => console.log('🗺️ [PloggingMap] 지도 준비 완료')}
         loadingIndicatorColor="#418663"
         loadingBackgroundColor="#F5F5F5"
       >
@@ -341,12 +372,47 @@ const PloggingMap = ({
               />
             )}
 
-            {/* 쓰레기 위치 마커 */}
-            {trashLocations && trashLocations.map((trash) => (
-              <Marker key={`trash-${trash.id}`} coordinate={trash.coordinate}>
-                <TrashMarker trash={trash} onPress={onTrashMarkerPress} />
-              </Marker>
-            ))}
+            {/* 🔥 쓰레기 위치 마커 - 수거되지 않은 것만 표시 */}
+            {trashLocations && trashLocations
+              .filter(trash => !trash.isPicked) // 🔥 수거되지 않은 쓰레기만 필터링
+              .map((trash, index) => {
+              console.log(`🗑️ [PloggingMap] 쓰레기 ${index} 마커 렌더링:`, {
+                id: trash.id,
+                coordinate: trash.coordinate,
+                amount: trash.amount,
+                hasId: !!trash.id,
+                hasCoordinate: !!trash.coordinate,
+                isPicked: trash.isPicked // 🔥 수거 상태 로깅
+              });
+              
+              return (
+                <Marker 
+                  key={`trash-${trash.id || index}`} 
+                  coordinate={trash.coordinate}
+                  onPress={() => {
+                    console.log(`🎯 [PloggingMap] Marker onPress 호출 - 쓰레기 ${trash.id}`);
+                    console.log(`🎯 [PloggingMap] 전달할 쓰레기 데이터:`, trash);
+                    if (onTrashMarkerPress) {
+                      console.log(`🎯 [PloggingMap] onTrashMarkerPress 함수 호출`);
+                      onTrashMarkerPress(trash);
+                    } else {
+                      console.warn(`⚠️ [PloggingMap] onTrashMarkerPress 함수가 없습니다`);
+                    }
+                  }}
+                  tracksViewChanges={false} // 🔥 성능 최적화 및 이벤트 안정성
+                >
+                  <TrashMarker 
+                    trash={trash} 
+                    onPress={(clickedTrash) => {
+                      console.log(`🎯 [PloggingMap] TrashMarker onPress - 쓰레기 ${clickedTrash?.id}`);
+                      if (onTrashMarkerPress) {
+                        onTrashMarkerPress(clickedTrash);
+                      }
+                    }}
+                  />
+                </Marker>
+              );
+            })}
 
             {/* 근처 산책로 마커 */}
             {nearbyCourses && nearbyCourses.map((course) => (
@@ -408,7 +474,7 @@ const PloggingMap = ({
       )}
     </View>
   );
-}; // <--- 🔥 이 부분이 수정되었습니다.
+};
 
 const styles = StyleSheet.create({
   // 기본 맵 컨테이너

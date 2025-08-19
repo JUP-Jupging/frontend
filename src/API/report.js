@@ -150,34 +150,99 @@ export const getReportById = async (reportId, accessToken) => {
 };
 
 /* ---------------------------------------------
- * 3) (주웠음 처리)
+ * 3) (주웠음 처리) - 🔥 디버깅 강화
  *    PUT /reports/{reportId}
  *    - 응답이 JSON이 아니라 "picked" (text)로 돌아오는 케이스가 있음
  * --------------------------------------------- */
 export const markReportPicked = async (reportId, accessToken) => {
-  if (!accessToken) throw new Error("인증 토큰이 없습니다.");
-
-  const resp = await fetch(`${BASE_URL}/reports/${reportId}`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-  });
-
-  // 서버가 텍스트만 주는 경우 대비
-  const contentType = resp.headers.get("content-type") || "";
-  const body = contentType.includes("application/json") ? await resp.json() : await resp.text();
-
-  if (!resp.ok) {
-    throw new Error(`주웠음 처리 실패 (${resp.status}) : ${typeof body === "string" ? body : JSON.stringify(body)}`);
+  console.log("🔥 [markReportPicked] === API 호출 시작 ===");
+  console.log("🔥 [markReportPicked] reportId:", reportId, typeof reportId);
+  console.log("🔥 [markReportPicked] accessToken:", accessToken ? "있음" : "없음");
+  console.log("🔥 [markReportPicked] BASE_URL:", BASE_URL);
+  
+  if (!accessToken) {
+    console.error("❌ [markReportPicked] 인증 토큰이 없습니다");
+    throw new Error("인증 토큰이 없습니다.");
   }
 
-  // "picked" 같은 텍스트를 boolean으로 매핑해주면 사용성이 좋아짐
-  if (typeof body === "string") {
-    return body.trim().toLowerCase() === "picked"; // picked → true
+  const url = `${BASE_URL}/reports/${reportId}`;
+  console.log("🔥 [markReportPicked] 요청 URL:", url);
+
+  try {
+    const resp = await fetch(url, {
+      method: "PUT",
+      headers: { 
+        Authorization: `Bearer ${accessToken}`, 
+        Accept: "application/json" 
+      },
+    });
+
+    console.log("🔥 [markReportPicked] HTTP 상태:", resp.status);
+    console.log("🔥 [markReportPicked] HTTP 상태 텍스트:", resp.statusText);
+
+    // 서버가 텍스트만 주는 경우 대비
+    const contentType = resp.headers.get("content-type") || "";
+    console.log("🔥 [markReportPicked] Content-Type:", contentType);
+    
+    let body;
+    try {
+      if (contentType.includes("application/json")) {
+        body = await resp.json();
+        console.log("🔥 [markReportPicked] JSON 응답:", body);
+      } else {
+        body = await resp.text();
+        console.log("🔥 [markReportPicked] 텍스트 응답:", `"${body}"`);
+      }
+    } catch (parseError) {
+      console.error("❌ [markReportPicked] 응답 파싱 오류:", parseError);
+      body = null;
+    }
+
+    if (!resp.ok) {
+      console.error("❌ [markReportPicked] HTTP 오류:", {
+        status: resp.status,
+        statusText: resp.statusText,
+        body: body
+      });
+      
+      // 백엔드 코드에 따른 구체적 에러 메시지
+      if (resp.status === 404) {
+        throw new Error("해당 쓰레기 신고를 찾을 수 없습니다.");
+      } else {
+        throw new Error(`주웠음 처리 실패 (${resp.status}) : ${typeof body === "string" ? body : JSON.stringify(body)}`);
+      }
+    }
+
+    // 성공 응답 처리
+    console.log("✅ [markReportPicked] 성공 응답 처리");
+    
+    // "picked" 같은 텍스트를 boolean으로 매핑해주면 사용성이 좋아짐
+    if (typeof body === "string") {
+      const trimmedBody = body.trim().toLowerCase();
+      const isSuccess = trimmedBody === "picked";
+      console.log("🔥 [markReportPicked] 텍스트 응답 결과:", {
+        원본: `"${body}"`,
+        정규화: `"${trimmedBody}"`,
+        성공여부: isSuccess
+      });
+      return isSuccess;
+    }
+    
+    // 혹시 JSON을 줄 경우 그대로 반환
+    console.log("🔥 [markReportPicked] JSON 응답 그대로 반환:", body);
+    return body;
+
+  } catch (error) {
+    console.error("❌ [markReportPicked] 전체 오류:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    throw error;
+  } finally {
+    console.log("🔥 [markReportPicked] === API 호출 종료 ===");
   }
-  // 혹시 JSON을 줄 경우 그대로 반환
-  return body;
 };
-
 /* ---------------------------------------------
  * 4) 산책로 기준 신고 목록
  *    GET /reports/trails/{trailId}
