@@ -4,11 +4,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import {
   View, Text, StyleSheet, TouchableOpacity, Dimensions,
-  Alert, SafeAreaView, BackHandler, Modal,
+  Alert, SafeAreaView, BackHandler, Modal, Image
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialIcons"
-import { captureRef } from 'react-native-view-shot' // 🔥 다시 추가 (가장 간단)
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import CommonModal from "../components/CommonModal"
 import { usePloggingContext } from "../contexts/PloggingContext"
 import PloggingMap from "../components/Plogging/PloggingMap"
@@ -16,7 +14,6 @@ import PloggingControls from "../components/Plogging/PloggingControls"
 import TrashInfoModal from "../components/Plogging/TrashInfoModal"
 import { getNearestTrail, getTrailDetail } from "../api/trails"
 import { savePloggingRecord } from "../api/plog"
-import BASE_URL from '../api/apiconfig'
 import ViewShot from 'react-native-view-shot' // 🔥 ViewShot 컴포넌트 사용
 import { useAuth } from "../stores/useAuth"; // 🔥 [수정 1] useAuth 훅 import
 
@@ -131,7 +128,7 @@ const TrailInfoModal = React.memo(({ visible, trail, onClose, onConfirm }) => {
             </View>
             
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>📍 현재 위치에서:</Text>
+              <Text style={styles.infoLabel}>📏 현재 위치에서:</Text>
               <Text style={styles.infoValue}>{trail.distanceToUser ? `${trail.distanceToUser.toFixed(0)}m` : '거리 계산 중'}</Text>
             </View>
           </View>
@@ -161,6 +158,7 @@ function PloggingStartScreen({ navigation, route }) {
   console.log("🚀 [PloggingStart] 컴포넌트 시작");
   const { accessToken } = useAuth();
   console.log('🔑 [PloggingStart] Zustand 스토어에서 가져온 token:', accessToken);
+  
   // Context에서 필요한 값들만 가져오기
   const context = usePloggingContext();
   if (!context) {
@@ -210,6 +208,28 @@ function PloggingStartScreen({ navigation, route }) {
     selectedTrailId: null,
     memberId: 1
   });
+
+  // 🔥 이미지 컴포넌트 - 에러 처리 추가
+  const ImageWithFallback = ({ source, style, ...props }) => {
+    const [hasError, setHasError] = useState(false)
+    
+    if (hasError || !source?.uri) {
+      return (
+        <View style={[style, styles.fallbackImageContainer]}>
+          <Icon name="image-not-supported" size={32} color="#CCCCCC" />
+        </View>
+      )
+    }
+    
+    return (
+      <Image
+        source={source}
+        style={style}
+        onError={() => setHasError(true)}
+        {...props}
+      />
+    )
+  }
 
   // 뒤로 가기 처리
   useEffect(() => {
@@ -603,8 +623,6 @@ function PloggingStartScreen({ navigation, route }) {
   const handleResume = useCallback(() => resumePlogging(), [resumePlogging]);
   const handleEnd = useCallback(() => setModalVisible(true), []);
 
-// 🔥 플로깅 종료 함수 수정
-// 🔥 플로깅 종료 함수 - 깔끔하게 정리
 // 🔥 플로깅 종료 함수 - 깔끔하게 정리
   const confirmEnd = useCallback(async () => {
     try {
@@ -630,9 +648,6 @@ function PloggingStartScreen({ navigation, route }) {
 
       // 서버 저장 시도 (savePloggingRecord 함수 사용)
       try {
-        // 🔥 [수정 3] AsyncStorage 대신 useAuth()로 가져온 accessToken 사용
-        // const accessToken = await AsyncStorage.getItem('accessToken'); // <- 이 줄 삭제
-
         console.log('🔑 [PloggingStart] Zustand 스토어에서 가져온 token:', accessToken);
         
         if (!accessToken || accessToken === 'null' || accessToken === 'undefined') {
@@ -721,7 +736,6 @@ function PloggingStartScreen({ navigation, route }) {
       navigation.navigate("PloggingRecord", { result: basicResult });
     }
   }, [
-    // 🔥 [수정 4] useCallback 의존성 배열에 accessToken 추가
     accessToken, 
     captureMapImage, 
     endPlogging, 
@@ -959,7 +973,8 @@ function PloggingStartScreen({ navigation, route }) {
           quality: 0.9,
           result: 'tmpfile'  // 임시 파일로 저장
         }}
-      >        <PloggingMap
+      >        
+        <PloggingMap
           mapRef={mapRef}
           currentLocation={currentLocation}
           routeCoordinates={routeCoordinates || []}
@@ -976,7 +991,8 @@ function PloggingStartScreen({ navigation, route }) {
         {/* 컨트롤 렌더링 */}
         {overlayControls}
         {runningControls}
-   </ViewShot>
+      </ViewShot>
+      
       {/* 모달들 */}
       <CommonModal
         visible={modalVisible}
@@ -1070,6 +1086,17 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     zIndex: 100,
     paddingHorizontal: 20,
+  },
+
+  // 🔥 Fallback 이미지 스타일 추가
+  fallbackImageContainer: {
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    borderRadius: 8,
   },
 
   // 안내 카드

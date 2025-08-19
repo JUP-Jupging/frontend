@@ -14,8 +14,9 @@ import {
   Alert,
   PermissionsAndroid,
   Platform,
+  SafeAreaView, // 🔥 SafeAreaView 추가
 } from "react-native"
-import Icon from "react-native-vector-icons/MaterialCommunityIcons"
+import Icon from "react-native-vector-icons/MaterialIcons"
 import MapView, { Marker } from "react-native-maps"
 import Geolocation from 'react-native-geolocation-service'
 import { getTrailDetail } from "../api/trails"
@@ -48,9 +49,10 @@ const DUMMY_IMAGES = [
   "https://via.placeholder.com/360x200/FF9800/FFFFFF?text=산책로3",
 ]
 
-// Responsive size constants
+// 🔥 반응형 크기 상수 - SafeArea 고려
 const PADDING_H = screenWidth * 0.04
-const HEADER_HEIGHT = screenHeight * 0.08
+const SAFE_AREA_TOP = Platform.OS === 'ios' ? screenHeight * 0.06 : screenHeight * 0.04 // 🔥 플랫폼별 상단 여백
+const HEADER_HEIGHT = screenHeight * 0.06 // 🔥 헤더 높이 조정
 const IMAGE_HEIGHT = screenHeight * 0.3
 const MAP_HEIGHT = screenHeight * 0.2
 
@@ -208,7 +210,7 @@ export default function CourseDetailScreen({ navigation, route }) {
 
         // API 실패 시 fallback 데이터 사용
         if (fallbackData) {
-          console.log("🔄 [CourseDetailScreen] fallback 데이터 사용 시작")
+          console.log("📄 [CourseDetailScreen] fallback 데이터 사용 시작")
           
           const dummyData = {
             id: fallbackData.id,
@@ -373,35 +375,39 @@ export default function CourseDetailScreen({ navigation, route }) {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>코스 정보 로딩중...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>코스 정보 로딩중...</Text>
+        </View>
+      </SafeAreaView>
     )
   }
 
   if (!courseData) {
     return (
-      <View style={styles.errorContainer}>
-        <Icon name="alert-circle" size={screenWidth * 0.15} color="#FF5722" />
-        <Text style={styles.errorText}>코스 정보를 불러올 수 없습니다</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchCourseDetail}>
-          <Text style={styles.retryButtonText}>다시 시도</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Icon name="alert-circle" size={screenWidth * 0.15} color="#FF5722" />
+          <Text style={styles.errorText}>코스 정보를 불러올 수 없습니다</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchCourseDetail}>
+            <Text style={styles.retryButtonText}>다시 시도</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     )
   }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
+    <SafeAreaView style={styles.container}>
+      {/* 🔥 Header - SafeArea 고려한 패딩 적용 */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={goBack}>
-          <Icon name="arrow-left" size={24} color="#333" />
+          <Icon name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>산책로 정보</Text>
         <TouchableOpacity style={styles.userButton} onPress={goToMyPloggingRecords}>
-          <Icon name="account" size={24} color="rgba(19, 18, 20, 0.5)" />
+          <Icon name="person" size={24} color="rgba(19, 18, 20, 0.5)" />
         </TouchableOpacity>
       </View>
 
@@ -471,7 +477,7 @@ export default function CourseDetailScreen({ navigation, route }) {
           {/* Map */}
           <View style={styles.detailItem}>
             <View style={styles.detailHeader}>
-              <Icon name="compass" size={20} color="#797982" />
+              <Icon name="map" size={20} color="#797982" />
               <Text style={styles.detailLabel}>지도</Text>
             </View>
             <View style={styles.mapContainer}>{renderMap()}</View>
@@ -481,7 +487,7 @@ export default function CourseDetailScreen({ navigation, route }) {
           {/* Toilet Info */}
           <View style={styles.detailItem}>
             <View style={styles.detailHeader}>
-              <Icon name="human-male-female" size={20} color="#797982" />
+              <Icon name="wc" size={20} color="#797982" />
               <Text style={styles.detailLabel}>화장실 정보</Text>
             </View>
             <Text style={styles.detailText}>{courseData.toilet}</Text>
@@ -490,7 +496,7 @@ export default function CourseDetailScreen({ navigation, route }) {
           {/* Amenity Info */}
           <View style={styles.detailItem}>
             <View style={styles.detailHeader}>
-              <Icon name="cube" size={20} color="#797982" />
+              <Icon name="store" size={20} color="#797982" />
               <Text style={styles.detailLabel}>편의시설 정보</Text>
             </View>
             <Text style={styles.detailText}>{courseData.tip}</Text>
@@ -528,7 +534,7 @@ export default function CourseDetailScreen({ navigation, route }) {
             onPress={getCurrentLocation}
             disabled={locationLoading}
           >
-            <Icon name="crosshairs-gps" size={20} color="#418663" />
+            <Icon name="my-location" size={20} color="#418663" />
             <Text style={styles.locationButtonText}>
               {locationLoading ? "위치 확인중..." : "내 위치 새로고침"}
             </Text>
@@ -536,12 +542,12 @@ export default function CourseDetailScreen({ navigation, route }) {
 
           {/* 플로깅 시작 버튼 */}
           <TouchableOpacity style={styles.startPloggingButton} onPress={startPlogging}>
-            <Icon name="play" size={20} color="#fff" />
+            <Icon name="play-arrow" size={20} color="#fff" />
             <Text style={styles.startPloggingButtonText}>이 코스로 플로깅 시작하기</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   )
 }
 
@@ -551,35 +557,37 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 
-  // Header Styles
+  // 🔥 Header Styles - SafeArea 고려
   header: {
-    height: HEADER_HEIGHT + 20,
     backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: PADDING_H,
+    marginTop: 20,
+    paddingVertical: 12, // 🔥 고정값으로 변경
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
-    paddingTop: screenHeight * 0.05,
+    minHeight: HEADER_HEIGHT, // 🔥 최소 높이 설정
   },
   backButton: {
-    width: 24,
-    height: 24,
+    width: 40,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
   },
   headerTitle: {
     fontFamily: "Pretendard",
     fontWeight: "700",
-    fontSize: 20,
-    lineHeight: 30,
+    fontSize: 18, // 🔥 폰트 크기 약간 줄임
+    lineHeight: 24,
     color: "#333333",
     textAlign: "center",
+    flex: 1,
   },
   userButton: {
-    width: 24,
-    height: 24,
+    width: 40,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
   },

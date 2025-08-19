@@ -22,6 +22,28 @@ export default function MyPloggingScreen() {
   const [isLoading, setIsLoading] = useState(false); // ✅ 로딩 상태 추가
   const accessToken = useAuth((s) => s.accessToken);
 
+  // 🔥 이미지 컴포넌트 - 에러 처리 추가
+  const ImageWithFallback = ({ source, style, ...props }) => {
+    const [hasError, setHasError] = useState(false)
+    
+    if (hasError || !source?.uri) {
+      return (
+        <View style={[style, styles.fallbackImageContainer]}>
+          <Icon name="image-not-supported" size={24} color="#CCCCCC" />
+        </View>
+      )
+    }
+    
+    return (
+      <Image
+        source={source}
+        style={style}
+        onError={() => setHasError(true)}
+        {...props}
+      />
+    )
+  }
+
   useFocusEffect(
     useCallback(() => {
       async function fetchUser() {
@@ -236,9 +258,9 @@ export default function MyPloggingScreen() {
         {/* 프로필 상단 영역 */}
         <View style={styles.profileSection}>
           {user?.profileImageUrl ? (
-            <Image source={{ uri: user.profileImageUrl }} style={styles.profileImage} />
+            <ImageWithFallback source={{ uri: user.profileImageUrl }} style={styles.profileImage} />
           ) : (
-            <Image source={require("../assets/profile.png")} style={styles.profileImage} />
+            <ImageWithFallback source={require("../assets/profile.png")} style={styles.profileImage} />
           )}          
           <View style={styles.profileInfo}>
             <Text style={styles.nickname}>
@@ -329,11 +351,11 @@ export default function MyPloggingScreen() {
                     </View>
                     
                     <View style={styles.recordImageContainer}>
-                      <Image
+                      <ImageWithFallback
                         source={
                           record.imageUrl
                             ? { uri: record.imageUrl }
-                            : require("../assets/map-image.png")
+                            : null
                         }
                         style={styles.recordMapImage}
                       />
@@ -375,11 +397,11 @@ export default function MyPloggingScreen() {
                       <Text style={styles.recordLocation}>{report.trailTypeName || "장소 정보 없음"}</Text>
                     </View>
                     <View style={styles.recordImageContainer}>
-                      <Image
+                      <ImageWithFallback
                         source={
                           report.imageUrl
                             ? { uri: report.imageUrl }
-                            : require("../assets/map-image.png")
+                            : null
                         }
                         style={styles.recordMapImage}
                       />
@@ -429,6 +451,18 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     marginRight: 20,
   },
+  
+  // 🔥 Fallback 이미지 스타일 추가
+  fallbackImageContainer: {
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+  },
+  
   profileInfo: {
     flex: 1,
   },
@@ -516,7 +550,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#333333",
     marginBottom: 20,
-    
   },
   recordCard: {
     backgroundColor: "#FFFFFF",
@@ -555,6 +588,12 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "rgba(51, 51, 51, 0.6)",
   },
+  recordTrashInfo: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#4CAF50",
+    marginTop: 4,
+  },
   recordImageContainer: {
     position: "relative",
     alignItems: "center",
@@ -588,4 +627,20 @@ const styles = StyleSheet.create({
     height: 24,
     tintColor: "#418663",
   },
-})
+  emptyText: {
+    fontSize: 14,
+    color: "#999999",
+    textAlign: "center",
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  loadingContainer: {
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#666666",
+    fontWeight: "500",
+  },
+});

@@ -87,6 +87,29 @@ export default function PloggingRecordScreen() {
     }
   }
 
+  // 🔥 이미지 컴포넌트 - 에러 처리 추가
+  const ImageWithFallback = ({ source, style, ...props }) => {
+    const [hasError, setHasError] = useState(false)
+    
+    if (hasError || !source?.uri) {
+      return (
+        <View style={[style, styles.fallbackImageContainer]}>
+          <Icon name="image-not-supported" size={48} color="#CCCCCC" />
+          <Text style={styles.fallbackImageText}>이미지 없음</Text>
+        </View>
+      )
+    }
+    
+    return (
+      <Image
+        source={source}
+        style={style}
+        onError={() => setHasError(true)}
+        {...props}
+      />
+    )
+  }
+
   // 🔥 이미지 배열 생성 함수 (산책로 이미지만)
   const getHeroImages = () => {
     console.log("🖼️ [PloggingRecord] getHeroImages 호출")
@@ -128,11 +151,11 @@ export default function PloggingRecordScreen() {
       })
     }
     
-    // 이미지가 없으면 기본 이미지
+    // 이미지가 없으면 기본 이미지 (이제 아이콘으로 대체됨)
     if (images.length === 0) {
       console.log("⚠️ [PloggingRecord] 이미지가 없어 기본 이미지 사용")
       images.push({
-        uri: "https://via.placeholder.com/400x250/4CAF50/FFFFFF?text=Plogging+Record",
+        uri: null, // null로 설정하면 ImageWithFallback에서 아이콘으로 대체
         type: 'placeholder',
         label: '🏞️ 플로깅 기록'
       })
@@ -306,7 +329,7 @@ export default function PloggingRecordScreen() {
         {
           id: 2,
           number: "2",
-          type: "나무잎 쓰레기",
+          type: "나뭇잎 쓰레기",
           location: "유리병 외 7개",
           tag: "적음",
           image: "https://via.placeholder.com/75x75/E8F5E8/4CAF50?text=Trash",
@@ -377,19 +400,11 @@ export default function PloggingRecordScreen() {
       >
         {/* 🔥 캡처된 지도 이미지 또는 대표 이미지 */}
         <View style={styles.heroImageContainer}>
-          {recordData.mapImage ? (
-            <Image 
-              source={{ uri: recordData.mapImage }}
-              style={styles.heroImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <Image 
-              source={{ uri: "https://via.placeholder.com/400x250/4CAF50/FFFFFF?text=Plogging+Route" }}
-              style={styles.heroImage}
-              resizeMode="cover"
-            />
-          )}
+          <ImageWithFallback
+            source={recordData.mapImage ? { uri: recordData.mapImage } : null}
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
           {/* 페이지 인디케이터 */}
           <View style={styles.pageIndicator}>
             {getHeroImages().map((_, index) => (
@@ -446,7 +461,7 @@ export default function PloggingRecordScreen() {
               <Text style={styles.sectionSubtitle}>이번 플로깅에서 이동한 경로입니다</Text>
             </View>
             <View style={styles.routeImageContainer}>
-              <Image 
+              <ImageWithFallback
                 source={{ uri: recordData.mapImage }}
                 style={styles.routeImage}
                 resizeMode="cover"
@@ -490,7 +505,7 @@ export default function PloggingRecordScreen() {
                   </View>
                 </View>
                 <View style={styles.trashImageContainer}>
-                  <Image 
+                  <ImageWithFallback
                     source={{ uri: trash.image || "https://via.placeholder.com/75x75/E8F5E8/4CAF50?text=Trash" }}
                     style={styles.trashImage} 
                   />
@@ -571,6 +586,23 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  
+  // 🔥 Fallback 이미지 스타일 추가
+  fallbackImageContainer: {
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+  },
+  fallbackImageText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#999999',
+    fontWeight: '500',
+  },
+  
   pageIndicator: {
     position: 'absolute',
     bottom: screenHeight * 0.02,
@@ -747,6 +779,12 @@ const styles = StyleSheet.create({
     color: "#666666",
     marginBottom: screenHeight * 0.01,
   },
+  trashDetails: {
+    fontSize: screenWidth * 0.032,
+    fontWeight: "400",
+    color: "#888888",
+    marginBottom: screenHeight * 0.008,
+  },
   trashTagContainer: {
     alignSelf: "flex-start",
   },
@@ -797,5 +835,20 @@ const styles = StyleSheet.create({
     fontSize: screenWidth * 0.04,
     fontWeight: "600",
     color: "#333333",
+  },
+  
+  // 🔥 디버그 정보 스타일 추가
+  debugInfo: {
+    backgroundColor: "rgba(255, 193, 7, 0.1)",
+    paddingHorizontal: PADDING_H,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+  },
+  debugText: {
+    fontSize: 12,
+    color: "#FF8F00",
+    fontWeight: "500",
+    textAlign: "center",
   },
 });

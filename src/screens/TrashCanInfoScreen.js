@@ -4,7 +4,8 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useLocation } from '../hooks/useLocation';
 import { fetchClosestTrashCans, convertToMapMarkers } from '../services/trashCanService';
 import { formatDistance } from '../utils/locationUtils';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from "react-native-vector-icons/MaterialIcons"
+import MaterialIcon from 'react-native-vector-icons/MaterialIcons'; // 🔥 MaterialIcons 추가
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -48,6 +49,50 @@ const getLocalGovernmentLogo = (location) => {
   return require('../assets/image232.png');
 };
 
+// 🔥 커스텀 쓰레기통 마커 컴포넌트
+const TrashCanMarker = ({ onPress, isSelected = false }) => {
+  return (
+    <TouchableOpacity 
+      onPress={onPress}
+      style={[
+        styles.markerContainer,
+        isSelected && styles.selectedMarkerContainer
+      ]}
+    >
+      <View style={[
+        styles.markerBackground,
+        isSelected && styles.selectedMarkerBackground
+      ]}>
+        <MaterialIcon 
+          name="delete-outline" 
+          size={isSelected ? 28 : 24} 
+          color="#FFFFFF" 
+        />
+      </View>
+      <View style={[
+        styles.markerPointer,
+        isSelected && styles.selectedMarkerPointer
+      ]} />
+    </TouchableOpacity>
+  );
+};
+
+// 🔥 현재 위치 마커 컴포넌트
+const MyLocationMarker = () => {
+  return (
+    <View style={styles.myLocationContainer}>
+      <View style={styles.myLocationBackground}>
+        <MaterialIcon 
+          name="my-location" 
+          size={20} 
+          color="#FFFFFF" 
+        />
+      </View>
+      <View style={styles.myLocationRing} />
+    </View>
+  );
+};
+
 export default function TrashCanMapScreen({ navigation }) {
   const { currentLocation, mapRef } = useLocation();
   const [selectedTrashCan, setSelectedTrashCan] = useState(null);
@@ -62,7 +107,7 @@ export default function TrashCanMapScreen({ navigation }) {
   // 근처 쓰레기통 데이터 가져오기
   const loadNearbyTrashCans = async () => {
     if (!currentLocation) {
-      console.log('[TrashCanMap] 현재 위치가 없어 쓰레기통 조회를 건너뜀니다');
+      console.log('[TrashCanMap] 현재 위치가 없어 쓰레기통 조회를 건너뜁니다');
       return;
     }
 
@@ -165,7 +210,7 @@ export default function TrashCanMapScreen({ navigation }) {
             />
           </TouchableOpacity>
           <TouchableOpacity onPress={goToProfile}>
-            <Icon name="account-circle" size={24} color="#333" />
+            <Icon name="person" size={24} color="#333" />
           </TouchableOpacity>
         </View>
       </View>
@@ -175,18 +220,35 @@ export default function TrashCanMapScreen({ navigation }) {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
-        showsUserLocation={true}
+        showsUserLocation={false} // 🔥 기본 내 위치 표시 끄기
         showsMyLocationButton={true}
         initialRegion={INITIAL_REGION}
       >
+        {/* 🔥 현재 위치 커스텀 마커 */}
+        {currentLocation && (
+          <Marker
+            coordinate={currentLocation}
+            anchor={{ x: 0.5, y: 0.5 }}
+            zIndex={1000}
+          >
+            <MyLocationMarker />
+          </Marker>
+        )}
+
+        {/* 🔥 쓰레기통 커스텀 마커들 */}
         {mapMarkers.map((marker) => (
           <Marker
             key={marker.id}
             coordinate={marker.coordinate}
             onPress={() => handleMarkerPress(marker)}
-            title={marker.title}
-            description={marker.description}
-          />
+            anchor={{ x: 0.5, y: 1 }} // 🔥 마커 하단 중앙이 좌표점
+            zIndex={selectedTrashCan?.id === marker.id ? 999 : 1}
+          >
+            <TrashCanMarker 
+              onPress={() => handleMarkerPress(marker)}
+              isSelected={selectedTrashCan?.id === marker.originalData?.id}
+            />
+          </Marker>
         ))}
       </MapView>
 
@@ -277,6 +339,7 @@ export default function TrashCanMapScreen({ navigation }) {
               style={styles.navigateBtn}
               onPress={handleNavigate}
             >
+              <MaterialIcon name="directions-walk" size={20} color="#FFFFFF" />
               <Text style={styles.navigateText}>길찾기 안내</Text>
             </TouchableOpacity>
           </View>
@@ -289,6 +352,7 @@ export default function TrashCanMapScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   headerWrapper: {
+    marginTop: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -319,6 +383,87 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
+  
+  // 🔥 쓰레기통 마커 스타일
+  markerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedMarkerContainer: {
+    transform: [{ scale: 1.1 }],
+  },
+  markerBackground: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FF6B6B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  selectedMarkerBackground: {
+    backgroundColor: '#FF4444',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+  },
+  markerPointer: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#FF6B6B',
+    marginTop: -3,
+  },
+  selectedMarkerPointer: {
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderTopWidth: 14,
+    borderTopColor: '#FF4444',
+    marginTop: -4,
+  },
+  
+  // 🔥 현재 위치 마커 스타일
+  myLocationContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  myLocationBackground: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#2196F3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  myLocationRing: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#2196F3',
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+  },
+  
   loadingOverlay: {
     position: 'absolute',
     top: 0,
