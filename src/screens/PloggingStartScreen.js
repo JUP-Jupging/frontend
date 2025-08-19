@@ -12,7 +12,7 @@ import { usePloggingContext } from "../contexts/PloggingContext"
 import PloggingMap from "../components/Plogging/PloggingMap"
 import PloggingControls from "../components/Plogging/PloggingControls"
 import TrashInfoModal from "../components/Plogging/TrashInfoModal"
-import { getNearestTrail, getTrailDetail } from "../API/trails" // 🔥 변경: getNearbyTrails 제거
+import { getNearestTrail, getTrailDetail } from "../api/trails" // 🔥 변경: getNearbyTrails 제거
 import BASE_URL from '../api/apiconfig'
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
@@ -34,7 +34,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 };
 
 // 🔧 설정: 플로깅 시작 가능한 최대 거리 (미터)
-const MAX_DISTANCE_TO_START = 500;
+const MAX_DISTANCE_TO_START = 50000;
 
 // 🔥 산책로 정보 모달 컴포넌트 - 단일 산책로용으로 단순화
 const TrailInfoModal = React.memo(({ visible, trail, onClose, onConfirm }) => {

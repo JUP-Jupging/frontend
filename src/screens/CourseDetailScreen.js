@@ -18,7 +18,7 @@ import {
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
 import MapView, { Marker } from "react-native-maps"
 import Geolocation from 'react-native-geolocation-service'
-import { getTrailDetail } from "../API/trails"
+import { getTrailDetail } from "../api/trails"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -39,7 +39,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 };
 
 // 🔧 설정: 플로깅 시작 가능한 최대 거리 (미터)
-const MAX_DISTANCE_TO_START = 500; // 500미터 이내에서만 플로깅 시작 가능
+const MAX_DISTANCE_TO_START = 50000; // 500미터 이내에서만 플로깅 시작 가능
 
 // 더미 이미지 배열 (이미지가 없을 때만 사용)
 const DUMMY_IMAGES = [
@@ -114,6 +114,31 @@ export default function CourseDetailScreen({ navigation, route }) {
     );
   };
 
+  // 🖼️ 이미지 배열 생성 함수
+  const buildImageArray = (data) => {
+    console.log('🖼️ [CourseDetailScreen] 이미지 배열 생성:', {
+      img1: data.img1 ? '있음' : '없음',
+      img2: data.img2 ? '있음' : '없음'
+    });
+
+    const images = [];
+    
+    // img1이 있으면 추가
+    if (data.img1) {
+      images.push(data.img1);
+    }
+    
+    // img2가 있으면 추가
+    if (data.img2) {
+      images.push(data.img2);
+    }
+    
+    console.log('📸 [CourseDetailScreen] 최종 이미지 배열:', images.length, '개');
+    
+    // 이미지가 하나도 없으면 더미 이미지 사용
+    return images.length > 0 ? images : DUMMY_IMAGES;
+  };
+
   // 코스 상세 정보 가져오기
   const fetchCourseDetail = async () => {
     try {
@@ -123,9 +148,10 @@ export default function CourseDetailScreen({ navigation, route }) {
 
       console.log("📋 [CourseDetailScreen] 코스 상세 정보 로드 시작:")
       console.log("- courseId:", courseId)
+      console.log("- fallbackData:", fallbackData ? '있음' : '없음')
 
       if (!courseId) {
-        console.error("⌛ [CourseDetailScreen] 코스 ID가 없습니다")
+        console.error("⚠️ [CourseDetailScreen] 코스 ID가 없습니다")
         setCourseData(null)
         return
       }
@@ -135,6 +161,18 @@ export default function CourseDetailScreen({ navigation, route }) {
         const data = await getTrailDetail(courseId)
 
         console.log("✅ [CourseDetailScreen] API에서 코스 상세 정보 로드 성공!")
+        console.log("🔍 [CourseDetailScreen] API 응답 데이터:", {
+          trailId: data.trailId,
+          trailName: data.trailName,
+          img1: data.img1 ? '있음' : '없음',
+          img2: data.img2 ? '있음' : '없음',
+          lengthDetail: data.lengthDetail,
+          spotLatitude: data.spotLatitude,
+          spotLongitude: data.spotLongitude
+        });
+
+        // 🖼️ 이미지 배열 생성
+        const imageArray = buildImageArray(data);
 
         // API 응답 데이터를 화면에서 사용할 형태로 변환
         const transformedData = {
@@ -143,9 +181,9 @@ export default function CourseDetailScreen({ navigation, route }) {
           address: data.lotNumberAddress || "주소 정보 없음",
           region: data.cityName || "지역 정보 없음",
           duration: data.trackTime || "소요시간 정보 없음",
-          length: data.length || "거리 정보 없음",
+          length: data.lengthDetail ? `${data.lengthDetail}km` : data.length || "거리 정보 없음",
           level: data.difficultyLevel || "난이도 정보 없음",
-          images: [], // 이미지는 별도 처리 필요
+          images: imageArray, // 🔥 img1, img2에서 생성한 이미지 배열
           toilet: data.toiletDescription || "화장실 정보 없음",
           tip: data.amenityDescription || "편의시설 정보 없음",
           description: data.descriptionDetail || "상세 설명 없음",
@@ -156,7 +194,12 @@ export default function CourseDetailScreen({ navigation, route }) {
           reportCount: data.reportCount || 0,
         }
 
-        console.log("🔄 [CourseDetailScreen] API 데이터 변환 완료:", transformedData)
+        console.log("📄 [CourseDetailScreen] API 데이터 변환 완료:", {
+          name: transformedData.name,
+          imagesCount: transformedData.images.length,
+          length: transformedData.length,
+          reportCount: transformedData.reportCount
+        });
         setCourseData(transformedData)
         
       } catch (apiError) {
@@ -165,6 +208,8 @@ export default function CourseDetailScreen({ navigation, route }) {
 
         // API 실패 시 fallback 데이터 사용
         if (fallbackData) {
+          console.log("🔄 [CourseDetailScreen] fallback 데이터 사용 시작")
+          
           const dummyData = {
             id: fallbackData.id,
             name: fallbackData.name,
@@ -173,7 +218,7 @@ export default function CourseDetailScreen({ navigation, route }) {
             duration: fallbackData.duration || "소요시간 정보 없음",
             length: fallbackData.distance || "거리 정보 없음",
             level: fallbackData.difficulty || "난이도 정보 없음",
-            images: [],
+            images: DUMMY_IMAGES, // fallback 시에는 더미 이미지 사용
             toilet: "화장실 정보가 제공되지 않습니다.",
             tip: "편의시설 정보가 제공되지 않습니다.",
             description: `${fallbackData.name}에서 즐기는 플로깅 코스입니다. 아름다운 자연 경관과 함께 건강한 운동을 즐겨보세요.`,
@@ -185,11 +230,12 @@ export default function CourseDetailScreen({ navigation, route }) {
           console.log("✅ [CourseDetailScreen] fallback 데이터 사용:", dummyData.name)
           setCourseData(dummyData)
         } else {
+          console.log("❌ [CourseDetailScreen] fallback 데이터도 없음")
           setCourseData(null)
         }
       }
     } catch (error) {
-      console.error("⌛ [CourseDetailScreen] 전체 처리 실패:", error)
+      console.error("⚠️ [CourseDetailScreen] 전체 처리 실패:", error)
       setCourseData(null)
     } finally {
       setLoading(false)
@@ -279,8 +325,14 @@ export default function CourseDetailScreen({ navigation, route }) {
   // 이미지 렌더링 함수
   const renderImageItem = ({ item, index }) => (
     <Image 
-      source={{ uri: item || DUMMY_IMAGES[index % DUMMY_IMAGES.length] }} 
-      style={styles.courseImage} 
+      source={{ uri: item }} 
+      style={styles.courseImage}
+      onError={(error) => {
+        console.log('❌ [CourseDetailScreen] 이미지 로드 실패:', item, error);
+      }}
+      onLoad={() => {
+        console.log('✅ [CourseDetailScreen] 이미지 로드 성공:', item);
+      }}
     />
   )
 
@@ -357,7 +409,7 @@ export default function CourseDetailScreen({ navigation, route }) {
         {/* Course Images */}
         <View style={styles.imageContainer}>
           <FlatList
-            data={courseData.images.length > 0 ? courseData.images : DUMMY_IMAGES}
+            data={courseData.images}
             renderItem={renderImageItem}
             horizontal
             pagingEnabled
@@ -368,18 +420,20 @@ export default function CourseDetailScreen({ navigation, route }) {
             }}
           />
 
-          {/* Image Indicators */}
-          <View style={styles.imageIndicators}>
-            {(courseData.images.length > 0 ? courseData.images : DUMMY_IMAGES).map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.indicator,
-                  currentImageIndex === index ? styles.activeIndicator : styles.inactiveIndicator,
-                ]}
-              />
-            ))}
-          </View>
+          {/* Image Indicators - 이미지가 2개 이상일 때만 표시 */}
+          {courseData.images.length > 1 && (
+            <View style={styles.imageIndicators}>
+              {courseData.images.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.indicator,
+                    currentImageIndex === index ? styles.activeIndicator : styles.inactiveIndicator,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Course Info */}
@@ -499,7 +553,7 @@ const styles = StyleSheet.create({
 
   // Header Styles
   header: {
-    height: HEADER_HEIGHT,
+    height: HEADER_HEIGHT + 20,
     backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",

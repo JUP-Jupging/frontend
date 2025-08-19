@@ -13,7 +13,9 @@ import {
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import DropDownPicker from "react-native-dropdown-picker"
-import { usePloggingContext } from "../contexts/PloggingContext" // 플로깅 상태 확인용
+import { usePloggingContext } from "../contexts/PloggingContext"
+import { useLocation } from "../hooks/useLocation" // 위치 훅 추가
+import { getNearbyTrails, getTrailList } from "../api/trails" // API 함수들 추가
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -24,78 +26,14 @@ const BANNER_HEIGHT = screenHeight * 0.15
 const PICK_CARD_WIDTH = screenWidth * 0.45
 const PICK_IMAGE_HEIGHT = PICK_CARD_WIDTH * 0.7
 
-// 더미 데이터
+// 더미 데이터 (오늘의 플로깅용)
 const DUMMY_TODAY_DATA = {
   timeSpent: 0,
-  targetTime: 60, // 1시간 = 60분
+  targetTime: 60,
   distance: 0.0,
   targetDistance: 3.0,
   trashCount: 0,
 }
-
-// 추천 코스 더미 데이터
-const DUMMY_RECOMMENDED_COURSES = [
-  {
-    id: 1,
-    name: "국립 중앙 박물관",
-    distance: "7.1km",
-    duration: "1시간30분",
-    image: "../assets/course1.jpg",
-    tags: ["가까운 곳", "문화시설"],
-    trashLevel: "보통",
-    difficulty: "쉬움",
-  },
-  {
-    id: 2,
-    name: "남산 서울타워",
-    distance: "5.2km",
-    duration: "1시간15분",
-    image: "../assets/course2.jpg",
-    tags: ["가까운 곳", "관광명소"],
-    trashLevel: "적음",
-    difficulty: "보통",
-  },
-  {
-    id: 3,
-    name: "한강공원 여의도",
-    distance: "8.5km",
-    duration: "2시간",
-    image: "../assets/course3.jpg",
-    tags: ["쓰레기 많은 곳", "공원"],
-    trashLevel: "많음",
-    difficulty: "쉬움",
-  },
-  {
-    id: 4,
-    name: "청계천 산책로",
-    distance: "6.3km",
-    duration: "1시간45분",
-    image: "../assets/course4.jpg",
-    tags: ["가까운 곳", "도심"],
-    trashLevel: "보통",
-    difficulty: "쉬움",
-  },
-  {
-    id: 5,
-    name: "올림픽공원",
-    distance: "9.2km",
-    duration: "2시간30분",
-    image: "../assets/course5.jpg",
-    tags: ["쓰레기 많은 곳", "공원"],
-    trashLevel: "많음",
-    difficulty: "어려움",
-  },
-  {
-    id: 6,
-    name: "북한산 둘레길",
-    distance: "12.1km",
-    duration: "3시간",
-    image: "../assets/course6.jpg",
-    tags: ["자연", "산"],
-    trashLevel: "적음",
-    difficulty: "어려움",
-  },
-]
 
 export default function MainScreen({ navigation }) {
   // 플로깅 전역 상태 확인
@@ -109,9 +47,13 @@ export default function MainScreen({ navigation }) {
     isBackgroundMode 
   } = usePloggingContext();
   
+  // 위치 훅 사용
+  const { currentLocation, getCurrentLocation } = useLocation();
+  
   const [selectedTag, setSelectedTag] = useState("가까운 곳")
   const [todayData, setTodayData] = useState(DUMMY_TODAY_DATA)
-  const [recommendedCourses, setRecommendedCourses] = useState([])
+  const [nearbyTrails, setNearbyTrails] = useState([]) // 가까운 산책로들
+  const [trashyTrails, setTrashyTrails] = useState([]) // 쓰레기 많은 산책로들
   const [loading, setLoading] = useState(true)
   const [coursesLoading, setCoursesLoading] = useState(true)
 
@@ -151,6 +93,154 @@ export default function MainScreen({ navigation }) {
     }
   };
 
+  // 가까운 산책로 5개 가져오기
+  const fetchNearbyTrails = async () => {
+    try {
+      console.log('📍 [MainScreen] 가까운 산책로 조회 시작');
+      console.log('- 현재 위치:', currentLocation);
+      
+      if (!currentLocation?.latitude || !currentLocation?.longitude) {
+        console.log('⚠️ [MainScreen] 현재 위치 정보 없음 - 위치 재조회');
+        await getCurrentLocation();
+        return;
+      }
+
+      // trails.js의 getNearbyTrails 함수 사용
+      const nearbyData = await getNearbyTrails(currentLocation.latitude, currentLocation.longitude);
+      console.log('✅ [MainScreen] 가까운 산책로 조회 성공:', nearbyData?.length || 0, '개');
+      
+      // 🔥 받아온 데이터 상세 로깅
+      if (nearbyData && nearbyData.length > 0) {
+        console.log('🔍 [MainScreen] 가까운 산책로 상세 정보:');
+        nearbyData.slice(0, 5).forEach((trail, index) => {
+          console.log(`  ${index + 1}. ${trail.trailName || trail.instlPlcNm}`, {
+            trailId: trail.trailId,
+            거리: trail.lengthDetail ? `${trail.lengthDetail}km` : trail.length,
+            난이도: trail.difficultyLevel,
+            쓰레기제보: trail.reportCount,
+            위치: `${trail.spotLatitude}, ${trail.spotLongitude}`,
+            이미지1: trail.img1 ? '있음' : '없음',
+            이미지2: trail.img2 ? '있음' : '없음',
+            도시: trail.cityName,
+            관리기관: trail.mngInstNm
+          });
+        });
+      }
+      
+      // 상위 5개만 선택
+      const trails = nearbyData.slice(0, 5);
+      setNearbyTrails(trails);
+      
+    } catch (error) {
+      console.error('❌ [MainScreen] 가까운 산책로 조회 실패:', error);
+      setNearbyTrails([]);
+    }
+  };
+
+  // 쓰레기 많은 산책로 5개 가져오기
+  const fetchTrashyTrails = async () => {
+    try {
+      console.log('🗑️ [MainScreen] 쓰레기 많은 산책로 조회 시작');
+      
+      // 전체 산책로 목록 조회
+      const allTrails = await getTrailList();
+      console.log('📊 [MainScreen] 전체 산책로 수:', allTrails?.length || 0);
+      
+      if (!allTrails || allTrails.length === 0) {
+        setTrashyTrails([]);
+        return;
+      }
+
+      // 1. reportCount 기준으로 정렬 (내림차순)
+      // 2. reportCount가 같으면 현재 위치에서 가까운 순으로 정렬
+      const sortedTrails = allTrails
+        .filter(trail => trail.reportCount !== undefined && trail.reportCount !== null)
+        .sort((a, b) => {
+          // 먼저 reportCount로 정렬 (많은 순)
+          if (b.reportCount !== a.reportCount) {
+            return b.reportCount - a.reportCount;
+          }
+          
+          // reportCount가 같으면 거리순으로 정렬 (가까운 순)
+          if (currentLocation?.latitude && currentLocation?.longitude && 
+              a.spotLatitude && a.spotLongitude && 
+              b.spotLatitude && b.spotLongitude) {
+            
+            const distanceA = calculateDistance(
+              currentLocation.latitude, 
+              currentLocation.longitude,
+              parseFloat(a.spotLatitude),
+              parseFloat(a.spotLongitude)
+            );
+            
+            const distanceB = calculateDistance(
+              currentLocation.latitude,
+              currentLocation.longitude, 
+              parseFloat(b.spotLatitude),
+              parseFloat(b.spotLongitude)
+            );
+            
+            return distanceA - distanceB;
+          }
+          
+          return 0;
+        });
+
+      console.log('🏆 [MainScreen] 쓰레기 많은 산책로 정렬 완료');
+      
+      // 🔥 상위 5개 산책로 상세 정보 로깅
+      const top5 = sortedTrails.slice(0, 5);
+      console.log('🔍 [MainScreen] 쓰레기 많은 산책로 TOP 5 상세:');
+      top5.forEach((trail, index) => {
+        const distance = currentLocation?.latitude && currentLocation?.longitude && 
+                        trail.spotLatitude && trail.spotLongitude 
+          ? calculateDistance(
+              currentLocation.latitude, 
+              currentLocation.longitude,
+              parseFloat(trail.spotLatitude),
+              parseFloat(trail.spotLongitude)
+            )
+          : null;
+        
+        console.log(`  ${index + 1}. ${trail.trailName || trail.instlPlcNm}`, {
+          trailId: trail.trailId,
+          쓰레기제보: trail.reportCount,
+          거리: trail.lengthDetail ? `${trail.lengthDetail}km` : trail.length,
+          난이도: trail.difficultyLevel,
+          위치: `${trail.spotLatitude}, ${trail.spotLongitude}`,
+          현재위치로부터거리: distance ? `${(distance/1000).toFixed(1)}km` : '계산불가',
+          이미지1: trail.img1 ? '있음' : '없음',
+          이미지2: trail.img2 ? '있음' : '없음',
+          도시: trail.cityName,
+          관리기관: trail.mngInstNm
+        });
+      });
+      
+      // 상위 5개만 선택
+      setTrashyTrails(top5);
+      
+    } catch (error) {
+      console.error('❌ [MainScreen] 쓰레기 많은 산책로 조회 실패:', error);
+      setTrashyTrails([]);
+    }
+  };
+
+  // 두 좌표 간의 거리 계산 (미터 단위)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // 지구 반지름 (미터)
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  };
+
   // DB에서 오늘의 플로깅 데이터 가져오기 (완료된 플로깅 기록만)
   const fetchTodayData = async () => {
     try {
@@ -185,74 +275,28 @@ export default function MainScreen({ navigation }) {
     }
   }
 
-  // DB에서 추천 코스 데이터 가져오기
+  // 추천 코스 데이터 가져오기 (실제 API 사용)
   const fetchRecommendedCourses = async () => {
     try {
       setCoursesLoading(true)
+      console.log('🔄 [MainScreen] 추천 코스 조회 시작');
 
-      // 실제 API 호출 (예시)
-      // const response = await fetch('https://your-api.com/api/courses/recommended');
-      // const data = await response.json();
-
-      // 시뮬레이션: 70% 확률로 DB 데이터 존재
-      const hasCoursesInDB = Math.random() > 0.3
-
-      // 1.5초 로딩 시뮬레이션
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      if (hasCoursesInDB) {
-        // DB에 데이터가 있는 경우 (실제로는 API에서 받아온 데이터)
-        const dbCourses = [
-          {
-            id: 1,
-            name: "국립 중앙 박물관",
-            distance: "7.1km",
-            duration: "1시간30분",
-            image: "../assets/course1.jpg",
-            tags: ["가까운 곳", "문화시설"],
-            trashLevel: "보통",
-            difficulty: "쉬움",
-          },
-          {
-            id: 2,
-            name: "남산 서울타워",
-            distance: "5.2km",
-            duration: "1시간15분",
-            image: "../assets/course2.jpg",
-            tags: ["가까운 곳", "관광명소"],
-            trashLevel: "적음",
-            difficulty: "보통",
-          },
-          {
-            id: 3,
-            name: "한강공원 여의도",
-            distance: "8.5km",
-            duration: "2시간",
-            image: "../assets/course3.jpg",
-            tags: ["쓰레기 많은 곳", "공원"],
-            trashLevel: "많음",
-            difficulty: "쉬움",
-          },
-          {
-            id: 4,
-            name: "청계천 산책로",
-            distance: "6.3km",
-            duration: "1시간45분",
-            image: "../assets/course4.jpg",
-            tags: ["가까운 곳", "도심"],
-            trashLevel: "보통",
-            difficulty: "쉬움",
-          },
-        ]
-        setRecommendedCourses(dbCourses)
-      } else {
-        // DB에 데이터가 없으면 더미 데이터 사용
-        setRecommendedCourses(DUMMY_RECOMMENDED_COURSES)
+      // 현재 위치 확인
+      if (!currentLocation?.latitude || !currentLocation?.longitude) {
+        console.log('⚠️ [MainScreen] 위치 정보 없음 - 위치 재조회');
+        await getCurrentLocation();
       }
+
+      // 병렬로 두 API 호출
+      await Promise.all([
+        fetchNearbyTrails(),
+        fetchTrashyTrails()
+      ]);
+
+      console.log('✅ [MainScreen] 모든 추천 코스 조회 완료');
+      
     } catch (error) {
-      console.error("Failed to fetch recommended courses:", error)
-      // 에러 발생시 더미 데이터 사용
-      setRecommendedCourses(DUMMY_RECOMMENDED_COURSES)
+      console.error('❌ [MainScreen] 추천 코스 조회 실패:', error);
     } finally {
       setCoursesLoading(false)
     }
@@ -261,17 +305,52 @@ export default function MainScreen({ navigation }) {
   // 태그별 코스 필터링
   const getFilteredCourses = () => {
     if (selectedTag === "가까운 곳") {
-      return recommendedCourses.filter((course) => course.tags.includes("가까운 곳"))
+      return nearbyTrails;
     } else if (selectedTag === "쓰레기 많은 곳") {
-      return recommendedCourses.filter((course) => course.tags.includes("쓰레기 많은 곳"))
+      return trashyTrails;
     }
-    return recommendedCourses
+    return [];
   }
+
+  // 거리 포맷팅 함수
+  const formatTrailDistance = (lengthDetail) => {
+    if (!lengthDetail) return "거리 정보 없음";
+    
+    // lengthDetail이 km 단위인 경우 (예: 3.6)
+    if (typeof lengthDetail === 'number') {
+      if (lengthDetail < 1) {
+        return `${Math.round(lengthDetail * 1000)}m`;
+      } else {
+        return `${lengthDetail.toFixed(1)}km`;
+      }
+    }
+    
+    // 문자열인 경우 그대로 반환
+    return lengthDetail;
+  };
+
+  // 난이도 한글 변환
+  const getDifficultyText = (level) => {
+    switch(level) {
+      case '쉬움': return '쉬움';
+      case '보통': return '보통'; 
+      case '어려움': return '어려움';
+      default: return '보통';
+    }
+  };
+
+  // 쓰레기 레벨 계산
+  const getTrashLevel = (reportCount) => {
+    if (!reportCount || reportCount === 0) return '적음';
+    if (reportCount >= 10) return '많음';
+    if (reportCount >= 5) return '보통';
+    return '적음';
+  };
 
   useEffect(() => {
     fetchTodayData()
     fetchRecommendedCourses()
-  }, [])
+  }, [currentLocation]) // 현재 위치가 변경되면 다시 조회
 
   const filteredCourses = getFilteredCourses()
 
@@ -505,20 +584,61 @@ export default function MainScreen({ navigation }) {
           </View>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pickScrollView}>
-            {filteredCourses.map((course) => (
+            {filteredCourses.map((course, index) => (
               <TouchableOpacity
-                key={course.id}
+                key={course.trailId || index}
                 style={styles.pickCard}
-                onPress={() => navigation.navigate("코스 상세", { courseId: course.id })}
+                onPress={() => {
+                  console.log('🎯 [MainScreen] 코스 카드 클릭:', {
+                    trailId: course.trailId,
+                    trailName: course.trailName || course.instlPlcNm,
+                    selectedTag: selectedTag
+                  });
+                  console.log('📍 [MainScreen] CourseDetail로 네비게이션 시도...');
+                  navigation.navigate("CourseDetail", { 
+                    courseId: course.trailId,
+                    trailId: course.trailId, // 호환성을 위한 중복
+                    courseData: {
+                      id: course.trailId,
+                      name: course.trailName || course.instlPlcNm,
+                      distance: course.lengthDetail ? `${course.lengthDetail}km` : course.length,
+                      difficulty: course.difficultyLevel,
+                      reportCount: course.reportCount,
+                      latitude: parseFloat(course.spotLatitude),
+                      longitude: parseFloat(course.spotLongitude),
+                      address: course.lotNumberAddress || '주소 정보 없음',
+                      region: course.cityName || '지역 정보 없음',
+                      duration: course.trackTime || '1시간',
+                    }
+                  });
+                }}
               >
-                {/* <Image source={require(course.image)} style={styles.pickImage} /> */}
-                <Text style={styles.pickCourseName}>{course.name}</Text>
+                {/* 🖼️ 산책로 이미지 표시 */}
+                {(course.img1 || course.img2) ? (
+                  <Image 
+                    source={{ uri: course.img1 || course.img2 }} 
+                    style={styles.pickImage}
+                    resizeMode="cover"
+                    onError={(error) => {
+                      console.log('❌ 이미지 로드 실패:', course.img1 || course.img2, error);
+                    }}
+                  />
+                ) : (
+                  <View style={styles.pickImagePlaceholder}>
+                    <Icon name="landscape" size={screenWidth * 0.08} color="#CCC" />
+                    <Text style={styles.pickImagePlaceholderText}>이미지 없음</Text>
+                  </View>
+                )}
+                
+                <Text style={styles.pickCourseName}>{course.trailName || course.instlPlcNm}</Text>
                 <View style={styles.pickInfoRow}>
                   <Text style={styles.pickInfoLabel}>거리:</Text>
-                  <Text style={styles.pickDistance}>{course.distance}</Text>
+                  <Text style={styles.pickDistance}>
+                    {course.lengthDetail ? formatTrailDistance(course.lengthDetail) : course.length || "정보없음"}
+                  </Text>
                   <Text style={styles.pickSeparator}>|</Text>
                   <Text style={styles.pickInfoLabel}>시간:</Text>
-                  <Text style={styles.pickDistance}>{course.duration}</Text>
+                  <Text style={styles.pickDistance}>{course.trackTime || "1시간"}</Text>
                 </View>
                 <View style={styles.pickTagsRow}>
                   <View
@@ -526,9 +646,9 @@ export default function MainScreen({ navigation }) {
                       styles.pickTag,
                       {
                         backgroundColor:
-                          course.trashLevel === "많음"
+                          getTrashLevel(course.reportCount) === "많음"
                             ? "#FFE0E0"
-                            : course.trashLevel === "보통"
+                            : getTrashLevel(course.reportCount) === "보통"
                               ? "#FFF3E0"
                               : "#E8F5E8",
                       },
@@ -539,19 +659,21 @@ export default function MainScreen({ navigation }) {
                         styles.pickTagText,
                         {
                           color:
-                            course.trashLevel === "많음"
+                            getTrashLevel(course.reportCount) === "많음"
                               ? "#D32F2F"
-                              : course.trashLevel === "보통"
+                              : getTrashLevel(course.reportCount) === "보통"
                                 ? "#F57C00"
                                 : "#388E3C",
                         },
                       ]}
                     >
-                      쓰레기 {course.trashCount || 0}개
+                      쓰레기 {course.reportCount || 0}개
                     </Text>
                   </View>
                   <View style={[styles.pickTag, { backgroundColor: "#E3F2FD" }]}>
-                    <Text style={[styles.pickTagText, { color: "#1976D2" }]}>{course.difficulty}</Text>
+                    <Text style={[styles.pickTagText, { color: "#1976D2" }]}>
+                      {getDifficultyText(course.difficultyLevel)}
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -561,8 +683,13 @@ export default function MainScreen({ navigation }) {
 
         {!coursesLoading && filteredCourses.length === 0 && (
           <View style={styles.noCoursesContainer}>
-            <Icon name="map-search" size={screenWidth * 0.1} color="#CCC" />
-            <Text style={styles.noCoursesText}>선택한 태그에 해당하는 코스가 없습니다.</Text>
+            <Icon name="search" size={screenWidth * 0.1} color="#CCC" />
+            <Text style={styles.noCoursesText}>
+              {selectedTag === "가까운 곳" 
+                ? "근처에 추천할 산책로가 없습니다." 
+                : "쓰레기 제보가 있는 산책로가 없습니다."
+              }
+            </Text>
           </View>
         )}
       </View>
@@ -755,12 +882,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 2,
-  },
-  cardTitle: {
-    fontSize: screenWidth * 0.027, // 10px 상당
-    fontWeight: "700",
-    color: "#AAB2C8",
-    lineHeight: screenWidth * 0.054, // 20px 상당
   },
   trashTitle: {
     fontSize: screenWidth * 0.024, // 크기 증가 (6px -> 9px 상당)
@@ -1009,6 +1130,22 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
     marginBottom: screenHeight * 0.008,
   },
+  pickImagePlaceholder: {
+    width: "100%",
+    height: PICK_IMAGE_HEIGHT,
+    borderRadius: 10,
+    backgroundColor: "#F5F5F5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: screenHeight * 0.008,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  pickImagePlaceholderText: {
+    fontSize: screenWidth * 0.025,
+    color: "#999",
+    marginTop: 4,
+  },
   pickCourseName: {
     fontSize: screenWidth * 0.035,
     fontWeight: "600",
@@ -1064,4 +1201,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 })
-
