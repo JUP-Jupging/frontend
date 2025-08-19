@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   View,
   Text,
@@ -12,124 +12,117 @@ import {
   SafeAreaView,
   Alert,
   Dimensions,
-  Platform,               
-  PermissionsAndroid, 
+  Platform,
+  PermissionsAndroid,
+  ActivityIndicator,
+  Modal,
+  ToastAndroid,
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
-import { launchImageLibrary, launchCamera } from "react-native-image-picker";
+import { launchImageLibrary, launchCamera } from "react-native-image-picker"
+import { useLocation } from "../hooks/useLocation"
+import { getNearestTrail } from "../api/trails"
+import { analyzeTrashImage, createReport } from "../api/report"
+import { useAuth } from "../stores/useAuth"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
-// 더미 데이터
-const DUMMY_TRAILS = [
-  { id: 1, name: "마로니에 공원 산책로" },
-  { id: 2, name: "한강 공원 산책로" },
-  { id: 3, name: "남산 둘레길" },
-]
+// trailTypeName + trailName을 한 줄로, 중복 제거
+function mergeTrailTitle(a, b) {
+  const A = (a || "").trim()
+  const B = (b || "").trim()
+  if (!A && !B) return ""
+  if (!A) return B
+  if (!B) return A
+  if (A === B) return A
+  if (B.includes(A)) return B
+  if (A.includes(B)) return A
+  if (B.startsWith(A)) return B
+  if (A.startsWith(B)) return A
+  return `${A} ${B}`
+}
 
-const DUMMY_LOCATIONS = [
-  { id: 1, name: "공원 입구 근처", coordinates: { lat: 37.5665, lng: 126.978 } },
-  { id: 2, name: "벤치 옆", coordinates: { lat: 37.5666, lng: 126.9781 } },
-  { id: 3, name: "화장실 앞", coordinates: { lat: 37.5667, lng: 126.9782 } },
-]
+// base64 -> data URI
+function toDataUri(b64) {
+  if (!b64 || typeof b64 !== "string") return null
+  // 양쪽 따옴표 제거 + 공백/개행 제거
+  let clean = b64.trim()
+  if (clean.startsWith('"') && clean.endsWith('"')) clean = clean.slice(1, -1)
+  clean = clean.replace(/\r?\n|\r/g, "").replace(/\s/g, "")
+  // 앞부분(매직넘버)로 MIME 추정
+  const head = clean.slice(0, 20)
+  let mime = "image/jpeg"
+  if (head.startsWith("iVBORw0KGgo")) mime = "image/png"  // PNG
+  else if (head.startsWith("R0lGOD")) mime = "image/gif"   // GIF
+  else if (head.startsWith("/9j/")) mime = "image/jpeg"    // JPEG
+  return clean.startsWith("data:") ? clean : `data:${mime};base64,${clean}`
+}
 
-const DUMMY_AMOUNTS = ["적음", "보통", "많음", "매우 많음"]
+// 보기 순서(한글 라벨)
+const CATEGORY_ORDER = ["종이", "캔", "플라스틱", "비닐", "유리", "스티로폼", "건전지"]
 
 export default function ReportTrashScreen({ navigation }) {
-  // 상태 관리
+  const { currentLocation, getCurrentLocation } = useLocation()
+  const accessToken = useAuth((s) => s.accessToken)
+
+  // AI 미리보기/수정 모달
+  const [aiModalVisible, setAiModalVisible] = useState(false)
+  const [aiPreviewUri, setAiPreviewUri] = useState(null)  // data:image/...;base64,xxxx
+  const [aiEditableCounts, setAiEditableCounts] = useState({}) // { "종이": 2, "유리": 1, ... }
+
+  // 상태
   const [title, setTitle] = useState("")
-  const [selectedTrail, setSelectedTrail] = useState(null)
-  const [selectedLocation, setSelectedLocation] = useState(null)
-  const [amount, setAmount] = useState("")
-  const [imageUris, setImageUris] = useState([])
-  const [modalVisible, setModalVisible] = useState(false)
-  const [trailModalVisible, setTrailModalVisible] = useState(false)
-  const [locationModalVisible, setLocationModalVisible] = useState(false)
-  const [amountModalVisible, setAmountModalVisible] = useState(false)
-
-  // 데이터 로딩 상태
-  const [trails, setTrails] = useState([])
-  const [locations, setLocations] = useState([])
+  const [selectedTrail, setSelectedTrail] = useState(null) // { trailId, trailTypeName, trailName, ... }
+  const [imageUris, setImageUris] = useState([])           // 최대 1장
+  const [categoryCounts, setCategoryCounts] = useState({}) // 서버 전송용(한글 키 그대로)
   const [isLoading, setIsLoading] = useState(true)
+  const [trailLoading, setTrailLoading] = useState(false)
+  const [modalVisible, setModalVisible] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
 
-  // 컴포넌트 마운트 시 데이터 로드
+  // 현재 위치 → 가장 가까운 산책로 자동 세팅
   useEffect(() => {
-    loadData()
+    (async () => {
+      try {
+        setIsLoading(true)
+        const loc = await getCurrentLocation()
+        if (!loc) {
+          Alert.alert("위치 오류", "현재 위치를 가져오지 못했습니다.")
+          return
+        }
+        setTrailLoading(true)
+        const nearest = await getNearestTrail(loc.latitude, loc.longitude)
+        if (nearest) setSelectedTrail(nearest)
+        setTitle("") // placeholder만 노출
+      } catch (e) {
+        console.log("초기 로딩 오류:", e?.message)
+      } finally {
+        setTrailLoading(false)
+        setIsLoading(false)
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const loadData = async () => {
-    try {
-      setIsLoading(true)
+  const trailLabel = useMemo(() => {
+    if (!selectedTrail) return "산책로를 불러오는 중..."
+    return mergeTrailTitle(selectedTrail.trailTypeName, selectedTrail.trailName)
+  }, [selectedTrail])
 
-      // 실제 API 호출 시뮬레이션 (실패하면 더미 데이터 사용)
-      const shouldUseDummyData = Math.random() > 0.3 // 70% 확률로 더미 데이터 사용
-
-      if (shouldUseDummyData) {
-        // 더미 데이터 사용
-        console.log("Using dummy data")
-        setTrails(DUMMY_TRAILS)
-        setLocations(DUMMY_LOCATIONS)
-
-        // 기본값 설정
-        setTitle("마로니에 공원 쓰레기")
-        setSelectedTrail(DUMMY_TRAILS[0])
-        setSelectedLocation(DUMMY_LOCATIONS[0])
-        setAmount("많음")
-      } else {
-        // 실제 API 호출 (여기서는 시뮬레이션)
-        console.log("Loading from API...")
-        // const trailsData = await fetchTrails();
-        // const locationsData = await fetchLocations();
-
-        // API 호출 실패 시 더미 데이터로 폴백
-        setTrails(DUMMY_TRAILS)
-        setLocations(DUMMY_LOCATIONS)
-      }
-    } catch (error) {
-      console.error("Data loading failed, using dummy data:", error)
-      setTrails(DUMMY_TRAILS)
-      setLocations(DUMMY_LOCATIONS)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-  // 권한 요청
-  async function ensureCameraPermissions() {
-    if (Platform.OS !== "android") return true;
-
-    const perms = [PermissionsAndroid.PERMISSIONS.CAMERA];
-    if (Platform.Version >= 33) {
-      perms.push(PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES);
-    } else {
-      perms.push(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE);
-    }
-
-    const results = await PermissionsAndroid.requestMultiple(perms);
-    return perms.every(p => results[p] === PermissionsAndroid.RESULTS.GRANTED);
-  }
-
+  // ───────── 카메라 권한 & 이미지 선택 ─────────
   async function ensureCameraPermissions() {
     if (Platform.OS !== "android") return true
-
     const perms = [PermissionsAndroid.PERMISSIONS.CAMERA]
-
-    if (Platform.Version >= 33) {
-      // Android 13+
-      perms.push(PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES)
-    } else {
-      // Android 12 이하
-      perms.push(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE)
-    }
-
+    if (Platform.Version >= 33) perms.push(PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES)
+    else perms.push(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE)
     const results = await PermissionsAndroid.requestMultiple(perms)
-    const granted = perms.every(p => results[p] === PermissionsAndroid.RESULTS.GRANTED)
-    return granted
+    return perms.every(p => results[p] === PermissionsAndroid.RESULTS.GRANTED)
   }
 
-  // ✅ 사진 추가(카메라/앨범 선택)
   const handleImagePicker = () => {
-    if (imageUris.length >= 1) { // ✅ 최대 1장
+    if (imageUris.length >= 1) {
       Alert.alert("알림", "최대 1장까지만 업로드할 수 있습니다.")
       return
     }
@@ -140,61 +133,52 @@ export default function ReportTrashScreen({ navigation }) {
       [
         {
           text: "카메라로 찍기",
-          onPress: async () => {                 // ✅ 권한 먼저
+          onPress: async () => {
             const ok = await ensureCameraPermissions()
             if (!ok) {
               Alert.alert("권한 필요", "카메라/사진 권한을 허용해주세요.")
               return
             }
-
-            const cameraOptions = {
-              mediaType: "photo",
-              saveToPhotos: false,    // ✅ 갤러리에 저장하지 않음
-              maxHeight: 2000,
-              maxWidth: 2000,
-            }
-
-            launchCamera(cameraOptions, (response) => {
-              if (response?.errorMessage) {
-                console.log("launchCamera error:", response.errorMessage)
-                return
+            launchCamera(
+              {
+                mediaType: "photo",
+                selectionLimit: 1,
+                maxWidth: 640,   // 1024~1280 권장
+                maxHeight: 640,
+                quality: 0.6,     // 0.6~0.8 권장
+                includeExtra: true
+              },
+              (response) => {
+                if (response?.errorMessage || response?.didCancel) return
+                const uri = response?.assets?.[0]?.uri
+                if (uri) setImageUris([uri])
               }
-              if (response?.didCancel) {
-                return
-              }
-              const uri = response?.assets?.[0]?.uri
-              if (uri) setImageUris([uri])       // ✅ 상태에만 보관
-            })
+            )
           },
         },
         {
           text: "앨범에서 선택",
           onPress: async () => {
-            // 앨범 접근도 OS 버전에 따라 READ 권한 필요할 수 있음
             const ok = Platform.OS === "android" ? await ensureCameraPermissions() : true
             if (!ok) {
               Alert.alert("권한 필요", "사진 접근 권한을 허용해주세요.")
               return
             }
-
-            const libraryOptions = {
-              mediaType: "photo",
-              selectionLimit: 1,      // ✅ 한 장만
-              maxHeight: 2000,
-              maxWidth: 2000,
-            }
-
-            launchImageLibrary(libraryOptions, (response) => {
-              if (response?.errorMessage) {
-                console.log("launchImageLibrary error:", response.errorMessage)
-                return
+            launchImageLibrary(
+              {
+  mediaType: "photo",
+  selectionLimit: 1,
+  maxWidth: 640,   // 1024~1280 권장
+  maxHeight: 640,
+  quality: 0.6,     // 0.6~0.8 권장
+  includeExtra: true
+},
+              (response) => {
+                if (response?.errorMessage || response?.didCancel) return
+                const uri = response?.assets?.[0]?.uri
+                if (uri) setImageUris([uri])
               }
-              if (response?.didCancel) {
-                return
-              }
-              const uri = response?.assets?.[0]?.uri
-              if (uri) setImageUris([uri])
-            })
+            )
           },
         },
         { text: "취소", style: "cancel" },
@@ -202,93 +186,188 @@ export default function ReportTrashScreen({ navigation }) {
     )
   }
 
-  const handleDeleteImage = () => {
-    setImageUris([]);
-  }
+  const handleDeleteImage = () => setImageUris([])
 
-  const handleAIAnalysis = () => {
-    // AI 분석 기능 시뮬레이션
-    Alert.alert("AI 분석", "AI가 이미지를 분석하여 쓰레기 정보를 자동으로 입력합니다.", [
-      {
-        text: "취소",
-        style: "cancel",
-      },
-      {
-        text: "분석하기",
-        onPress: () => {
-          // AI 분석 결과 시뮬레이션
-          setTitle("AI 분석: 플라스틱 쓰레기")
-          setAmount("보통")
-          Alert.alert("완료", "AI 분석이 완료되었습니다.")
-        },
-      },
-    ])
-  }
-
-  const handleSubmit = () => {
-    if (!title.trim() || !selectedTrail || !selectedLocation || !amount.trim()) {
-      Alert.alert("오류", "모든 필드를 입력해주세요.")
+  // ───────── AI 분석 → 모달로 미리보기 + 개수 편집 ─────────
+  const handleAIAnalysis = async () => {
+    if (!imageUris[0]) {
+      Alert.alert("이미지 필요", "먼저 사진을 추가해주세요.")
       return
     }
+    try {
+      setAnalyzing(true)
+      const file = { uri: imageUris[0], name: "photo.jpg", type: "image/jpeg" }
+      const result = await analyzeTrashImage(file)
+      console.log("[AI] image_base64 length:", result?.image_base64?.length)
+      console.log("[AI] image_base64 head:", result?.image_base64?.slice(0, 30))
 
-    // 서버로 데이터 전송 시뮬레이션
-    const reportData = {
-      title: title.trim(),
-      trail: selectedTrail,
-      location: selectedLocation,
-      amount: amount.trim(),
-      imageUris, // 배열로 변경
-      timestamp: new Date().toISOString(),
+      // 미리보기 이미지 (base64)
+      setAiPreviewUri(toDataUri(result?.image_base64))
+
+      // counts.grouped (한글 키 기준) → 편집 상태 세팅
+      const grouped = result?.counts?.grouped || {}
+      const editable = {}
+      Object.entries(grouped).forEach(([label, val]) => {
+        editable[label] = Number(val) || 0
+      })
+      setAiEditableCounts(editable)
+
+      // 모달 오픈
+      setAiModalVisible(true)
+    } catch (e) {
+      console.log("AI 분석 오류:", e?.message)
+      Alert.alert("분석 실패", "이미지 분석에 실패했습니다. 다시 시도해주세요.")
+    } finally {
+      setAnalyzing(false)
     }
-
-    console.log("제보 데이터:", reportData)
-
-    // TODO: 실제 API 호출
-    // try {
-    //   await submitTrashReport(reportData);
-    //   setModalVisible(true);
-    // } catch (error) {
-    //   Alert.alert('오류', '제보 전송에 실패했습니다.');
-    // }
-
-    setModalVisible(true)
   }
 
-  const renderTrailSelector = () => (
-    <TouchableOpacity style={styles.selectBox} onPress={() => setTrailModalVisible(true)}>
-      <Text style={[styles.selectText, !selectedTrail && styles.placeholderText]}>
-        {selectedTrail ? selectedTrail.name : "산책로 선택하기"}
-      </Text>
-      <Icon name="place" size={20} color="#555" />
-    </TouchableOpacity>
-  )
+  // 적용된 결과 요약(한글 라벨, 0 제외, 정렬)
+  const appliedKorSummary = useMemo(() => {
+    return Object.entries(categoryCounts)
+      .filter(([_, n]) => (Number(n) || 0) > 0)
+      .map(([ko, n]) => ({ ko, n }))
+      .sort((a, b) => CATEGORY_ORDER.indexOf(a.ko) - CATEGORY_ORDER.indexOf(b.ko))
+  }, [categoryCounts])
+  const resetForm = () => {
+    setTitle("");
+    setImageUris([]);
+    setCategoryCounts({});
+    setAiEditableCounts({});
+    setAiPreviewUri(null);
+    setAiModalVisible(false);
+  };
+  // ───────── 제출 ─────────
+  const handleSubmit = async () => {
+    if (!title.trim()) return Alert.alert("오류", "제목을 입력해주세요.")
+    if (!selectedTrail?.trailId) return Alert.alert("오류", "산책로 정보를 불러오지 못했습니다.")
+    if (!currentLocation?.latitude || !currentLocation?.longitude) return Alert.alert("오류", "현재 좌표가 없습니다.")
+    if (!imageUris[0]) return Alert.alert("오류", "사진 1장을 첨부해주세요.")
 
-  const renderLocationSelector = () => (
-    <TouchableOpacity style={styles.selectBox} onPress={() => setLocationModalVisible(true)}>
-      <Text style={[styles.selectText, !selectedLocation && styles.placeholderText]}>
-        {selectedLocation ? selectedLocation.name : "위치 선택하기"}
-      </Text>
-      <Icon name="place" size={20} color="#555" />
-    </TouchableOpacity>
-  )
+    const imageFile = {
+      uri: imageUris[0],
+      name: "photo.jpg",
+      type: "image/jpeg",
+    }
 
-  const renderAmountSelector = () => (
-    <TouchableOpacity style={styles.selectBox} onPress={() => setAmountModalVisible(true)}>
-      <Text style={[styles.selectText, !amount && styles.placeholderText]}>{amount || "쓰레기 양 선택하기"}</Text>
-      <Icon name="keyboard-arrow-down" size={20} color="#555" />
-    </TouchableOpacity>
-  )
+    const payload = {
+      title: title.trim(),
+      lat: currentLocation.latitude,
+      lng: currentLocation.longitude,
+      trailId: selectedTrail.trailId,
+      isPicked: "N",
+      // ✅ 한글 키 그대로, 0 제외된 객체
+      categoryCounts,
+      image: imageFile,
+    }
 
+    try {
+      setSubmitting(true)
+      await createReport(accessToken, payload)
+
+      // 성공 처리: 토스트/알럿 → 폼 리셋 → 뒤로
+      if (Platform.OS === "android") {
+        ToastAndroid.show("제보가 되었습니다.", ToastAndroid.SHORT)
+      } else {
+        Alert.alert("제보가 되었습니다.")
+      }
+      resetForm()
+      navigation.goBack()
+    } catch (e) {
+      console.log("제보 실패:", e?.message)
+      Alert.alert("제보 실패", "네트워크 혹은 서버 오류입니다.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+
+  // ───────── AI 모달 본문 ─────────
+  const renderAiModalContent = () => {
+    // 보기 순서대로 라벨 정렬
+    const rows = Object.keys(aiEditableCounts).sort(
+      (a, b) => CATEGORY_ORDER.indexOf(a) - CATEGORY_ORDER.indexOf(b)
+    )
+
+    const setValue = (k, v) => {
+      const n = Math.max(0, parseInt(v, 10) || 0)
+      setAiEditableCounts(prev => ({ ...prev, [k]: n }))
+    }
+
+    return (
+      <View style={styles.aiModalWrap}>
+        {aiPreviewUri ? (
+          <Image
+            source={{ uri: aiPreviewUri }}
+            style={styles.aiPreview}
+            resizeMode="contain"
+            onLoad={() => console.log("[AI] preview loaded")}
+            onError={(e) => {
+              console.log("[AI] preview error:", e?.nativeEvent)
+              // MIME 불일치 시 한 번 교차 시도
+              if (aiPreviewUri.startsWith("data:image/jpeg;base64,")) {
+                setAiPreviewUri(aiPreviewUri.replace("image/jpeg", "image/png"))
+              } else if (aiPreviewUri.startsWith("data:image/png;base64,")) {
+                setAiPreviewUri(aiPreviewUri.replace("image/png", "image/jpeg"))
+              }
+            }}
+          />
+        ) : (
+          <View style={[styles.aiPreview, { alignItems: "center", justifyContent: "center" }]}>
+            <Text>미리볼 이미지가 없습니다.</Text>
+          </View>
+        )}
+
+        <Text style={styles.aiModalTitle}>분석된 쓰레기 종류 (수정 가능)</Text>
+
+        {rows.length === 0 ? (
+          <Text style={styles.infoText}>감지된 항목이 없습니다.</Text>
+        ) : (
+          rows.map((ko) => (
+            <View key={ko} style={styles.countRow}>
+              <Text style={styles.countLabel}>{ko}</Text>
+              <View style={styles.counter}>
+                <TouchableOpacity
+                  style={styles.counterBtn}
+                  onPress={() => setValue(ko, (aiEditableCounts[ko] || 0) - 1)}
+                >
+                  <Text style={styles.counterBtnText}>-</Text>
+                </TouchableOpacity>
+                <TextInput
+                  value={String(aiEditableCounts[ko])}
+                  onChangeText={(t) => setValue(ko, t.replace(/[^\d]/g, ""))}
+                  keyboardType="number-pad"
+                  style={styles.counterInput}
+                />
+                <TouchableOpacity
+                  style={styles.counterBtn}
+                  onPress={() => setValue(ko, (aiEditableCounts[ko] || 0) + 1)}
+                >
+                  <Text style={styles.counterBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
+
+        <View style={{ height: 8 }} />
+      </View>
+    )
+  }
+
+  // ───────── 로딩 화면 (훅 아래, 메인 반환 위) ─────────
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text>데이터를 불러오는 중...</Text>
+          <ActivityIndicator />
+          <Text style={{ marginTop: 8 }}>데이터를 불러오는 중...</Text>
         </View>
       </SafeAreaView>
     )
   }
 
+  // ───────── 메인 UI ─────────
   return (
     <SafeAreaView style={styles.container}>
       {/* 헤더 */}
@@ -297,16 +376,20 @@ export default function ReportTrashScreen({ navigation }) {
           <Icon name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>쓰레기 제보</Text>
-        <TouchableOpacity style={styles.menuButton}>
-          <Text style={styles.menuText}>등록</Text>
+        <TouchableOpacity style={styles.menuButton} onPress={handleSubmit} disabled={submitting}>
+          <Text style={styles.menuText}>{submitting ? "등록중..." : "등록"}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* AI 분석 버튼 */}
-        <TouchableOpacity style={styles.aiButton} onPress={handleAIAnalysis}>
+        <TouchableOpacity
+          style={[styles.aiButton, analyzing && { opacity: 0.7 }]}
+          onPress={handleAIAnalysis}
+          disabled={analyzing}
+        >
           <Image source={require("../assets/ai-svgrepo-com.png")} style={styles.aiIcon} resizeMode="contain" />
-          <Text style={styles.aiText}>AI 분석으로 쓰레기 정보 입력하기</Text>
+          <Text style={styles.aiText}>{analyzing ? "AI 분석 중..." : "AI 분석으로 쓰레기 정보 입력하기"}</Text>
           <Image source={require("../assets/check-square.png")} style={styles.checkIcon} resizeMode="contain" />
         </TouchableOpacity>
 
@@ -341,23 +424,69 @@ export default function ReportTrashScreen({ navigation }) {
             placeholderTextColor="rgba(51, 51, 51, 0.5)"
           />
 
+          {/* 산책로 - 고정 표시 */}
           <Text style={styles.label}>산책로</Text>
-          {renderTrailSelector()}
+          <View style={styles.infoBox}>
+            {trailLoading ? (
+              <ActivityIndicator size="small" />
+            ) : (
+              <Text style={styles.infoText}>{trailLabel || "산책로 정보를 불러오지 못했습니다."}</Text>
+            )}
+          </View>
 
+          {/* 위치 - 고정 표시 */}
           <Text style={styles.label}>쓰레기 위치</Text>
-          {renderLocationSelector()}
+          <View style={styles.infoBox}>
+            {currentLocation?.latitude ? (
+              <>
+                <Text style={styles.infoText}>현재 좌표를 저장했습니다.</Text>
+                <Text style={styles.coordText}>
+                  ({currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)})
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.infoText}>현재 좌표가 없습니다.</Text>
+            )}
+          </View>
 
-          <Text style={styles.label}>쓰레기 양</Text>
-          {renderAmountSelector()}
+          {/* 적용된 AI 결과 요약 + 수정 */}
+          <Text style={styles.label}>분석 결과</Text>
+          <View style={styles.infoBox}>
+            {appliedKorSummary.length === 0 ? (
+              <Text style={styles.infoText}>아직 적용된 분석 결과가 없습니다.</Text>
+            ) : (
+              <>
+                <View style={{ gap: 6 }}>
+                  {appliedKorSummary.map(({ ko, n }) => (
+                    <Text key={ko} style={styles.infoText}>• {ko}: {n}</Text>
+                  ))}
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    // 현재 적용된 값 기준으로 7종 모두 편집 가능하게 열기
+                    const next = {}
+                    CATEGORY_ORDER.forEach((ko) => {
+                      next[ko] = Number(categoryCounts[ko]) || 0
+                    })
+                    setAiEditableCounts(next)
+                    setAiModalVisible(true)
+                  }}
+                  style={{ marginTop: 10, alignSelf: "flex-start" }}
+                >
+                  <Text style={{ color: "#418663", fontWeight: "600" }}>수정</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
 
         {/* 제보하기 버튼 */}
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitText}>제보하기</Text>
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={submitting}>
+          <Text style={styles.submitText}>{submitting ? "제보중..." : "제보하기"}</Text>
         </TouchableOpacity>
       </ScrollView>
 
-      {/* 모달들 */}
+      {/* 완료 모달 */}
       <CommonModal
         visible={modalVisible}
         message="근처로 이동해서 주워주세요."
@@ -368,91 +497,49 @@ export default function ReportTrashScreen({ navigation }) {
         }}
       />
 
-      {/* 산책로 선택 모달 */}
-      <CommonModal
-        visible={trailModalVisible}
-        message="산책로를 선택하세요"
-        onCancel={() => setTrailModalVisible(false)}
-        onConfirm={() => setTrailModalVisible(false)}
-        customContent={
-          <View style={styles.modalContent}>
-            {trails.map((trail) => (
-              <TouchableOpacity
-                key={trail.id}
-                style={styles.modalItem}
-                onPress={() => {
-                  setSelectedTrail(trail)
-                  setTrailModalVisible(false)
-                }}
-              >
-                <Text style={styles.modalItemText}>{trail.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        }
-      />
+      {/* AI 미리보기/수정 모달 (RN Modal) */}
+      <Modal
+        visible={aiModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAiModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>AI 분석 결과</Text>
 
-      {/* 위치 선택 모달 */}
-      <CommonModal
-        visible={locationModalVisible}
-        message="위치를 선택하세요"
-        onCancel={() => setLocationModalVisible(false)}
-        onConfirm={() => setLocationModalVisible(false)}
-        customContent={
-          <View style={styles.modalContent}>
-            {locations.map((location) => (
-              <TouchableOpacity
-                key={location.id}
-                style={styles.modalItem}
-                onPress={() => {
-                  setSelectedLocation(location)
-                  setLocationModalVisible(false)
-                }}
-              >
-                <Text style={styles.modalItemText}>{location.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        }
-      />
+            {renderAiModalContent()}
 
-      {/* 쓰레기 양 선택 모달 */}
-      <CommonModal
-        visible={amountModalVisible}
-        message="쓰레기 양을 선택하세요"
-        onCancel={() => setAmountModalVisible(false)}
-        onConfirm={() => setAmountModalVisible(false)}
-        customContent={
-          <View style={styles.modalContent}>
-            {DUMMY_AMOUNTS.map((amountOption) => (
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalBtnSecondary} onPress={() => setAiModalVisible(false)}>
+                <Text style={styles.modalBtnSecondaryText}>취소</Text>
+              </TouchableOpacity>
               <TouchableOpacity
-                key={amountOption}
-                style={styles.modalItem}
+                style={styles.modalBtnPrimary}
                 onPress={() => {
-                  setAmount(amountOption)
-                  setAmountModalVisible(false)
+                  // 0 제외, 한글 키 그대로 적용
+                  const out = {}
+                  Object.entries(aiEditableCounts).forEach(([ko, v]) => {
+                    const n = Math.max(0, parseInt(v, 10) || 0)
+                    if (n > 0) out[ko] = n
+                  })
+                  setCategoryCounts(out)
+                  setAiModalVisible(false)
                 }}
               >
-                <Text style={styles.modalItemText}>{amountOption}</Text>
+                <Text style={styles.modalBtnPrimaryText}>확인</Text>
               </TouchableOpacity>
-            ))}
+            </View>
           </View>
-        }
-      />
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -464,190 +551,121 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F1F1F1",
     backgroundColor: "#FFFFFF",
   },
-  backButton: {
-    padding: 5,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#333333",
-    textAlign: "center",
-  },
-  menuButton: {
-    padding: 5,
-  },
-  menuText: {
-    fontSize: 16,
-    color: "#333333",
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
+  backButton: { padding: 5 },
+  headerTitle: { fontSize: 20, fontWeight: "700", color: "#333333", textAlign: "center" },
+  menuButton: { padding: 5 },
+  menuText: { fontSize: 16, color: "#333333" },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 30 },
+
   aiButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#418663",
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    marginTop: 20,
-    marginBottom: 20,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    backgroundColor: "#418663", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20,
+    marginTop: 20, marginBottom: 20,
   },
-  aiText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "400",
-    marginHorizontal: 10,
-    flex: 1,
-    textAlign: "center",
-  },
-  imageSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 30,
-  },
+  aiText: { color: "#FFFFFF", fontSize: 14, fontWeight: "400", marginHorizontal: 10, flex: 1, textAlign: "center" },
+
+  imageSection: { flexDirection: "row", alignItems: "center", marginBottom: 30 },
   imageUploadBox: {
-    width: 50,
-    height: 50,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#418663",
-    borderRadius: 5,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
+    width: 50, height: 50, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#418663",
+    borderRadius: 5, justifyContent: "center", alignItems: "center", position: "relative",
   },
-  cameraBoxInner: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  imageCount: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#418663",
-    marginTop: 2,
-    textAlign: "center",
-  },
-  cameraIconInBox: {
-    position: "absolute",
-    bottom: 8,
-    alignSelf: "center",
-  },
-  imageScrollView: {
-    flexDirection: "row",
-    marginHorizontal: 10,
-  },
-  imageContainer: {
-    position: "relative",
-    marginRight: 10,
-  },
-  uploadedImage: {
-    width: 65,
-    height: 50,
-    borderRadius: 5,
-  },
+  cameraBoxInner: { flex: 1, justifyContent: "center", alignItems: "center" },
+  imageCount: { fontSize: 10, fontWeight: "600", color: "#418663", marginTop: 2, textAlign: "center" },
+  imageScrollView: { flexDirection: "row", marginHorizontal: 10 },
+  imageContainer: { position: "relative", marginRight: 10 },
+  uploadedImage: { width: 65, height: 50, borderRadius: 5 },
   imageDeleteButton: {
-    position: "absolute",
-    top: -8,
-    right: -8,
-    width: 24,
-    height: 24,
-    backgroundColor: "#D9D9D9",
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#418663",
-    justifyContent: "center",
-    alignItems: "center",
+    position: "absolute", top: -8, right: -8, width: 24, height: 24, backgroundColor: "#D9D9D9",
+    borderRadius: 12, borderWidth: 1.5, borderColor: "#418663", justifyContent: "center", alignItems: "center",
   },
-  cameraButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: "auto",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+
+  formSection: { marginBottom: 30 },
+  label: { fontSize: 16, fontWeight: "700", color: "#333333", marginBottom: 8, marginTop: 20 },
+  textInput: { borderBottomWidth: 1.5, borderBottomColor: "#F1F1F1", paddingVertical: 12, fontSize: 16, color: "#333333" },
+
+  infoBox: {
+    borderWidth: 1, borderColor: "#D9D9D9", borderRadius: 5, paddingHorizontal: 12, paddingVertical: 10, minHeight: 40,
+    backgroundColor: "#FAFAFA",
   },
-  formSection: {
-    marginBottom: 30,
+  infoText: { fontSize: 16, color: "#333333" },
+  coordText: { marginTop: 4, fontSize: 12, color: "#666" },
+
+  submitButton: { backgroundColor: "#418663", borderRadius: 10, paddingVertical: 15, alignItems: "center", marginTop: 8 },
+  submitText: { color: "#FFFFFF", fontSize: 18, fontWeight: "600" },
+
+  aiIcon: { width: 24, height: 24, tintColor: "#FFFFFF" },
+  checkIcon: { width: 20, height: 20, tintColor: "#FFFFFF" },
+
+  // AI 모달 내부
+  aiModalWrap: { width: "100%" },
+  aiPreview: {
+    width: "100%",
+    height: 220,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#EEE",
+    marginBottom: 12,
+    backgroundColor: "#FFF",
   },
-  label: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#333333",
-    marginBottom: 8,
-    marginTop: 20,
-  },
-  textInput: {
-    borderBottomWidth: 1.5,
-    borderBottomColor: "#F1F1F1",
-    paddingVertical: 12,
-    fontSize: 16,
-    color: "#333333",
-  },
-  selectBox: {
+  aiModalTitle: { fontSize: 16, fontWeight: "700", color: "#333", marginBottom: 8 },
+  countRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#D9D9D9",
-    borderRadius: 5,
-    paddingHorizontal: 12,
     paddingVertical: 8,
-    minHeight: 33,
   },
-  selectText: {
-    fontSize: 16,
-    color: "#333333",
+  countLabel: { fontSize: 16, color: "#333", flex: 1 },
+  counter: { flexDirection: "row", alignItems: "center" },
+  counterBtn: {
+    width: 34, height: 34, borderRadius: 6, borderWidth: 1, borderColor: "#D9D9D9",
+    alignItems: "center", justifyContent: "center",
+  },
+  counterBtnText: { fontSize: 18, fontWeight: "700", color: "#333" },
+  counterInput: {
+    width: 56, height: 34, marginHorizontal: 8, borderWidth: 1, borderColor: "#D9D9D9",
+    borderRadius: 6, textAlign: "center", fontSize: 16, color: "#333", paddingVertical: 4, paddingHorizontal: 8,
+  },
+
+  // RN Modal 스타일
+  modalOverlay: {
     flex: 1,
-  },
-  placeholderText: {
-    color: "rgba(51, 51, 51, 0.5)",
-  },
-  submitButton: {
-    backgroundColor: "#418663",
-    borderRadius: 10,
-    paddingVertical: 15,
+    backgroundColor: "rgba(0,0,0,0.45)",
     alignItems: "center",
-    marginTop: 0,
+    justifyContent: "center",
+    padding: 16,
   },
-  submitText: {
-    color: "#FFFFFF",
+  modalCard: {
+    width: "100%",
+    maxWidth: 560,
+    maxHeight: "90%",
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "700",
+    color: "#333",
+    marginBottom: 12,
   },
-  modalContent: {
-    maxHeight: 200,
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 12,
   },
-  modalItem: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F1F1",
+  modalBtnPrimary: {
+    backgroundColor: "#418663",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
-  modalItemText: {
-    fontSize: 16,
-    color: "#333333",
+  modalBtnPrimaryText: { color: "#fff", fontWeight: "700" },
+  modalBtnSecondary: {
+    backgroundColor: "#F0F0F0",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
-  aiIcon: {
-    width: 24,
-    height: 24,
-    tintColor: "#FFFFFF",
-  },
-  checkIcon: {
-    width: 20,
-    height: 20,
-    tintColor: "#FFFFFF",
-  },
+  modalBtnSecondaryText: { color: "#333", fontWeight: "600" },
 })
