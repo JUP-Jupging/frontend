@@ -5,40 +5,35 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Aler
 import { useNavigation } from "@react-navigation/native"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
+import { updateNickname, getMyPage } from "../api/mypage"
+import { useAuth } from "../stores/useAuth"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 export default function ChangeNicknameScreen() {
   const navigation = useNavigation()
-  const [nickname, setNickname] = useState("쓰레기줍기장인") // TODO: 사용자 정보에서 불러오기
+  const accessToken = useAuth((s) => s.accessToken)
+  const [appNickname, setappNickname] = useState(appNickname) // TODO: 사용자 정보에서 불러오기
   const [modalVisible, setModalVisible] = useState(false)
 
   const handleSave = () => {
-    if (!nickname.trim()) {
+    if (!appNickname.trim()) {
       Alert.alert("입력 오류", "닉네임을 입력해주세요.")
       return
     }
-    if (nickname.trim().length < 2) {
+    if (appNickname.trim().length < 2) {
       Alert.alert("입력 오류", "닉네임은 2자 이상이어야 합니다.")
       return
     }
     setModalVisible(true)
   }
 
+
   const confirmChange = async () => {
     try {
       setModalVisible(false)
-
-      // TODO: 실제 API 호출
-      /*
-      await fetch('https://your-backend.com/api/update-nickname', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nickname: nickname.trim() }),
-      });
-      */
-
-      console.log("닉네임 변경됨:", nickname.trim())
+      // 닉네임 변경 API 호출
+      await updateNickname(accessToken, appNickname.trim())
       Alert.alert("완료", "닉네임이 성공적으로 변경되었습니다.")
       navigation.goBack()
     } catch (error) {
@@ -66,8 +61,8 @@ export default function ChangeNicknameScreen() {
           <Text style={styles.label}>닉네임</Text>
           <TextInput
             style={styles.input}
-            value={nickname}
-            onChangeText={setNickname}
+            value={appNickname}
+            onChangeText={setappNickname}
             placeholder="닉네임을 입력하세요"
             placeholderTextColor="rgba(51, 51, 51, 0.5)"
             maxLength={20}

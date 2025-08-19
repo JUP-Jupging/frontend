@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, StyleSheet, TouchableOpacity, Image, SafeAreaView, ScrollView, Dimensions } from "react-native"
 import { useNavigation } from "@react-navigation/native"
 import Icon from "react-native-vector-icons/MaterialIcons"
@@ -18,17 +19,19 @@ export default function MyPloggingScreen() {
   const [reports, setReports] = useState([]);
   const [ploggingRecords, setPloggingRecords] = useState([]); // ✅ 플로깅 기록 상태
   const accessToken = useAuth((s) => s.accessToken);
-  useEffect(() => {
-    async function fetchUser() {
-      try {
-        const data = await getMyPage(accessToken);
-        setUser(data);
-      } catch (e) {
-        console.error("마이페이지 정보 불러오기 실패:", e);
+  useFocusEffect(
+    useCallback(() => {
+      async function fetchUser() {
+        try {
+          const data = await getMyPage(accessToken);
+          setUser(data);
+        } catch (e) {
+          console.error("마이페이지 정보 불러오기 실패:", e);
+        }
       }
-    }
-    if (accessToken) fetchUser();
-  }, [accessToken]);
+      if (accessToken) fetchUser();
+    }, [accessToken])
+  );
   useEffect(() => {
     async function fetchReports() {
       try {
@@ -72,7 +75,7 @@ export default function MyPloggingScreen() {
           )}          
           <View style={styles.profileInfo}>
             <Text style={styles.nickname}>
-              {user?.appnickname ? user.appnickname : "닉네임 없음"}
+              {user?.appNickname ? user.appNickname : "닉네임 없음"}
             </Text>          </View>
           <TouchableOpacity onPress={() => navigation.navigate("MyPageMain")}>
             <Icon name="chevron-right" size={24} color="#131214" />
