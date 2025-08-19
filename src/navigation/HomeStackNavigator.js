@@ -8,6 +8,7 @@ import MainScreen from '../screens/MainScreen';
 import PloggingStartScreen from '../screens/PloggingStartScreen';
 import PloggingRecordScreen from '../screens/PloggingRecordScreen';
 import TrashCanInfoScreen from '../screens/TrashCanInfoScreen';
+import CourseDetailScreen from "../screens/CourseDetailScreen"
 
 const Stack = createNativeStackNavigator();
 
@@ -28,6 +29,12 @@ export default function HomeStackNavigator() {
         component={PloggingRecordScreen}
         options={{ headerShown: false }}
       />
+
+      <Stack.Screen
+  name="CourseDetail"
+  component={CourseDetailScreen}
+  options={{ headerShown: false }}
+/>
 
       {/* 쓰레기통 정보 화면도 홈 스택에 추가 */}
       <Stack.Screen

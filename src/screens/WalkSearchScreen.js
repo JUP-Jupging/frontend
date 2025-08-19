@@ -12,7 +12,9 @@ import {
   ActivityIndicator,
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
-import { getTrails, searchTrails, testConnection } from "../api/trails"
+// 🔥 trails.js에서 올바른 함수들 import
+import { getTrailList, searchTrails } from "../api/trails"
+import { useLocation } from "../hooks/useLocation"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -25,32 +27,52 @@ export default function WalkSearchScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState([])
   const [allCourses, setAllCourses] = useState([])
-  const [filters, setFilters] = useState({
-    cityName: "",
-    difficultyLevel: ""
-  })
+  const [filters, setFilters] = useState({ cityName: "", difficultyLevel: "" })
   const [loading, setLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const debounceRef = useRef(null)
+  const { currentLocation } = useLocation()
 
-  useEffect(() => {
-    const initializeScreen = async () => {
-      await testConnection()
-    }
-    initializeScreen()
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
-  }, [])
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3;
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+    const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
 
-  const loadTrailsWithFilters = async (appliedFilters = {}) => {
+  // 🔥 trails.js의 getTrailList 함수 사용
+  const loadTrailsWithFilters = async (filterParams = {}) => {
     let isMounted = true
     try {
       setLoading(true)
-      const data = await getTrails(appliedFilters)
-      if (isMounted) setAllCourses(Array.isArray(data) ? data : [])
+      // trails.js의 getTrailList 함수 호출
+      const data = await getTrailList(filterParams)
+
+      let sortedData = Array.isArray(data) ? data : []
+
+      if (currentLocation && sortedData.length > 0) {
+        const { latitude: userLat, longitude: userLng } = currentLocation
+        sortedData = sortedData.map(item => {
+          const trailLat = item.spotLatitude || item.latitude
+          const trailLng = item.spotLongitude || item.longitude
+          return {
+            ...item,
+            __distance: trailLat && trailLng
+              ? calculateDistance(userLat, userLng, trailLat, trailLng)
+              : Number.MAX_SAFE_INTEGER,
+          }
+        })
+        sortedData.sort((a, b) => a.__distance - b.__distance)
+      }
+
+      if (isMounted) setAllCourses(sortedData)
     } catch (e) {
+      console.error("❌ 산책로 목록 불러오기 실패:", e)
       if (isMounted) setAllCourses([])
     } finally {
       if (isMounted) setLoading(false)
@@ -58,10 +80,7 @@ export default function WalkSearchScreen({ navigation }) {
   }
 
   const applyFilters = () => {
-    const activeFilters = {}
-    if (filters.cityName) activeFilters.cityName = filters.cityName
-    if (filters.difficultyLevel) activeFilters.difficultyLevel = filters.difficultyLevel
-    loadTrailsWithFilters(activeFilters)
+    loadTrailsWithFilters(filters)
     setShowFilters(false)
   }
 
@@ -71,6 +90,7 @@ export default function WalkSearchScreen({ navigation }) {
     setShowFilters(false)
   }
 
+  // 🔥 trails.js의 searchTrails 함수 사용
   const performSearch = async (query) => {
     const q = query.trim()
     if (!q) {
@@ -81,14 +101,21 @@ export default function WalkSearchScreen({ navigation }) {
     try {
       setLoading(true)
       setShowResults(true)
+      // trails.js의 searchTrails 함수 호출
       const data = await searchTrails(q)
       setSearchResults(Array.isArray(data) ? data : [])
     } catch (e) {
+      console.error("❌ 검색 실패:", e)
       setSearchResults([])
     } finally {
       setLoading(false)
     }
   }
+
+  // 🔥 초기 로드 시 모든 트레일 불러오기
+  useEffect(() => {
+    loadTrailsWithFilters()
+  }, [])
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -100,57 +127,42 @@ export default function WalkSearchScreen({ navigation }) {
     }
   }, [searchQuery])
 
-  const handleResultPress = (item) => {
-    navigation.navigate("CourseDetail", { courseId: item.trailId || item.id, trailId: item.trailId || item.id })
+  const handleTrailPress = (trailId) => {
+    // StackNavigator에 등록한 이름("CourseDetail")으로 수정합니다.
+    navigation.navigate("CourseDetail", { trailId });
+  };
+
+  const getDifficultyColor = (difficulty) => {
+    switch (difficulty) {
+      case "쉬움": return "#4CAF50"
+      case "보통": return "#FF9800"
+      case "어려움": return "#F44336"
+      default: return "#666"
+    }
   }
 
   const renderSearchItem = ({ item }) => (
-    <TouchableOpacity style={styles.searchItem} onPress={() => handleResultPress(item)}>
+    <TouchableOpacity style={styles.searchItem} onPress={() => handleTrailPress(item.trailId)}>
       <View style={styles.itemContent}>
-        <Text style={styles.itemName}>
-          {item.trailName || item.name || "산책로 이름"}
-        </Text>
-        <Text style={styles.itemAddress}>
-          {item.cityName || item.address || "위치 정보 없음"}
-        </Text>
-        <Text style={styles.itemType}>
-          {item.trailTypeName && `유형: ${item.trailTypeName}`}
-        </Text>
+        <Text style={styles.itemName}>{item.trailName || item.name || "산책로 이름"}</Text>
+        <Text style={styles.itemAddress}>{item.cityName || item.address || "위치 정보 없음"}</Text>
+        <Text style={styles.itemType}>{item.trailTypeName && `유형: ${item.trailTypeName}`}</Text>
         <View style={styles.itemInfo}>
           <View style={styles.infoItem}>
             <Icon name="map-marker" size={screenWidth * 0.03} color="#666" />
-            <Text style={styles.infoText}>
-              {item.length ? `${item.length}` : "거리 정보 없음"}
-            </Text>
+            <Text style={styles.infoText}>{item.length ? `${item.length}` : "거리 정보 없음"}</Text>
           </View>
           <View style={styles.infoItem}>
             <Icon name="clock-outline" size={screenWidth * 0.03} color="#666" />
-            <Text style={styles.infoText}>
-              {item.trackTime ? `${item.trackTime}` : "소요시간 정보 없음"}
-            </Text>
+            <Text style={styles.infoText}>{item.trackTime ? `${item.trackTime}` : "소요시간 정보 없음"}</Text>
           </View>
           <View style={styles.infoItem}>
-            <Text style={[styles.difficultyText, { color: getDifficultyColor(item.difficultyLevel || item.difficulty) }]}>
-              {item.difficultyLevel || item.difficulty || "난이도 정보 없음"}
-            </Text>
+            <Text style={[styles.difficultyText, { color: getDifficultyColor(item.difficultyLevel || item.difficulty) }]}> {item.difficultyLevel || item.difficulty || "난이도 정보 없음"} </Text>
           </View>
         </View>
       </View>
     </TouchableOpacity>
   )
-
-  const getDifficultyColor = (difficulty) => {
-    switch (difficulty) {
-      case "쉬움":
-        return "#4CAF50"
-      case "보통":
-        return "#FF9800"
-      case "어려움":
-        return "#F44336"
-      default:
-        return "#666"
-    }
-  }
 
   const goBack = () => navigation.goBack()
   const goToProfile = () => navigation.navigate("내 플로깅 기록")
@@ -188,6 +200,7 @@ export default function WalkSearchScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </View>
+      
       {/* 필터 영역 */}
       {showFilters && (
         <View style={styles.filterContainer}>
@@ -273,7 +286,7 @@ export default function WalkSearchScreen({ navigation }) {
             </View>
           ) : (
             <FlatList
-              data={(allCourses || []).slice(0, 3)}
+              data={allCourses || []}
               keyExtractor={(item, idx) => String(item.trailId ?? item.id ?? idx)}
               renderItem={renderSearchItem}
               contentContainerStyle={styles.recentListContainer}

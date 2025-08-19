@@ -15,7 +15,11 @@ export default function RecommendCourseStackNavigator() {
 options={{ headerShown: false }}
 />
 
-
+      <Stack.Screen 
+        name="PloggingStart" 
+        component={PloggingStartScreen} 
+        options={{ headerShown: false }} 
+      />
       
             <Stack.Screen name="CourseDetail" component={CourseDetailScreen} options={{ headerShown: false }} />
       

@@ -10,6 +10,7 @@ import { TouchableOpacity, Image } from 'react-native';
 import MyPageStackNavigator from './MyPageStackNavigator';
 import RecommendCourseStackNavigator from './RecommendCourseStackNavigator';
 import FloatingPloggingIndicator from '../components/FloatingPloggingIndicator'; // 🎯 플로깅 진행 상황을 보여주는 드래그 가능한 모달
+import SearchStackNavigator from './SearchStackNavigator'; // 👈 새로 만든 SearchStackNavigator를 import 합니다.
 
 const Tab = createBottomTabNavigator();
 
@@ -58,7 +59,8 @@ function TabNavigator() {
       {/* 🔍 코스 검색 탭 */}
       <Tab.Screen
         name="코스 검색"
-        component={WalkSearchScreen}
+        // component={WalkSearchScreen} // 👈 기존 코드
+        component={SearchStackNavigator} // 👈 새로 만든 화면 관리자로 교체!
         options={{ headerShown: false }}
       />
 
