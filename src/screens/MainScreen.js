@@ -594,7 +594,8 @@ export default function MainScreen({ navigation }) {
                     trailName: course.trailName || course.instlPlcNm,
                     selectedTag: selectedTag
                   });
-                  navigation.navigate("CourseDetailScreen", { 
+                  console.log('📍 [MainScreen] CourseDetail로 네비게이션 시도...');
+                  navigation.navigate("CourseDetail", { 
                     courseId: course.trailId,
                     trailId: course.trailId, // 호환성을 위한 중복
                     courseData: {
