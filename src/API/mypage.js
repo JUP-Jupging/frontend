@@ -26,11 +26,11 @@ export const getMyPage = async (accessToken) => {
  * 바디: { nickname: "새닉네임" }
  * 헤더: Authorization: Bearer <accessToken>
  */
-export const updateNickname = async (accessToken, nickname) => {
+export const updateNickname = async (accessToken, appNickname) => {
   try {
     const { data } = await axios.patch(
       `${BASE_URL}/members/me/app_nickname`,
-      { nickname },
+      { appNickname },
       {
         headers: { Authorization: `Bearer ${accessToken}` },
         timeout: 10000,
@@ -59,8 +59,8 @@ export const updateProfileImage = async (accessToken, file) => {
       type: file.type || "image/jpeg",
     });
 
-    const { data } = await axios.patch(
-      `${BASE_URL}/members/me/profile_image`,
+    const { data } = await axios.post(
+      `${BASE_URL}/members/profile`,
       formData,
       {
         headers: {
