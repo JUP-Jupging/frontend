@@ -16,6 +16,8 @@ import DropDownPicker from "react-native-dropdown-picker"
 import { usePloggingContext } from "../contexts/PloggingContext"
 import { useLocation } from "../hooks/useLocation" // 위치 훅 추가
 import { getNearbyTrails, getTrailList } from "../api/trails" // API 함수들 추가
+import { getMyPloggingRecords } from "../api/plog" // 🔥 플로깅 기록 API 추가
+import { useAuth } from "../stores/useAuth" // 🔥 인증 훅 추가
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -26,16 +28,10 @@ const BANNER_HEIGHT = screenHeight * 0.15
 const PICK_CARD_WIDTH = screenWidth * 0.45
 const PICK_IMAGE_HEIGHT = PICK_CARD_WIDTH * 0.7
 
-// 더미 데이터 (오늘의 플로깅용)
-const DUMMY_TODAY_DATA = {
-  timeSpent: 0,
-  targetTime: 60,
-  distance: 0.0,
-  targetDistance: 3.0,
-  trashCount: 0,
-}
-
 export default function MainScreen({ navigation }) {
+  // 🔥 인증 정보
+  const { accessToken } = useAuth();
+
   // 플로깅 전역 상태 확인
   const { 
     status, 
@@ -44,14 +40,16 @@ export default function MainScreen({ navigation }) {
     trashCount, 
     totalDistance, 
     formatDistance,
-    isBackgroundMode 
+    isBackgroundMode,
+    currentTrailInfo // 🔥 현재 산책로 정보 추가
   } = usePloggingContext();
   
   // 위치 훅 사용
   const { currentLocation, getCurrentLocation } = useLocation();
   
   const [selectedTag, setSelectedTag] = useState("가까운 곳")
-  const [todayData, setTodayData] = useState(DUMMY_TODAY_DATA)
+  const [todayPloggingRecords, setTodayPloggingRecords] = useState([]) // 🔥 오늘의 플로깅 기록
+  const [currentPloggingTrail, setCurrentPloggingTrail] = useState(null) // 🔥 현재 플로깅 중인 산책로 정보
   const [nearbyTrails, setNearbyTrails] = useState([]) // 가까운 산책로들
   const [trashyTrails, setTrashyTrails] = useState([]) // 쓰레기 많은 산책로들
   const [loading, setLoading] = useState(true)
@@ -76,7 +74,6 @@ export default function MainScreen({ navigation }) {
   }
 
   // 네비게이션 함수들
-  const goToRealtimePlogging = () => navigation.navigate("RealtimePlogging")
   const goToRecommend = () => navigation.navigate("추천 코스")
   const goToReport = () => navigation.navigate("쓰레기 제보")
   const goToPlogging = () => navigation.navigate("PloggingStart")
@@ -84,19 +81,183 @@ export default function MainScreen({ navigation }) {
   const goToMyPloggingRecords = () => navigation.navigate("내 플로깅 기록")
   const goToRecommendCourse = () => navigation.navigate("RecommendCourse")
 
-  // 플로깅 화면으로 이동 (진행 중일 때)
+  // 🔥 플로깅 화면으로 이동 - 항상 PloggingStart로 이동
   const goToPloggingScreen = () => {
-    if (status === "running" || status === "paused") {
-      navigation.navigate("PloggingStart");
+    navigation.navigate("PloggingStart");
+  };
+
+  // 🔥 현재 플로깅 중인 산책로 정보 파싱 - PloggingContext에서 가져오기
+  const getCurrentPloggingInfo = () => {
+    // 🔥 플로깅 진행 중이 아닐 때는 기본값 반환
+    if (status === "idle") {
+      return {
+        name: "플로깅을 시작하세요",
+        totalTime: 3600, // 기본 1시간 (초) - 표시용
+        totalDistance: 3000, // 기본 3km (미터) - 표시용
+      };
+    }
+
+    // 🔥 플로깅 진행 중일 때 Context에서 현재 산책로 정보 사용
+    if (currentTrailInfo) {
+      console.log('✅ [MainScreen] Context에서 산책로 정보 사용:', currentTrailInfo);
+      return {
+        name: currentTrailInfo.name || currentTrailInfo.trailName || "플로깅 코스",
+        totalTime: parseTimeString(currentTrailInfo.trackTime || currentTrailInfo.duration) || 3600,
+        totalDistance: parseDistanceString(currentTrailInfo.lengthDetail || currentTrailInfo.distance) || 3000,
+      };
+    }
+
+    // Context에 정보가 없으면 임시로 nearbyTrails에서 첫 번째 사용 (데모용)
+    if (nearbyTrails && nearbyTrails.length > 0) {
+      const currentTrail = nearbyTrails[0];
+      console.log('⚠️ [MainScreen] Context 정보 없음, 임시로 근처 산책로 사용:', currentTrail.trailName);
+      return {
+        name: currentTrail.trailName || currentTrail.instlPlcNm || "플로깅 코스",
+        totalTime: parseTimeString(currentTrail.trackTime) || 3600,
+        totalDistance: parseDistanceString(currentTrail.lengthDetail) || 3000,
+      };
+    }
+
+    // 기본값
+    console.log('🔄 [MainScreen] 기본값 사용');
+    return {
+      name: "플로깅 코스",
+      totalTime: 3600, // 기본 1시간
+      totalDistance: 3000, // 기본 3km
+    };
+  }
+
+  // 🔥 시간 문자열 파싱 개선 (백엔드 trackTime 형식에 맞게)
+  const parseTimeString = (timeStr) => {
+    if (!timeStr) return 3600; // 기본 1시간
+    
+    // "1시간 30분" 형식
+    const hourMatch = timeStr.match(/(\d+)시간/);
+    const minMatch = timeStr.match(/(\d+)분/);
+    
+    const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+    const minutes = minMatch ? parseInt(minMatch[1]) : 0;
+    
+    // "90분" 같은 형식도 처리
+    if (!hourMatch && minMatch) {
+      const totalMinutes = parseInt(minMatch[1]);
+      return totalMinutes * 60;
+    }
+    
+    // "1.5시간" 같은 소수점 형식도 처리
+    const decimalHourMatch = timeStr.match(/(\d+\.?\d*)시간/);
+    if (decimalHourMatch) {
+      const hours = parseFloat(decimalHourMatch[1]);
+      return Math.round(hours * 3600);
+    }
+    
+    return (hours * 3600) + (minutes * 60);
+  }
+
+  // 🔥 거리 문자열 파싱 개선 (백엔드 lengthDetail 형식에 맞게)
+  const parseDistanceString = (lengthDetail) => {
+    if (!lengthDetail) return 3000; // 기본 3km
+    
+    // 숫자인 경우 (km 단위로 가정)
+    if (typeof lengthDetail === 'number') {
+      return lengthDetail * 1000; // km를 미터로 변환
+    }
+    
+    // 문자열인 경우
+    if (typeof lengthDetail === 'string') {
+      // "3.5km" 형식
+      const kmMatch = lengthDetail.match(/(\d+\.?\d*)\s*km/i);
+      if (kmMatch) {
+        return parseFloat(kmMatch[1]) * 1000;
+      }
+      
+      // "3500m" 형식
+      const mMatch = lengthDetail.match(/(\d+)\s*m/i);
+      if (mMatch) {
+        return parseInt(mMatch[1]);
+      }
+      
+      // 순수 숫자 문자열인 경우 (km로 가정)
+      const numberMatch = lengthDetail.match(/^(\d+\.?\d*)$/);
+      if (numberMatch) {
+        return parseFloat(numberMatch[1]) * 1000;
+      }
+    }
+    
+    return 3000; // 기본값
+  }
+
+  // 🔥 시간을 사용자 친화적 형식으로 변환
+  const formatTimeForDisplay = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (hours > 0 && minutes > 0) {
+      return `${hours}시간 ${minutes}분`;
+    } else if (hours > 0) {
+      return `${hours}시간`;
     } else {
-      goToRealtimePlogging();
+      return `${minutes}분`;
+    }
+  }
+
+  // 🔥 오늘의 플로깅 기록 가져오기 (완료된 기록만)
+  const fetchTodayPloggingRecords = async () => {
+    try {
+      setLoading(true);
+      console.log('📅 [MainScreen] 오늘의 플로깅 기록 조회 시작');
+
+      if (!accessToken) {
+        console.warn('⚠️ [MainScreen] 액세스 토큰 없음 - 로그인 필요');
+        setTodayPloggingRecords([]);
+        return;
+      }
+
+      // API에서 내 플로깅 기록 가져오기
+      const allRecords = await getMyPloggingRecords(accessToken);
+      console.log('📊 [MainScreen] 전체 플로깅 기록 수:', allRecords?.length || 0);
+
+      if (!allRecords || allRecords.length === 0) {
+        console.log('📝 [MainScreen] 플로깅 기록 없음');
+        setTodayPloggingRecords([]);
+        return;
+      }
+
+      // 오늘 날짜 필터링
+      const today = new Date();
+      const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD
+
+      const todayRecords = allRecords.filter(record => {
+        if (!record.ploggingTime) return false;
+        
+        const recordDate = new Date(record.ploggingTime).toISOString().split('T')[0];
+        return recordDate === todayString;
+      });
+
+      console.log('✅ [MainScreen] 오늘의 플로깅 기록:', todayRecords.length, '개');
+
+      // 오늘의 총 통계 계산
+      const todayStats = todayRecords.reduce((acc, record) => {
+        acc.totalTime += record.duration || 0; // 초 단위
+        acc.totalDistance += record.distance || 0; // 미터 단위
+        acc.totalTrashCount += record.trashCount || 0;
+        return acc;
+      }, { totalTime: 0, totalDistance: 0, totalTrashCount: 0 });
+
+      setTodayPloggingRecords(todayStats);
+
+    } catch (error) {
+      console.error('❌ [MainScreen] 오늘의 플로깅 기록 조회 실패:', error);
+      setTodayPloggingRecords([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   // 가까운 산책로 5개 가져오기
   const fetchNearbyTrails = async () => {
     try {
-      console.log('📍 [MainScreen] 가까운 산책로 조회 시작');
+      console.log('🔍 [MainScreen] 가까운 산책로 조회 시작');
       console.log('- 현재 위치:', currentLocation);
       
       if (!currentLocation?.latitude || !currentLocation?.longitude) {
@@ -241,40 +402,6 @@ export default function MainScreen({ navigation }) {
     return R * c;
   };
 
-  // DB에서 오늘의 플로깅 데이터 가져오기 (완료된 플로깅 기록만)
-  const fetchTodayData = async () => {
-    try {
-      setLoading(true)
-
-      // 오늘 날짜 생성 (YYYY-MM-DD 형식)
-      const today = new Date()
-      const todayString = today.toISOString().split('T')[0]
-
-      // 실제 API 호출 - 오늘 날짜로 완료된 플로깅 기록 조회
-      // const response = await fetch(`https://your-api.com/api/plogging/records/today?date=${todayString}`);
-      // const data = await response.json();
-
-      // 시뮬레이션: API 호출 대신 더미 데이터 사용
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      // 확인용 더미 데이터 - 항상 데이터가 있는 것으로 표시
-      const todayRecord = {
-        timeSpent: 75, // 1시간 15분
-        targetTime: 60,
-        distance: 2.8, // 2.8km
-        targetDistance: 3.0,
-        trashCount: 12, // 12개
-      }
-      setTodayData(todayRecord)
-    } catch (error) {
-      console.error("Failed to fetch today's plogging data:", error)
-      // 에러 발생시 초기값 사용
-      setTodayData(DUMMY_TODAY_DATA)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   // 추천 코스 데이터 가져오기 (실제 API 사용)
   const fetchRecommendedCourses = async () => {
     try {
@@ -348,11 +475,14 @@ export default function MainScreen({ navigation }) {
   };
 
   useEffect(() => {
-    fetchTodayData()
+    fetchTodayPloggingRecords() // 🔥 오늘의 플로깅 기록 조회
     fetchRecommendedCourses()
-  }, [currentLocation]) // 현재 위치가 변경되면 다시 조회
+  }, [currentLocation, accessToken]) // 🔥 accessToken 변경시에도 재조회
 
   const filteredCourses = getFilteredCourses()
+
+  // 🔥 현재 플로깅 정보
+  const currentPloggingInfo = getCurrentPloggingInfo()
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: PADDING_H * 2 }}>
@@ -387,7 +517,7 @@ export default function MainScreen({ navigation }) {
 
         {/* Right Cards */}
         <View style={styles.rightCards}>
-          {/* 실시간 플로깅 카드 */}
+          {/* 🔥 실시간 플로깅 카드 - 진행 중인 플로깅과 연동 */}
           <TouchableOpacity style={styles.realtimePloggingCard} onPress={goToPloggingScreen}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>
@@ -401,18 +531,20 @@ export default function MainScreen({ navigation }) {
               {status === "running" || status === "paused" ? "플로깅 화면으로 >" : "실시간 플로깅 >"}
             </Text>
 
-            {/* Progress Bars */}
+            {/* 🔥 실시간 Progress Bars - 현재 진행 상황 반영 */}
             <View style={styles.progressSection}>
               {(status === "running" || status === "paused") ? (
-                // 플로깅 진행 중일 때만 실제 데이터 표시
+                // 플로깅 진행 중일 때 실제 데이터와 목표 비교
                 <>
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
                       <Text style={styles.progressLabel}>시간</Text>
-                      <Text style={styles.progressValue}>{formatTime(time)} / 1시간</Text>
+                      <Text style={styles.progressValue}>
+                        {formatTime(time)} / {formatTimeForDisplay(currentPloggingInfo.totalTime)}
+                      </Text>
                     </View>
                     <ProgressBar 
-                      progress={(time / 3600) * 100} 
+                      progress={Math.min((time / currentPloggingInfo.totalTime) * 100, 100)} 
                       color="#4CAF50" 
                     />
                   </View>
@@ -420,10 +552,12 @@ export default function MainScreen({ navigation }) {
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
                       <Text style={styles.progressLabel}>거리</Text>
-                      <Text style={styles.progressValue}>{formatDistance(totalDistance)} / 3.0km</Text>
+                      <Text style={styles.progressValue}>
+                        {formatDistance(totalDistance)} / {(currentPloggingInfo.totalDistance / 1000).toFixed(1)}km
+                      </Text>
                     </View>
                     <ProgressBar 
-                      progress={(totalDistance / 3000) * 100} 
+                      progress={Math.min((totalDistance / currentPloggingInfo.totalDistance) * 100, 100)} 
                       color="#2196F3" 
                     />
                   </View>
@@ -435,12 +569,12 @@ export default function MainScreen({ navigation }) {
                   </View>
                 </>
               ) : (
-                // 플로깅 진행 중이 아닐 때는 빈 progress bar 표시
+                // 🔥 플로깅 진행 중이 아닐 때는 0으로 표시
                 <>
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
                       <Text style={styles.progressLabel}>시간</Text>
-                      <Text style={styles.progressValue}>0분 / 1시간</Text>
+                      <Text style={styles.progressValue}>0분 / 목표시간</Text>
                     </View>
                     <ProgressBar 
                       progress={0} 
@@ -451,7 +585,7 @@ export default function MainScreen({ navigation }) {
                   <View style={styles.progressItem}>
                     <View style={styles.progressHeader}>
                       <Text style={styles.progressLabel}>거리</Text>
-                      <Text style={styles.progressValue}>0.0km / 3.0km</Text>
+                      <Text style={styles.progressValue}>0.0km / 목표거리</Text>
                     </View>
                     <ProgressBar 
                       progress={0} 
@@ -463,7 +597,7 @@ export default function MainScreen({ navigation }) {
             </View>
           </TouchableOpacity>
 
-          {/* 오늘의 플로깅 카드 - DB에서 오늘 완료된 플로깅 기록 표시 */}
+          {/* 🔥 오늘의 플로깅 카드 - 완료된 기록 표시 */}
           <View style={styles.todayPloggingCard}>
             {/* 상단 헤더 */}
             <View style={styles.todayCardHeader}>
@@ -478,7 +612,7 @@ export default function MainScreen({ navigation }) {
               </View>
             ) : (
               <View style={styles.todayDataContainer}>
-                {(todayData.timeSpent === 0 && todayData.distance === 0 && todayData.trashCount === 0) ? (
+                {(todayPloggingRecords.totalTime === 0 && todayPloggingRecords.totalDistance === 0 && todayPloggingRecords.totalTrashCount === 0) ? (
                   // 오늘 플로깅 기록이 없는 경우
                   <View style={styles.noTodayDataContainer}>
                     <Text style={styles.noTodayDataText}>오늘 아직 플로깅을{"\n"}시작하지 않았어요</Text>
@@ -490,16 +624,16 @@ export default function MainScreen({ navigation }) {
                     {/* 왼쪽: 시간과 거리 */}
                     <View style={styles.leftSection}>
                       <Text style={styles.timeText}>
-                        {Math.floor(todayData.timeSpent / 60)}시간 {todayData.timeSpent % 60}분
+                        {Math.floor(todayPloggingRecords.totalTime / 3600)}시간 {Math.floor((todayPloggingRecords.totalTime % 3600) / 60)}분
                       </Text>
                       <Text style={styles.distanceText}>
-                        {todayData.distance.toFixed(1)}km
+                        {(todayPloggingRecords.totalDistance / 1000).toFixed(1)}km
                       </Text>
                     </View>
                     
                     {/* 오른쪽: 쓰레기 개수 */}
                     <View style={styles.rightSection}>
-                      <Text style={styles.trashCountInline}>{todayData.trashCount}개</Text>
+                      <Text style={styles.trashCountInline}>{todayPloggingRecords.totalTrashCount}개</Text>
                     </View>
                   </View>
                 )}
@@ -550,7 +684,7 @@ export default function MainScreen({ navigation }) {
 
       {/* Pick Section */}
       <View style={styles.pickWrapper}>
-        <Text style={styles.pickTitle}>줍깅 PICK 추천코스 🎉</Text>
+        <Text style={styles.pickTitle}>중깅 PICK 추천코스 🎉</Text>
 
         <View style={styles.pickTags}>
           <TouchableOpacity
@@ -594,7 +728,7 @@ export default function MainScreen({ navigation }) {
                     trailName: course.trailName || course.instlPlcNm,
                     selectedTag: selectedTag
                   });
-                  console.log('📍 [MainScreen] CourseDetail로 네비게이션 시도...');
+                  console.log('🔍 [MainScreen] CourseDetail로 네비게이션 시도...');
                   navigation.navigate("CourseDetail", { 
                     courseId: course.trailId,
                     trailId: course.trailId, // 호환성을 위한 중복
@@ -705,7 +839,6 @@ const styles = StyleSheet.create({
 
   // Header Styles
   headerRow: {
-
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: PADDING_H,

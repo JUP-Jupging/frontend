@@ -7,18 +7,21 @@ import { useNavigation } from "@react-navigation/native"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import { getMyPage } from "../api/mypage";
 import { getMyReports } from "../api/report";
-import { getMyPloggingRecords } from "../api/plog"; // ✅ 플로깅 기록 API import
+import { getMyPloggingRecords, getPloggingDetail } from "../api/plog"; // ✅ 상세 조회 API 추가
 import { useAuth } from "../stores/useAuth";
+import { formatUserFriendlyDate, formatPloggingTime, formatDistance, formatPloggingCardInfo } from "../utils/timeUtils"; // ✅ 시간 유틸리티 import
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 export default function MyPloggingScreen() {
   const navigation = useNavigation()
-  const [activeTab, setActiveTab] = useState("줍깅")
+  const [activeTab, setActiveTab] = useState("플로깅")
   const [user, setUser] = useState(null);
   const [reports, setReports] = useState([]);
   const [ploggingRecords, setPloggingRecords] = useState([]); // ✅ 플로깅 기록 상태
+  const [isLoading, setIsLoading] = useState(false); // ✅ 로딩 상태 추가
   const accessToken = useAuth((s) => s.accessToken);
+
   useFocusEffect(
     useCallback(() => {
       async function fetchUser() {
@@ -32,6 +35,7 @@ export default function MyPloggingScreen() {
       if (accessToken) fetchUser();
     }, [accessToken])
   );
+
   useEffect(() => {
     async function fetchReports() {
       try {
@@ -44,18 +48,181 @@ export default function MyPloggingScreen() {
     }
     if (accessToken && activeTab === "신고") fetchReports();
   }, [accessToken, activeTab]);
-    useEffect(() => {
+
+  // ✅ 플로깅 기록 가져오기 - 시간 유틸리티 적용
+  useEffect(() => {
     async function fetchPloggingRecords() {
       try {
+        setIsLoading(true);
+        console.log('📋 [MyPloggingScreen] 플로깅 기록 가져오기 시작');
+        
         const data = await getMyPloggingRecords(accessToken);
-        setPloggingRecords(Array.isArray(data) ? data : []);
+        console.log('📋 [MyPloggingScreen] 가져온 원본 데이터:', data);
+        
+        // ✅ 시간 유틸리티를 사용해서 표시용 정보 생성
+        const formattedRecords = (Array.isArray(data) ? data : []).map((record, index) => {
+          
+          // 🔥 ploggingTime 안전 처리
+          const safePloggingTime = record.ploggingTime === "string" ? "0" : record.ploggingTime;
+          
+          const cardInfo = formatPloggingCardInfo({
+            ...record,
+            ploggingTime: safePloggingTime // 안전한 값으로 교체
+          });
+          
+          console.log(`📋 [MyPloggingScreen] 기록 ${index + 1} 포맷팅:`, {
+            original: record,
+            safePloggingTime: safePloggingTime,
+            formatted: cardInfo
+          });
+          
+          return {
+            ...record,
+            ploggingTime: safePloggingTime, // 🔥 원본도 안전한 값으로 업데이트
+            // 표시용 정보 추가
+            displayInfo: cardInfo,
+            // 기존 필드들도 유지하되 포맷된 버전 추가
+            formattedDate: cardInfo.date,
+            formattedTime: cardInfo.time,
+            formattedDistance: cardInfo.distance
+          };
+        });
+        
+        console.log('✅ [MyPloggingScreen] 최종 포맷된 기록들:', formattedRecords);
+        setPloggingRecords(formattedRecords);
       } catch (e) {
-        console.error("플로깅 기록 불러오기 실패:", e);
+        console.error("❌ [MyPloggingScreen] 플로깅 기록 불러오기 실패:", e);
         setPloggingRecords([]);
+      } finally {
+        setIsLoading(false);
       }
     }
-    if (accessToken && activeTab === "줍깅") fetchPloggingRecords();
+    
+    if (accessToken && activeTab === "플로깅") {
+      fetchPloggingRecords();
+    }
   }, [accessToken, activeTab]);
+
+  // ✅ 플로깅 기록 클릭 핸들러 - 상세 조회 후 기록 페이지로 이동
+  const handlePloggingRecordPress = async (record) => {
+    try {
+      console.log('🔍 [MyPloggingScreen] 플로깅 기록 클릭:', record.ploggingId);
+      
+      // 로딩 시작
+      setIsLoading(true);
+      
+      // 상세 정보 가져오기 (memberId는 user 정보에서 가져오거나 record에서 추출)
+      const memberId = user?.memberId || user?.id || 1; // 사용자 ID 가져오기
+      console.log('👤 [MyPloggingScreen] 사용할 memberId:', memberId);
+      
+      const detailData = await getPloggingDetail(record.ploggingId, memberId, accessToken);
+      console.log('📋 [MyPloggingScreen] 상세 데이터:', detailData);
+      
+      // ✅ PloggingRecordScreen에서 기대하는 형태로 데이터 변환
+      const transformedData = {
+        // 기본 정보
+        title: detailData.trailTypeName || record.trailTypeName || "플로깅 기록",
+        date: formatUserFriendlyDate(detailData.displayDate),
+        location: detailData.trailTypeName || "플로깅 경로",
+        
+        // 운동 정보
+        duration: formatPloggingTime(detailData.ploggingTime),
+        distance: formatDistance(detailData.distance),
+        difficulty: detailData.difficulty || "보통",
+        
+        // 경로 및 이미지 정보
+        route: [], // 경로 좌표는 API에서 제공되지 않는 듯
+        trashLocations: detailData.trashInfo || [],
+        mapImage: detailData.imageUrl, // 플로깅 이미지
+        routeImage: detailData.imageUrl,
+        
+        // 메타데이터
+        trailId: detailData.trailId,
+        ploggingId: detailData.ploggingId,
+        startTime: detailData.ploggingDate2 || detailData.ploggingDate,
+        endTime: detailData.ploggingDate2 || detailData.ploggingDate,
+        
+        // 쓰레기 정보
+        trashCount: (detailData.trashInfo || []).length,
+        collectedTrash: (detailData.trashInfo || []).map((trash, index) => ({
+          id: trash.reportId || index,
+          type: determineTrashType(trash), // 쓰레기 타입 결정
+          amount: determineTrashAmount(trash), // 양 결정
+          location: `위도: ${trash.lat || 0}, 경도: ${trash.lng || 0}`,
+          title: determineTrashType(trash)
+        })),
+        
+        // 원본 상세 데이터도 포함
+        _detailData: detailData,
+        _originalRecord: record
+      };
+      
+      console.log('🎯 [MyPloggingScreen] 변환된 데이터:', transformedData);
+      
+      // PloggingRecordScreen으로 이동
+      navigation.navigate("PloggingRecordScreen", {
+        result: transformedData
+      });
+      
+    } catch (error) {
+      console.error('❌ [MyPloggingScreen] 플로깅 상세 조회 실패:', error);
+      // 에러 발생 시에도 기본 정보로 이동
+      const fallbackData = {
+        title: record.trailTypeName || "플로깅 기록",
+        date: formatUserFriendlyDate(record.displayDate),
+        location: record.trailTypeName || "플로깅 경로",
+        duration: formatPloggingTime(record.ploggingTime),
+        distance: formatDistance(record.distance),
+        difficulty: "보통",
+        route: [],
+        trashCount: record.trashCount || 0,
+        collectedTrash: [],
+        mapImage: record.imageUrl,
+        _originalRecord: record,
+        _error: error.message
+      };
+      
+      navigation.navigate("PloggingRecordScreen", {
+        result: fallbackData
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ✅ 쓰레기 타입 결정 함수
+  const determineTrashType = (trash) => {
+    const typeMapping = {
+      paper: "종이류",
+      can: "캔류",
+      plastic: "플라스틱",
+      vinyl: "비닐류",
+      glass: "유리병",
+      styro: "스티로폼",
+      battery: "배터리"
+    };
+    
+    // API 응답의 각 쓰레기 타입 필드를 확인
+    for (const [key, koreanName] of Object.entries(typeMapping)) {
+      if (trash[key] && trash[key] > 0) {
+        return `${koreanName} ${trash[key]}개`;
+      }
+    }
+    
+    return "일반 쓰레기";
+  };
+
+  // ✅ 쓰레기 양 결정 함수
+  const determineTrashAmount = (trash) => {
+    const total = (trash.paper || 0) + (trash.can || 0) + (trash.plastic || 0) + 
+                  (trash.vinyl || 0) + (trash.glass || 0) + (trash.styro || 0) + (trash.battery || 0);
+    
+    if (total > 10) return "많음";
+    if (total > 5) return "보통";
+    if (total > 0) return "적음";
+    return "없음";
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* 헤더 */}
@@ -76,7 +243,8 @@ export default function MyPloggingScreen() {
           <View style={styles.profileInfo}>
             <Text style={styles.nickname}>
               {user?.appNickname ? user.appNickname : "닉네임 없음"}
-            </Text>          </View>
+            </Text>          
+          </View>
           <TouchableOpacity onPress={() => navigation.navigate("MyPageMain")}>
             <Icon name="chevron-right" size={24} color="#131214" />
           </TouchableOpacity>
@@ -85,8 +253,8 @@ export default function MyPloggingScreen() {
         {/* 탭 영역 */}
         <View style={styles.tabContainer}>
           <View style={styles.tabRow}>
-            <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab("줍깅")}>
-              <Text style={activeTab === "줍깅" ? styles.activeTab : styles.inactiveTab}>줍깅 기록</Text>
+            <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab("플로깅")}>
+              <Text style={activeTab === "플로깅" ? styles.activeTab : styles.inactiveTab}>플로깅 기록</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab("신고")}>
               <Text style={activeTab === "신고" ? styles.activeTab : styles.inactiveTab}>제보 기록</Text>
@@ -98,7 +266,7 @@ export default function MyPloggingScreen() {
             <View
               style={[
                 styles.tabIndicator,
-                { left: activeTab === "줍깅" ? 0 : (screenWidth - 40) / 2 },
+                { left: activeTab === "플로깅" ? 0 : (screenWidth - 40) / 2 },
               ]}
             />
             <View style={styles.tabUnderline} />
@@ -106,7 +274,7 @@ export default function MyPloggingScreen() {
         </View>
 
         {/* 탭에 따라 다른 내용 */}
-        {activeTab === "줍깅" ? (
+        {activeTab === "플로깅" ? (
           <>
             {/* 플로깅 하러 가기 버튼 */}
             <TouchableOpacity style={styles.actionBox}>
@@ -117,25 +285,49 @@ export default function MyPloggingScreen() {
               </View>
             </TouchableOpacity>
 
+            {/* ✅ 로딩 상태 표시 */}
+            {isLoading && (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>기록을 불러오는 중...</Text>
+              </View>
+            )}
+
             {/* 플로깅 기록 리스트 */}
             <View style={styles.recordSection}>
               <Text style={styles.recordTitle}>플로깅 기록</Text>
               {ploggingRecords.length === 0 ? (
-                <Text style={{ color: "#999", textAlign: "center", marginTop: 20 }}>플로깅 기록이 없습니다.</Text>
+                <Text style={styles.emptyText}>플로깅 기록이 없습니다.</Text>
               ) : (
                 ploggingRecords.map((record) => (
-                  <View key={record.ploggingId} style={styles.recordCard}>
+                  <TouchableOpacity 
+                    key={record.ploggingId} 
+                    style={styles.recordCard}
+                    onPress={() => handlePloggingRecordPress(record)}
+                    disabled={isLoading}
+                  >
                     <View style={styles.recordContent}>
                       <Text style={styles.recordMainTitle}>
-                        {record.trailTypeName || "코스 정보 없음"}
+                        {record.displayInfo?.title || record.trailTypeName || "플로깅 기록"}
                       </Text>
+                      
+                      {/* ✅ 개선된 시간 표시 */}
                       <Text style={styles.recordDate}>
-                        {record.ploggingDate || "날짜 없음"}
+                        {record.displayInfo?.date || "날짜 정보 없음"}
                       </Text>
+                      
+                      {/* ✅ 운동 정보 표시 개선 */}
                       <Text style={styles.recordLocation}>
-                        {`거리: ${record.distance || 0}m / 시간: ${record.ploggingTime || "정보 없음"}`}
+                        {`거리: ${record.displayInfo?.distance || "0m"} / 시간: ${record.displayInfo?.time || "정보 없음"}`}
                       </Text>
+                      
+                      {/* ✅ 추가 정보 표시 */}
+                      {record.trashCount > 0 && (
+                        <Text style={styles.recordTrashInfo}>
+                          🗑️ 수집한 쓰레기: {record.trashCount}개
+                        </Text>
+                      )}
                     </View>
+                    
                     <View style={styles.recordImageContainer}>
                       <Image
                         source={
@@ -149,7 +341,7 @@ export default function MyPloggingScreen() {
                         <Image source={require("../assets/trash-02.png")} style={styles.trashIconImage} />
                       </TouchableOpacity>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))
               )}
             </View>
@@ -169,7 +361,7 @@ export default function MyPloggingScreen() {
             <View style={styles.recordSection}>
               <Text style={styles.recordTitle}>제보 기록</Text>
               {reports.length === 0 ? (
-                <Text style={{ color: "#999", textAlign: "center", marginTop: 20 }}>제보 기록이 없습니다.</Text>
+                <Text style={styles.emptyText}>제보 기록이 없습니다.</Text>
               ) : (
                 reports.map((report) => (
                   <View key={report.reportId} style={styles.recordCard}>
@@ -177,8 +369,8 @@ export default function MyPloggingScreen() {
                       <Text style={styles.recordMainTitle}>{report.title || "제목 없음"}</Text>
                       <Text style={styles.recordDate}>
                         {report.createdAt
-                          ? report.createdAt.split("T")[0]
-                          : new Date().toISOString().split("T")[0]}
+                          ? formatUserFriendlyDate(report.createdAt)
+                          : formatUserFriendlyDate(new Date().toISOString())}
                       </Text>
                       <Text style={styles.recordLocation}>{report.trailTypeName || "장소 정보 없음"}</Text>
                     </View>
@@ -324,11 +516,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#333333",
     marginBottom: 20,
+    
   },
   recordCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 10,
     padding: 20,
+    paddingTop: 16,
+    marginTop: 16,
     flexDirection: "row",
     shadowColor: "#000",
     shadowOffset: {

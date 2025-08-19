@@ -4,6 +4,8 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Dim
 import { useNavigation, useRoute } from "@react-navigation/native"
 import MapView, { Polyline, Marker } from "react-native-maps"
 import Icon from "react-native-vector-icons/MaterialIcons"
+import { getTrailDetail } from "../api/trails" // 🔥 산책로 상세정보 API 추가
+import { formatUserFriendlyDate, formatPloggingTime, formatDistance } from "../utils/timeUtils" // ✅ 시간 유틸리티 import
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -13,34 +15,15 @@ const HERO_HEIGHT = screenHeight * 0.3
 const STAT_FONT_SIZE = screenWidth * 0.035
 const TITLE_FONT_SIZE = screenWidth * 0.07
 
-// 시간을 포맷하는 헬퍼 함수
-const formatDuration = (seconds) => {
-  if (!seconds || seconds === 0) return "00:00:00"
-  
-  const hrs = Math.floor(seconds / 3600)
-  const mins = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
-  
-  return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-}
-
-// 거리를 포맷하는 헬퍼 함수
-const formatDistance = (meters) => {
-  if (!meters || meters === 0) return "0km"
-  
-  if (meters >= 1000) {
-    return `${(meters / 1000).toFixed(2)}km`
-  } else {
-    return `${(meters / 1000).toFixed(3)}km`
-  }
-}
-
 export default function PloggingRecordScreen() {
   const navigation = useNavigation()
   const route = useRoute()
   const [recordData, setRecordData] = useState(null)
   const [trashList, setTrashList] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [trailDetail, setTrailDetail] = useState(null) // 🔥 산책로 상세정보 상태 추가
+  const [currentImageIndex, setCurrentImageIndex] = useState(0) // 🔥 현재 이미지 인덱스
+  const [dataSource, setDataSource] = useState('unknown') // ✅ 데이터 소스 추적
 
   // 네비게이션 함수들
   const goToHome = () => navigation.navigate("Main")
@@ -49,36 +32,177 @@ export default function PloggingRecordScreen() {
   const goToTrashCanInfo = () => navigation.navigate("TrashCanInfo")
 
   useEffect(() => {
+    console.log("🎬 [PloggingRecord] useEffect 시작 - loadRecordData, loadTrashList 호출")
     loadRecordData()
     loadTrashList()
   }, [])
+
+  // 🔥 trailDetail이 업데이트될 때마다 이미지 상태 로깅
+  useEffect(() => {
+    if (trailDetail) {
+      console.log("📄 [PloggingRecord] trailDetail 업데이트됨:")
+      console.log("  - img1:", trailDetail.img1)
+      console.log("  - img2:", trailDetail.img2)
+      console.log("  - 기타 이미지 필드들:", {
+        imageUrl: trailDetail.imageUrl,
+        image: trailDetail.image,
+        images: trailDetail.images,
+        picture: trailDetail.picture,
+        photo: trailDetail.photo
+      })
+    }
+  }, [trailDetail])
+
+  // 🔥 산책로 상세정보 로드 함수 추가
+  const loadTrailDetail = async (trailId) => {
+    try {
+      console.log("🔍 [PloggingRecord] 산책로 상세정보 로드 시작:", trailId)
+      console.log("🔍 [PloggingRecord] trailId 타입:", typeof trailId)
+      console.log("🔍 [PloggingRecord] trailId 값:", JSON.stringify(trailId))
+      
+      const detail = await getTrailDetail(trailId)
+      console.log("✅ [PloggingRecord] 산책로 상세정보 로드 성공")
+      console.log("📋 [PloggingRecord] 상세정보 전체:", JSON.stringify(detail, null, 2))
+      console.log("🖼️ [PloggingRecord] img1:", detail?.img1)
+      console.log("🖼️ [PloggingRecord] img2:", detail?.img2)
+      console.log("🖼️ [PloggingRecord] imageUrl:", detail?.imageUrl)
+      console.log("🖼️ [PloggingRecord] 모든 이미지 관련 필드:", {
+        img1: detail?.img1,
+        img2: detail?.img2,
+        imageUrl: detail?.imageUrl,
+        image: detail?.image,
+        images: detail?.images,
+        picture: detail?.picture,
+        photo: detail?.photo
+      })
+      
+      setTrailDetail(detail)
+      return detail
+    } catch (error) {
+      console.error("❌ [PloggingRecord] 산책로 상세정보 로드 실패:", error)
+      console.error("❌ [PloggingRecord] 에러 상세:", error.message)
+      console.error("❌ [PloggingRecord] 에러 스택:", error.stack)
+      return null
+    }
+  }
+
+  // 🔥 이미지 배열 생성 함수 (산책로 이미지만)
+  const getHeroImages = () => {
+    console.log("🖼️ [PloggingRecord] getHeroImages 호출")
+    console.log("🔍 [PloggingRecord] trailDetail 상태:", !!trailDetail)
+    console.log("🔍 [PloggingRecord] trailDetail 전체:", JSON.stringify(trailDetail, null, 2))
+    
+    const images = []
+    
+    // 🔥 산책로 이미지들만 추가 (img1, img2)
+    if (trailDetail?.img1) {
+      console.log("✅ [PloggingRecord] img1 추가:", trailDetail.img1)
+      images.push({
+        uri: trailDetail.img1,
+        type: 'trail',
+        label: '🏞️ 산책로 이미지 1'
+      })
+    } else {
+      console.log("❌ [PloggingRecord] img1 없음")
+    }
+    
+    if (trailDetail?.img2) {
+      console.log("✅ [PloggingRecord] img2 추가:", trailDetail.img2)
+      images.push({
+        uri: trailDetail.img2,
+        type: 'trail',
+        label: '🏞️ 산책로 이미지 2'
+      })
+    } else {
+      console.log("❌ [PloggingRecord] img2 없음")
+    }
+    
+    // ✅ 플로깅 기록 이미지도 추가 (있는 경우)
+    if (recordData?.mapImage && recordData.mapImage !== trailDetail?.img1 && recordData.mapImage !== trailDetail?.img2) {
+      console.log("✅ [PloggingRecord] 플로깅 기록 이미지 추가:", recordData.mapImage)
+      images.push({
+        uri: recordData.mapImage,
+        type: 'plogging',
+        label: '📸 플로깅 기록 이미지'
+      })
+    }
+    
+    // 이미지가 없으면 기본 이미지
+    if (images.length === 0) {
+      console.log("⚠️ [PloggingRecord] 이미지가 없어 기본 이미지 사용")
+      images.push({
+        uri: "https://via.placeholder.com/400x250/4CAF50/FFFFFF?text=Plogging+Record",
+        type: 'placeholder',
+        label: '🏞️ 플로깅 기록'
+      })
+    }
+    
+    console.log("📋 [PloggingRecord] 최종 이미지 배열:", images.map(img => ({
+      type: img.type,
+      label: img.label,
+      hasUri: !!img.uri
+    })))
+    
+    return images
+  }
 
   const loadRecordData = async () => {
     try {
       setIsLoading(true)
       
-      // route.params에서 전달받은 데이터가 있는지 확인
+      // ✅ route.params에서 전달받은 데이터가 있는지 확인
       if (route.params?.result) {
         console.log("Using passed result data:", route.params.result)
         
-        // 전달받은 플로깅 결과를 적절한 형태로 변환
+        // ✅ 데이터 소스 확인
         const result = route.params.result;
+        
+        if (result._detailData) {
+          console.log("📊 [PloggingRecord] 마이페이지에서 온 상세 데이터")
+          setDataSource('mypage')
+        } else {
+          console.log("📊 [PloggingRecord] 플로깅 종료 후 실시간 데이터")
+          setDataSource('realtime')
+        }
+        
+        // 전달받은 플로깅 결과를 적절한 형태로 변환
         const transformedData = {
-          id: Date.now(),
-          title: result.routeName || "플로깅 기록",
-          date: new Date().toLocaleDateString('ko-KR').replace(/\. /g, '.').replace(/\.$/, ''),
-          location: result.routeLocation || "플로깅 경로",
-          duration: formatDuration(result.totalTime || 0),
-          distance: formatDistance(result.totalDistance || 0),
+          id: result.ploggingId || Date.now(),
+          title: result.title || result.routeName || "플로깅 기록",
+          date: result.date || formatUserFriendlyDate(new Date().toISOString()),
+          location: result.location || result.routeLocation || "플로깅 경로",
+          duration: result.duration || formatPloggingTime(result.totalTime || 0),
+          distance: result.distance || formatDistance(result.totalDistance || 0),
           trashCount: result.trashCount || 0,
-          difficulty: "보통", // 기본값 설정
-          route: result.routeCoordinates || [],
+          difficulty: result.difficulty || "보통",
+          route: result.route || result.routeCoordinates || [],
           trashLocations: result.trashLocations || [],
-          mapImage: result.mapImage,
+          mapImage: result.mapImage || result.routeImage,
           routeImage: result.routeImage || result.mapImage,
+          startTime: result.startTime,
+          endTime: result.endTime,
+          trailId: result.trailId,
+          
+          // ✅ 원본 데이터 보존
+          _original: result,
+          _dataSource: dataSource
         };
         
+        console.log("📋 [PloggingRecord] 변환된 데이터:", {
+          ...transformedData,
+          hasMapImage: !!transformedData.mapImage,
+          hasTrailDetail: !!trailDetail,
+          trailId: transformedData.trailId,
+          dataSource: dataSource
+        });
+        
         setRecordData(transformedData);
+        
+        // 🔥 산책로 ID가 있으면 상세정보 로드
+        if (result.trailId) {
+          console.log("🔍 [PloggingRecord] 산책로 ID 발견, 상세정보 로드:", result.trailId)
+          await loadTrailDetail(result.trailId)
+        }
         
         // 수집된 쓰레기 목록도 설정
         if (result.collectedTrash && result.collectedTrash.length > 0) {
@@ -92,9 +216,9 @@ export default function PloggingRecordScreen() {
         return;
       }
       
-      // API 호출로 실제 데이터 로드 (route.params가 없는 경우)
-      // const response = await fetch(`https://your-api.com/api/plogging/records/${recordId}`)
-      // const data = await response.json()
+      // ✅ API 호출로 실제 데이터 로드 (route.params가 없는 경우)
+      console.log("⚠️ [PloggingRecord] route.params 없음, 기본 데이터 사용")
+      setDataSource('fallback')
       
       // 시뮬레이션: 더미 데이터 사용
       await new Promise(resolve => setTimeout(resolve, 500))
@@ -102,10 +226,10 @@ export default function PloggingRecordScreen() {
       const dummyData = {
         id: 1,
         title: "남산",
-        date: "25.07.07",
+        date: formatUserFriendlyDate(new Date().toISOString()),
         location: "서울",
-        duration: "00:48:30",
-        distance: "5.11km",
+        duration: formatPloggingTime("2910"), // 48분 30초
+        distance: formatDistance(5110), // 5.11km
         trashCount: 0,
         difficulty: "쉬움",
         route: [
@@ -115,6 +239,7 @@ export default function PloggingRecordScreen() {
         ],
         routeImage: "https://example.com/route-image.jpg",
         mapImage: null,
+        _dataSource: 'fallback'
       }
       
       setRecordData(dummyData)
@@ -123,13 +248,14 @@ export default function PloggingRecordScreen() {
       // 에러 시 빈 데이터
       const emptyData = {
         title: "플로깅 기록 없음",
-        date: new Date().toLocaleDateString('ko-KR'),
+        date: formatUserFriendlyDate(new Date().toISOString()),
         location: "기록된 경로가 없습니다",
-        duration: "00:00:00",
-        distance: "0km",
+        duration: formatPloggingTime(0),
+        distance: formatDistance(0),
         trashCount: 0,
         difficulty: "없음",
         route: [],
+        _dataSource: 'error'
       }
       setRecordData(emptyData)
     } finally {
@@ -139,20 +265,33 @@ export default function PloggingRecordScreen() {
 
   const loadTrashList = async () => {
     try {
-      // route.params에서 전달받은 결과 데이터가 있는지 확인
+      // ✅ route.params에서 전달받은 결과 데이터가 있는지 확인
       if (route.params?.result) {
         // 실제 플로깅 결과에서 수집된 쓰레기 목록 사용
         const result = route.params.result;
         if (result.collectedTrash && result.collectedTrash.length > 0) {
-          console.log("Using collected trash data from plogging result:", result.collectedTrash)
+          console.log("✅ [PloggingRecord] 수집된 쓰레기 데이터 사용:", result.collectedTrash)
+          
           const formattedTrashList = result.collectedTrash.map((trash, index) => ({
             id: trash.id || (index + 1),
             number: (index + 1).toString(),
             type: trash.type,
             location: trash.location,
             tag: "수집됨",
-            image: "https://via.placeholder.com/75x75/E8F5E8/4CAF50?text=Collected"
+            image: "https://via.placeholder.com/75x75/E8F5E8/4CAF50?text=Collected",
+            
+            // ✅ 스웨거 응답의 쓰레기 세부 정보 추가
+            details: {
+              paper: trash.paper || 0,
+              can: trash.can || 0,
+              plastic: trash.plastic || 0,
+              vinyl: trash.vinyl || 0,
+              glass: trash.glass || 0,
+              styro: trash.styro || 0,
+              battery: trash.battery || 0
+            }
           }));
+          
           setTrashList(formattedTrashList);
           return;
         } else {
@@ -162,9 +301,8 @@ export default function PloggingRecordScreen() {
         }
       }
       
-      // API 호출로 쓰레기 목록 로드 (route.params가 없는 경우에만)
-      // const response = await fetch(`https://your-api.com/api/plogging/records/${recordId}/trash`)
-      // const data = await response.json()
+      // ✅ API 호출로 쓰레기 목록 로드 (route.params가 없는 경우에만)
+      console.log("⚠️ [PloggingRecord] route.params 없음, 더미 쓰레기 데이터 사용")
       
       // 시뮬레이션: 더미 데이터 (실제 플로깅 데이터가 없을 때만 사용)
       const dummyTrashList = [
@@ -174,15 +312,17 @@ export default function PloggingRecordScreen() {
           type: "플라스틱 병",
           location: "플라스틱 병 외 7개",
           tag: "많음",
-          image: "https://example.com/trash1.jpg"
+          image: "https://via.placeholder.com/75x75/E8F5E8/4CAF50?text=Trash",
+          details: { plastic: 8, can: 0, paper: 0, vinyl: 0, glass: 0, styro: 0, battery: 0 }
         },
         {
           id: 2,
           number: "2",
-          type: "나무 잎 쓰레기",
+          type: "나무잎 쓰레기",
           location: "유리병 외 7개",
           tag: "적음",
-          image: "https://example.com/trash2.jpg"
+          image: "https://via.placeholder.com/75x75/E8F5E8/4CAF50?text=Trash",
+          details: { glass: 8, can: 0, paper: 0, vinyl: 0, plastic: 0, styro: 0, battery: 0 }
         }
       ];
       
@@ -192,6 +332,30 @@ export default function PloggingRecordScreen() {
       setTrashList([])
     }
   }
+
+  // ✅ 쓰레기 세부 정보를 한국어로 변환하는 함수
+  const formatTrashDetails = (details) => {
+    if (!details) return "상세 정보 없음";
+    
+    const typeMapping = {
+      paper: "종이",
+      can: "캔",
+      plastic: "플라스틱",
+      vinyl: "비닐",
+      glass: "유리",
+      styro: "스티로폼",
+      battery: "배터리"
+    };
+    
+    const items = [];
+    for (const [key, koreanName] of Object.entries(typeMapping)) {
+      if (details[key] && details[key] > 0) {
+        items.push(`${koreanName} ${details[key]}개`);
+      }
+    }
+    
+    return items.length > 0 ? items.join(', ') : "수집된 쓰레기 없음";
+  };
 
   if (isLoading) {
     return (
@@ -223,19 +387,64 @@ export default function PloggingRecordScreen() {
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
       >
-        {/* 대표 이미지 */}
+        {/* 🔥 개선된 히어로 이미지 스크롤뷰 */}
         <View style={styles.heroImageContainer}>
-          <Image 
-            source={{ uri: "https://via.placeholder.com/400x250/4CAF50/FFFFFF?text=Seoul+Tower" }}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
-          {/* 페이지 인디케이터 */}
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(event) => {
+              const newIndex = Math.round(event.nativeEvent.contentOffset.x / screenWidth)
+              setCurrentImageIndex(newIndex)
+            }}
+            style={styles.imageScrollView}
+          >
+            {getHeroImages().map((image, index) => (
+              <View key={index} style={styles.imageSlide}>
+                <Image 
+                  source={{ uri: image.uri }}
+                  style={styles.heroImage}
+                  resizeMode="cover"
+                  onLoadStart={() => {
+                    console.log(`📄 [PloggingRecord] 이미지 ${index + 1} 로드 시작:`, image.uri)
+                  }}
+                  onLoad={() => {
+                    console.log(`✅ [PloggingRecord] 이미지 ${index + 1} 로드 성공:`, image.label)
+                  }}
+                  onError={(error) => {
+                    console.error(`❌ [PloggingRecord] 이미지 ${index + 1} 로드 실패:`, image.uri, error.nativeEvent)
+                  }}
+                />
+                {/* 이미지 타입 라벨 */}
+                <View style={styles.imageTypeLabel}>
+                  <Text style={styles.imageLabelText}>{image.label}</Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+          
+          {/* 🔥 개선된 페이지 인디케이터 */}
           <View style={styles.pageIndicator}>
-            <View style={[styles.indicatorDot, styles.activeDot]} />
-            <View style={styles.indicatorDot} />
+            {getHeroImages().map((_, index) => (
+              <View 
+                key={index} 
+                style={[
+                  styles.indicatorDot, 
+                  index === currentImageIndex && styles.activeDot
+                ]} 
+              />
+            ))}
           </View>
         </View>
+
+        {/* ✅ 데이터 소스 디버그 정보 (개발용) */}
+        {__DEV__ && recordData?._dataSource && (
+          <View style={styles.debugInfo}>
+            <Text style={styles.debugText}>
+              데이터 소스: {recordData._dataSource} | 이미지 수: {getHeroImages().length}
+            </Text>
+          </View>
+        )}
 
         {/* 기본 정보 */}
         <View style={styles.mainInfoSection}>
@@ -262,6 +471,36 @@ export default function PloggingRecordScreen() {
           </View>
         </View>
 
+        {/* 🔥 플로깅 경로 이미지 섹션 - 원래 자리로 복원 */}
+        {recordData.mapImage && (
+          <View style={styles.routeImageSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>플로깅 경로</Text>
+              <Text style={styles.sectionSubtitle}>이번 플로깅에서 이동한 경로입니다</Text>
+            </View>
+            <View style={styles.routeImageContainer}>
+              <Image 
+                source={{ uri: recordData.mapImage }}
+                style={styles.routeImage}
+                resizeMode="cover"
+                onLoadStart={() => {
+                  console.log("📄 [PloggingRecord] 경로 이미지 로드 시작:", recordData.mapImage)
+                }}
+                onLoad={() => {
+                  console.log("✅ [PloggingRecord] 경로 이미지 로드 성공")
+                }}
+                onError={(error) => {
+                  console.error("❌ [PloggingRecord] 경로 이미지 로드 실패:", recordData.mapImage, error.nativeEvent)
+                }}
+              />
+              <View style={styles.routeImageOverlay}>
+                <Icon name="route" size={24} color="#FFFFFF" />
+                <Text style={styles.routeImageText}>총 거리: {recordData.distance}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* 주운 쓰레기 섹션 */}
         <View style={styles.trashSection}>
           <View style={styles.sectionHeader}>
@@ -279,6 +518,14 @@ export default function PloggingRecordScreen() {
                   <View style={styles.trashInfo}>
                     <Text style={styles.trashType}>{trash.type}</Text>
                     <Text style={styles.trashLocation}>{trash.location}</Text>
+                    
+                    {/* ✅ 쓰레기 세부 정보 표시 */}
+                    {trash.details && (
+                      <Text style={styles.trashDetails}>
+                        {formatTrashDetails(trash.details)}
+                      </Text>
+                    )}
+                    
                     <View style={styles.trashTagContainer}>
                       <Text style={styles.trashTag}>#{trash.tag}</Text>
                     </View>
@@ -286,7 +533,7 @@ export default function PloggingRecordScreen() {
                 </View>
                 <View style={styles.trashImageContainer}>
                   <Image 
-                    source={{ uri: "https://via.placeholder.com/75x75/E8F5E8/4CAF50?text=Trash" }}
+                    source={{ uri: trash.image || "https://via.placeholder.com/75x75/E8F5E8/4CAF50?text=Trash" }}
                     style={styles.trashImage} 
                   />
                 </View>
@@ -356,6 +603,17 @@ const styles = StyleSheet.create({
     height: HERO_HEIGHT,
     position: 'relative',
   },
+  
+  // 🔥 새로운 스크롤뷰 스타일들
+  imageScrollView: {
+    flex: 1,
+  },
+  imageSlide: {
+    width: screenWidth,
+    height: '100%',
+    position: 'relative',
+  },
+  
   heroImage: {
     width: '100%',
     height: '100%',
@@ -378,6 +636,23 @@ const styles = StyleSheet.create({
   activeDot: {
     backgroundColor: '#4CAF50',
   },
+  
+  // 🔥 이미지 타입 라벨 스타일 수정
+  imageTypeLabel: {
+    position: 'absolute',
+    top: screenHeight * 0.02,
+    right: screenWidth * 0.04,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  imageLabelText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
   mainInfoSection: {
     paddingHorizontal: PADDING_H,
     paddingVertical: screenHeight * 0.03,

@@ -22,8 +22,15 @@ export default function HomeStackNavigator() {
         options={{ headerShown: false }}
       />
 
+      {/* ✅ PloggingRecord와 PloggingRecordScreen 둘 다 등록 (호환성) */}
       <Stack.Screen
         name="PloggingRecord"
+        component={PloggingRecordScreen}
+        options={{ headerShown: false }}
+      />
+
+      <Stack.Screen
+        name="PloggingRecordScreen"
         component={PloggingRecordScreen}
         options={{ headerShown: false }}
       />

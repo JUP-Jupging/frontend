@@ -17,6 +17,9 @@ export const PloggingProvider = ({ children }) => {
   // [로직 추가] 수집한 쓰레기 목록을 저장할 상태
   const [collectedTrash, setCollectedTrash] = useState([]);
   
+  // 🔥 [새로 추가] 현재 플로깅 중인 산책로 정보
+  const [currentTrailInfo, setCurrentTrailInfo] = useState(null);
+  
   const contextRef = useRef({ isActive: true });
   
   useEffect(() => {
@@ -48,11 +51,18 @@ export const PloggingProvider = ({ children }) => {
   }, [ploggingHook.status]);
 
   const actions = {
-    startPlogging: async () => {
+    // 🔥 [수정] 플로깅 시작 시 산책로 정보도 함께 저장
+    startPlogging: async (trailInfo = null) => {
       if (!contextRef.current.isActive) return false;
       try {
         const location = await locationHook.getCurrentLocation();
         if (location && contextRef.current.isActive) {
+          // 🔥 산책로 정보 저장
+          if (trailInfo) {
+            setCurrentTrailInfo(trailInfo);
+            console.log('🎯 [PloggingContext] 산책로 정보 설정:', trailInfo);
+          }
+          
           ploggingHook.startPlogging();
           locationHook.startLocationTracking(true);
           return true;
@@ -75,11 +85,14 @@ export const PloggingProvider = ({ children }) => {
       ploggingHook.resumePlogging();
       locationHook.startLocationTracking(true);
     },
+    // 🔥 [수정] 플로깅 종료 시 산책로 정보도 초기화
     endPlogging: () => {
       const result = {
         // ... (기존 데이터)
         // [로직 수정] 수집한 쓰레기 목록을 최종 결과에 포함
         collectedTrash: [...collectedTrash],
+        // 🔥 현재 산책로 정보도 결과에 포함
+        trailInfo: currentTrailInfo,
       };
       
       locationHook.stopLocationTracking();
@@ -89,6 +102,8 @@ export const PloggingProvider = ({ children }) => {
       setTrashLocations([]);
       // [로직 추가] 플로깅 종료 시 수집한 쓰레기 목록 초기화
       setCollectedTrash([]);
+      // 🔥 산책로 정보도 초기화
+      setCurrentTrailInfo(null);
 
       return result;
     },
@@ -108,6 +123,11 @@ export const PloggingProvider = ({ children }) => {
     removeTrash: (trashId) => {
       if (!contextRef.current.isActive) return;
       setTrashLocations(prev => prev.filter(t => t.id !== trashId));
+    },
+    // 🔥 [새로 추가] 산책로 정보 설정 함수
+    setCurrentTrailInfo: (trailInfo) => {
+      if (!contextRef.current.isActive) return;
+      setCurrentTrailInfo(trailInfo);
     }
   };
 
@@ -127,6 +147,9 @@ export const PloggingProvider = ({ children }) => {
 
     // [로직 추가] 수집된 쓰레기 목록 상태를 외부로 노출
     collectedTrash,
+    
+    // 🔥 [새로 추가] 현재 산책로 정보 노출
+    currentTrailInfo,
 
     ...actions,
   };

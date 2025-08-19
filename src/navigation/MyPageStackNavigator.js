@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MyPageScreen from '../screens/MyPageScreen';
 import MyPloggingScreen from '../screens/MyPloggingScreen';
 import ChangeNicknameScreen from '../screens/ChangeNicknameScreen';
+import PloggingRecordScreen from '../screens/PloggingRecordScreen'; // ✅ 추가
 
 const Stack = createNativeStackNavigator();
 
@@ -29,7 +30,12 @@ export default function MyPageStackNavigator() {
         options={{ title: '닉네임 변경', headerShown: false }}
       />
 
-
+      {/* ✅ PloggingRecordScreen 추가 - 마이페이지에서 플로깅 기록 상세보기용 */}
+      <Stack.Screen
+        name="PloggingRecordScreen"
+        component={PloggingRecordScreen}
+        options={{ title: '플로깅 기록 상세', headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }
