@@ -18,7 +18,7 @@ import {
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
 import MapView, { Marker } from "react-native-maps"
 import Geolocation from 'react-native-geolocation-service'
-import { getTrailDetail } from "../API/trails"
+import { getTrailDetail } from "../api/trails"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
