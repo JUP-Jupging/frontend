@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialCommunityIcons"
-import { getTrails, searchTrails, testConnection } from "../API/trails"
+import { getTrails, searchTrails, testConnection } from "../api/trails"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
