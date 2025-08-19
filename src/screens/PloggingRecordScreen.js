@@ -36,6 +36,7 @@ export default function PloggingRecordScreen() {
     loadRecordData()
     loadTrashList()
   }, [])
+  
 
   // 🔥 trailDetail이 업데이트될 때마다 이미지 상태 로깅
   useEffect(() => {
@@ -152,7 +153,7 @@ export default function PloggingRecordScreen() {
       
       // ✅ route.params에서 전달받은 데이터가 있는지 확인
       if (route.params?.result) {
-        console.log("Using passed result data:", route.params.result)
+        console.log("✅ [PloggingRecord] 플로깅 결과 데이터 수신:", route.params.result)
         
         // ✅ 데이터 소스 확인
         const result = route.params.result;
@@ -177,25 +178,13 @@ export default function PloggingRecordScreen() {
           difficulty: result.difficulty || "보통",
           route: result.route || result.routeCoordinates || [],
           trashLocations: result.trashLocations || [],
-          mapImage: result.mapImage || result.routeImage,
-          routeImage: result.routeImage || result.mapImage,
+          mapImage: result.mapImage, // 🔥 캡처된 지도 이미지
+          routeImage: result.routeImage || result.mapImage, // 🔥 경로 이미지
           startTime: result.startTime,
           endTime: result.endTime,
-          trailId: result.trailId,
-          
-          // ✅ 원본 데이터 보존
-          _original: result,
-          _dataSource: dataSource
         };
         
-        console.log("📋 [PloggingRecord] 변환된 데이터:", {
-          ...transformedData,
-          hasMapImage: !!transformedData.mapImage,
-          hasTrailDetail: !!trailDetail,
-          trailId: transformedData.trailId,
-          dataSource: dataSource
-        });
-        
+        console.log("📋 [PloggingRecord] 변환된 데이터:", transformedData);
         setRecordData(transformedData);
         
         // 🔥 산책로 ID가 있으면 상세정보 로드
@@ -244,7 +233,7 @@ export default function PloggingRecordScreen() {
       
       setRecordData(dummyData)
     } catch (error) {
-      console.error("Failed to load record data:", error)
+      console.error("❌ [PloggingRecord] 기록 데이터 로드 실패:", error)
       // 에러 시 빈 데이터
       const emptyData = {
         title: "플로깅 기록 없음",
@@ -271,12 +260,11 @@ export default function PloggingRecordScreen() {
         const result = route.params.result;
         if (result.collectedTrash && result.collectedTrash.length > 0) {
           console.log("✅ [PloggingRecord] 수집된 쓰레기 데이터 사용:", result.collectedTrash)
-          
           const formattedTrashList = result.collectedTrash.map((trash, index) => ({
             id: trash.id || (index + 1),
             number: (index + 1).toString(),
-            type: trash.type,
-            location: trash.location,
+            type: trash.type || trash.title || "쓰레기",
+            location: trash.location || `${trash.amount || '보통'} 크기`,
             tag: "수집됨",
             image: "https://via.placeholder.com/75x75/E8F5E8/4CAF50?text=Collected",
             
@@ -295,7 +283,7 @@ export default function PloggingRecordScreen() {
           setTrashList(formattedTrashList);
           return;
         } else {
-          console.log("No trash collected during plogging")
+          console.log("ℹ️ [PloggingRecord] 수집된 쓰레기 없음")
           setTrashList([]);
           return;
         }
@@ -328,7 +316,7 @@ export default function PloggingRecordScreen() {
       
       setTrashList(dummyTrashList);
     } catch (error) {
-      console.error("Failed to load trash list:", error)
+      console.error("❌ [PloggingRecord] 쓰레기 목록 로드 실패:", error)
       setTrashList([])
     }
   }
@@ -387,43 +375,22 @@ export default function PloggingRecordScreen() {
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
       >
-        {/* 🔥 개선된 히어로 이미지 스크롤뷰 */}
+        {/* 🔥 캡처된 지도 이미지 또는 대표 이미지 */}
         <View style={styles.heroImageContainer}>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(event) => {
-              const newIndex = Math.round(event.nativeEvent.contentOffset.x / screenWidth)
-              setCurrentImageIndex(newIndex)
-            }}
-            style={styles.imageScrollView}
-          >
-            {getHeroImages().map((image, index) => (
-              <View key={index} style={styles.imageSlide}>
-                <Image 
-                  source={{ uri: image.uri }}
-                  style={styles.heroImage}
-                  resizeMode="cover"
-                  onLoadStart={() => {
-                    console.log(`📄 [PloggingRecord] 이미지 ${index + 1} 로드 시작:`, image.uri)
-                  }}
-                  onLoad={() => {
-                    console.log(`✅ [PloggingRecord] 이미지 ${index + 1} 로드 성공:`, image.label)
-                  }}
-                  onError={(error) => {
-                    console.error(`❌ [PloggingRecord] 이미지 ${index + 1} 로드 실패:`, image.uri, error.nativeEvent)
-                  }}
-                />
-                {/* 이미지 타입 라벨 */}
-                <View style={styles.imageTypeLabel}>
-                  <Text style={styles.imageLabelText}>{image.label}</Text>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-          
-          {/* 🔥 개선된 페이지 인디케이터 */}
+          {recordData.mapImage ? (
+            <Image 
+              source={{ uri: recordData.mapImage }}
+              style={styles.heroImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <Image 
+              source={{ uri: "https://via.placeholder.com/400x250/4CAF50/FFFFFF?text=Plogging+Route" }}
+              style={styles.heroImage}
+              resizeMode="cover"
+            />
+          )}
+          {/* 페이지 인디케이터 */}
           <View style={styles.pageIndicator}>
             {getHeroImages().map((_, index) => (
               <View 
@@ -471,7 +438,7 @@ export default function PloggingRecordScreen() {
           </View>
         </View>
 
-        {/* 🔥 플로깅 경로 이미지 섹션 - 원래 자리로 복원 */}
+        {/* 🔥 경로 이미지 섹션 - 통계 정보와 주운 쓰레기 사이에 추가 */}
         {recordData.mapImage && (
           <View style={styles.routeImageSection}>
             <View style={styles.sectionHeader}>
@@ -483,15 +450,6 @@ export default function PloggingRecordScreen() {
                 source={{ uri: recordData.mapImage }}
                 style={styles.routeImage}
                 resizeMode="cover"
-                onLoadStart={() => {
-                  console.log("📄 [PloggingRecord] 경로 이미지 로드 시작:", recordData.mapImage)
-                }}
-                onLoad={() => {
-                  console.log("✅ [PloggingRecord] 경로 이미지 로드 성공")
-                }}
-                onError={(error) => {
-                  console.error("❌ [PloggingRecord] 경로 이미지 로드 실패:", recordData.mapImage, error.nativeEvent)
-                }}
               />
               <View style={styles.routeImageOverlay}>
                 <Icon name="route" size={24} color="#FFFFFF" />
@@ -549,11 +507,6 @@ export default function PloggingRecordScreen() {
 
         {/* 하단 버튼들 */}
         <View style={styles.bottomButtons}>
-          {/* <TouchableOpacity style={styles.ploggingButton} onPress={goToPloggingStart}>
-            <Icon name="add" size={24} color="#FFFFFF" />
-            <Text style={styles.ploggingButtonText}>플로깅 더하기</Text>
-          </TouchableOpacity> */}
-          
           <TouchableOpacity style={styles.trashCanButton} onPress={goToTrashCanInfo}>
             <Icon name="delete-outline" size={24} color="#333333" />
             <Text style={styles.trashCanButtonText}>근처 쓰레기통 찾기</Text>
@@ -686,6 +639,45 @@ const styles = StyleSheet.create({
     color: "#333333",
     textAlign: "center",
   },
+
+  // 🔥 경로 이미지 섹션 스타일 추가
+  routeImageSection: {
+    paddingHorizontal: PADDING_H,
+    paddingVertical: screenHeight * 0.02,
+    backgroundColor: "#F8F9FA",
+  },
+  routeImageContainer: {
+    borderRadius: screenWidth * 0.03,
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  routeImage: {
+    width: '100%',
+    height: screenHeight * 0.25,
+  },
+  routeImageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingVertical: screenHeight * 0.015,
+    paddingHorizontal: screenWidth * 0.04,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  routeImageText: {
+    color: '#FFFFFF',
+    fontSize: screenWidth * 0.04,
+    fontWeight: '600',
+    marginLeft: screenWidth * 0.02,
+  },
+
   trashSection: {
     paddingHorizontal: PADDING_H,
     paddingTop: screenHeight * 0.02,
@@ -792,20 +784,6 @@ const styles = StyleSheet.create({
     paddingTop: screenHeight * 0.03,
     gap: screenHeight * 0.015,
   },
-  ploggingButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#4CAF50",
-    borderRadius: screenWidth * 0.03,
-    paddingVertical: screenHeight * 0.02,
-    gap: screenWidth * 0.02,
-  },
-  ploggingButtonText: {
-    fontSize: screenWidth * 0.04,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
   trashCanButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -820,5 +798,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#333333",
   },
-  // 하단 네비게이션 바 관련 스타일 제거
-})
+});
