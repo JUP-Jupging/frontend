@@ -1,215 +1,109 @@
-"use client"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
+import { useFocusEffect } from "@react-navigation/native"
+import axios from "axios"
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   Image,
   Dimensions,
-  ActivityIndicator,
   SafeAreaView,
+  TextInput,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Modal,
+  FlatList,
+  ActivityIndicator,
 } from "react-native"
 import Icon from "react-native-vector-icons/MaterialIcons"
-import DropDownPicker from "react-native-dropdown-picker"
+import { useLocation } from "../hooks/useLocation"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
-// 더미 코스 데이터 (reportCount 추가)
-const DUMMY_COURSES = [
-  {
-    id: "1",
-    name: "국립 중앙 박물관",
-    address: "서울 용산구 서빙고로 137 국립중앙박물관",
-    difficulty: "쉬움",
-    region: "서울",
-    image: "/placeholder.svg?height=50&width=50",
-    distance: "7.1", // km
-    duration: "1시간30분",
-    reportCount: 5,
-  },
-  {
-    id: "2",
-    name: "남산",
-    address: "서울 중구 회현동1가",
-    difficulty: "어려움",
-    region: "서울",
-    image: "/placeholder.svg?height=50&width=50",
-    distance: "5.2",
-    duration: "2시간",
-    reportCount: 2,
-  },
-  {
-    id: "3",
-    name: "한강공원 여의도",
-    address: "서울 영등포구 여의동로 330",
-    difficulty: "쉬움",
-    region: "서울",
-    image: "/placeholder.svg?height=50&width=50",
-    distance: "8.5",
-    duration: "2시간30분",
-    reportCount: 10,
-  },
-  {
-    id: "4",
-    name: "청계천 산책로",
-    address: "서울 중구 청계천로 1",
-    difficulty: "쉬움",
-    region: "서울",
-    image: "/placeholder.svg?height=50&width=50",
-    distance: "6.3",
-    duration: "1시간45분",
-    reportCount: 7,
-  },
-]
-
-// 지역 옵션
-const REGION_OPTIONS = [
-  { label: "지역", value: null },
-  { label: "서울", value: "서울" },
-  { label: "부산", value: "부산" },
-  { label: "대구", value: "대구" },
-  { label: "인천", value: "인천" },
-  { label: "광주", value: "광주" },
-  { label: "대전", value: "대전" },
-  { label: "울산", value: "울산" },
-  { label: "세종", value: "세종" },
-  { label: "경기", value: "경기" },
-  { label: "제주", value: "제주" },
-]
-
-// 난이도 옵션
-const DIFFICULTY_OPTIONS = [
-  { label: "난이도", value: null },
-  { label: "쉬움", value: "쉬움" },
-  { label: "보통", value: "보통" },
-  { label: "어려움", value: "어려움" },
-]
-
-// 정렬 옵션
-const SORT_OPTIONS = [
-  { label: "전체", value: "all" },
-  { label: "가까운순", value: "distance" },
-  { label: "쓰레기 많은순", value: "trash" },
-]
-
 export default function RecommendCourseScreen({ navigation }) {
-  const [tab, setTab] = useState("전체")
-  const [courses, setCourses] = useState([])
-  const [filteredCourses, setFilteredCourses] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
+  const [showStoryInput, setShowStoryInput] = useState(false)
+  const [story, setStory] = useState("")
+  const [inputSubmitted, setInputSubmitted] = useState(false)
 
-  // 필터 상태
-  const [regionOpen, setRegionOpen] = useState(false)
-  const [regionValue, setRegionValue] = useState(null)
-  const [regionItems, setRegionItems] = useState(REGION_OPTIONS)
+  // 추천 결과 모달 관련 state
+  const [modalVisible, setModalVisible] = useState(false)
+  const [recommendResults, setRecommendResults] = useState([])
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [loadingRecommend, setLoadingRecommend] = useState(false)
 
-  const [difficultyOpen, setDifficultyOpen] = useState(false)
-  const [difficultyValue, setDifficultyValue] = useState(null)
-  const [difficultyItems, setDifficultyItems] = useState(DIFFICULTY_OPTIONS)
-
-  const [sortOpen, setSortOpen] = useState(false)
-  const [sortValue, setSortValue] = useState("all")
-  const [sortItems, setSortItems] = useState(SORT_OPTIONS)
-
-  // DB에서 코스 데이터 가져오기
-  const fetchCourses = async () => {
-    try {
-      setLoading(true)
-      // 실제 API 호출 (예시)
-      // const response = await fetch('https://your-api.com/api/courses');
-      // const data = await response.json();
-
-      // 시뮬레이션: 항상 더미 데이터 사용 (테스트용)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setCourses(DUMMY_COURSES)
-      setFilteredCourses(DUMMY_COURSES)
-    } catch (error) {
-      setCourses(DUMMY_COURSES)
-      setFilteredCourses(DUMMY_COURSES)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // 필터 적용
-  const applyFilters = () => {
-    let filtered = [...courses]
-    if (regionValue) {
-      filtered = filtered.filter((course) => course.region === regionValue)
-    }
-    if (difficultyValue) {
-      filtered = filtered.filter((course) => course.difficulty === difficultyValue)
-    }
-    // 정렬
-    if (sortValue === "distance") {
-      filtered = filtered.sort((a, b) => {
-        const aDist = parseFloat(a.distance)
-        const bDist = parseFloat(b.distance)
-        return aDist - bDist
-      })
-    } else if (sortValue === "trash") {
-      filtered = filtered.sort((a, b) => b.reportCount - a.reportCount)
-    }
-    // 전체는 필터만 적용, 정렬 없음
-    setFilteredCourses(filtered)
-  }
-
-  useEffect(() => {
-    fetchCourses()
-  }, [])
-
-  useEffect(() => {
-    applyFilters()
-  }, [regionValue, difficultyValue, sortValue, courses])
+  // 위치 hook
+  const { currentLocation } = useLocation()
 
   const goBack = () => navigation.goBack()
   const goToProfile = () => navigation.navigate("내 플로깅 기록")
 
-  const getDifficultyColor = (difficulty) => "#418663"
+  const handleAnalysisButton = () => {
+    setShowStoryInput(true)
+    setInputSubmitted(false)
+  }
 
-  const renderTabs = () => (
-    <View style={styles.tabContainer}>
-      <View style={styles.tabRow}>
-        <TouchableOpacity style={styles.tabButton} onPress={() => setTab("전체")}>
-          <Text style={[styles.tabText, tab === "전체" && styles.activeTabText]}>전체</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tabButton} onPress={() => setTab("AI")}>
-          <Text style={[styles.tabText, tab === "AI" && styles.activeTabText]}>AI 기반 추천</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.tabIndicatorContainer}>
-        <View style={styles.tabUnderline} />
-        <View style={[styles.tabIndicator, { left: tab === "전체" ? 0 : screenWidth * 0.5 }]} />
-      </View>
+  const handleStorySubmit = () => {
+    setInputSubmitted(true)
+    Keyboard.dismiss()
+  }
+
+  const handleRecommendButton = async () => {
+    setLoadingRecommend(true)
+    try {
+      const res = await axios.post("https://ai.jupging.store/recommend", {
+        story: story,
+        lat: currentLocation.latitude,
+        lng: currentLocation.longitude,
+      })
+      setRecommendResults(res.data.trails)
+      setSelectedIndex(0)
+      setModalVisible(true)
+    } catch (err) {
+      alert("추천 요청에 실패했습니다.")
+    }
+    setLoadingRecommend(false)
+  }
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => setIsKeyboardVisible(true))
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => setIsKeyboardVisible(false))
+    return () => {
+      showSub.remove()
+      hideSub.remove()
+    }
+  }, [])
+  useFocusEffect(
+  React.useCallback(() => {
+    setShowStoryInput(false)
+    setStory("")
+    setInputSubmitted(false)
+    setRecommendResults([])
+    setModalVisible(false)
+    setSelectedIndex(0)
+    setLoadingRecommend(false)
+    // cleanup 필요 없으면 return 없음
+  }, [])
+)
+  // 추천 결과 카드 렌더
+  const renderResultItem = ({ item }) => (
+    <View style={styles.resultCard}>
+      <Image
+        source={item.img1 ? { uri: item.img1 } : require("../assets/ai-assistant2.png")}
+        style={styles.resultImage}
+        resizeMode="cover"
+      />
+      <Text style={styles.resultTitle}>{item.trail_name || item.title}</Text>
+      <Text style={styles.resultAddress}>{item.lot_number_address}</Text>
+      <Text style={styles.resultReason}>
+            {item.reason
+              ? item.reason.replace(/\. /g, ".\n").replace(/([가-힣]) /g, "$1\n")
+              : ""}
+      </Text>    
     </View>
-  )
-
-  const renderCourseItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.courseItem}
-      onPress={() => navigation.navigate("CourseDetail", { 
-        courseId: item.id,
-        trailId: item.id,
-        courseData: item // 더미 데이터도 함께 전달
-      })}
-    >
-      <Image source={{ uri: item.image }} style={styles.courseImage} />
-      <View style={styles.courseContent}>
-        <Text style={styles.courseName}>{item.name}</Text>
-        <Text style={styles.courseAddress}>{item.address}</Text>
-        <View style={styles.tagContainer}>
-          <View style={[styles.difficultyTag, { backgroundColor: "#C8DECB" }]}>
-            <Text style={[styles.tagText, { color: getDifficultyColor(item.difficulty) }]}># {item.difficulty}</Text>
-          </View>
-          <View style={[styles.reportTag, { backgroundColor: "#F5E6E6", marginLeft: 8 }]}>
-            <Text style={[styles.tagText, { color: "#C94A4A" }]}>쓰레기 {item.reportCount}</Text>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
   )
 
   return (
@@ -227,118 +121,148 @@ export default function RecommendCourseScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Tabs */}
-      <View style={{ marginBottom: 15 }}>
-        {renderTabs()}
-      </View>
-
-      {tab === "전체" ? (
-        <View style={styles.contentContainer}>
-          {/* Filters */}
-          <View style={styles.filterBar}>
-            <View style={styles.filterLeft}>
-              <View style={styles.filterItem}>
-                <DropDownPicker
-                  placeholder="지역"
-                  open={regionOpen}
-                  value={regionValue}
-                  items={regionItems}
-                  setOpen={setRegionOpen}
-                  setValue={setRegionValue}
-                  setItems={setRegionItems}
-                  style={styles.dropdown}
-                  dropDownContainerStyle={styles.dropdownContainer}
-                  textStyle={styles.dropdownText}
-                  placeholderStyle={styles.dropdownPlaceholder}
-                  zIndex={3000}
-                  zIndexInverse={1000}
+      {/* 데이터 기반 맞춤 추천 영역 */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={80}
+      >
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.aiContainer}>
+            <Text style={styles.aiSubtitle}>사연을 적어 데이터 기반으로 맞춤 추천을 받아보세요.</Text>
+            <Text style={styles.aiTitle}>나에게 맞는 산책로는?</Text>
+            <View style={styles.aiCard}>
+              <View style={styles.aiImageContainer}>
+                <Image
+                  source={require("../assets/ai-assistant2.png")}
+                  style={styles.aiRobotImage}
+                  resizeMode="contain"
                 />
               </View>
-              <View style={styles.filterItem}>
-                <DropDownPicker
-                  placeholder="난이도"
-                  open={difficultyOpen}
-                  value={difficultyValue}
-                  items={difficultyItems}
-                  setOpen={setDifficultyOpen}
-                  setValue={setDifficultyValue}
-                  setItems={setDifficultyItems}
-                  style={styles.dropdown}
-                  dropDownContainerStyle={styles.dropdownContainer}
-                  textStyle={styles.dropdownText}
-                  placeholderStyle={styles.dropdownPlaceholder}
-                  zIndex={2000}
-                  zIndexInverse={1000}
-                />
+              {!showStoryInput ? (
+                <TouchableOpacity style={styles.aiAnalysisButton} onPress={handleAnalysisButton}>
+                  <Text style={styles.aiAnalysisButtonText}>원하는 산책로 스타일 입력하기</Text>
+                </TouchableOpacity>
+              ) : (
+                <KeyboardAvoidingView
+                  behavior={Platform.OS === "ios" ? "padding" : "height"}
+                  keyboardVerticalOffset={80}
+                  style={{ width: "100%" }}
+                >
+                  <View style={styles.storyInputContainer}>
+                    {!inputSubmitted ? (
+                      <>
+                        <TextInput
+                          style={styles.storyInput}
+                          multiline
+                          value={story}
+                          onChangeText={setStory}
+                          placeholder={
+                            "주말에 가족이랑 2~3km 가볍게, 화장실/편의점 있으면 좋아요.\n서울 동부권이면 베스트! 플로깅장소 추천해주세요"
+                          }
+                          placeholderTextColor="#BEBEBE"
+                          onFocus={() => setIsKeyboardVisible(true)}
+                          onBlur={() => setIsKeyboardVisible(false)}
+                        />
+                        <TouchableOpacity style={styles.storySubmitButton} onPress={handleStorySubmit}>
+                          <Text style={styles.storySubmitButtonText}>입력 완료</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <View style={styles.storyPreview}>
+                        <Text style={styles.storyPreviewText}>{story}</Text>
+                        <TouchableOpacity style={styles.storyEditButton} onPress={() => setInputSubmitted(false)}>
+                          <Text style={styles.storyEditButtonText}>수정</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                </KeyboardAvoidingView>
+              )}
+            </View>
+            <Text style={styles.aiDescription}>가고싶은 산책로의 성향, 분위기, 정보 등{"\n"} 원하는 산책 상황을 입력하고 추천 받아 보세요.</Text>
+            <TouchableOpacity
+              style={[
+                styles.aiButton,
+                (!inputSubmitted || !story.trim() || loadingRecommend) && { backgroundColor: "#BEBEBE" },
+              ]}
+              disabled={!inputSubmitted || !story.trim() || loadingRecommend}
+              onPress={handleRecommendButton}
+            >
+              <Text style={styles.aiButtonText}>
+                {loadingRecommend ? "추천 중..." : "데이터 기반 맞춤 추천 받기"}
+              </Text>
+            </TouchableOpacity>
+            {loadingRecommend && (
+              <View style={{ marginTop: 20 }}>
+                <ActivityIndicator size="large" color="#418663" />
+                <Text style={{ color: "#418663", marginTop: 8 }}>추천 결과를 불러오는 중...</Text>
               </View>
-            </View>
-            <View style={styles.filterRight}>
-              <DropDownPicker
-                placeholder="정렬"
-                open={sortOpen}
-                value={sortValue}
-                items={sortItems}
-                setOpen={setSortOpen}
-                setValue={setSortValue}
-                setItems={setSortItems}
-                style={styles.dropdown}
-                dropDownContainerStyle={styles.dropdownContainer}
-                textStyle={styles.dropdownText}
-                placeholderStyle={styles.dropdownPlaceholder}
-                zIndex={1000}
-                zIndexInverse={1000}
-              />
-            </View>
+            )}
           </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-          {/* Course Count */}
-          <Text style={[styles.countText, { marginTop: 25 }]}>산책로 {filteredCourses.length}</Text>
-
-          {/* Course List */}
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#418663" />
-              <Text style={styles.loadingText}>코스 정보 로딩중...</Text>
-            </View>
-          ) : (
+      {/* 추천 결과 모달 */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
             <FlatList
-              data={filteredCourses}
-              keyExtractor={(item) => item.id}
-              renderItem={renderCourseItem}
-              contentContainerStyle={styles.listContainer}
-              showsVerticalScrollIndicator={false}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Icon name="search" size={screenWidth * 0.15} color="#CCC" />
-                  <Text style={styles.emptyText}>조건에 맞는 산책로가 없습니다.</Text>
-                  <Text style={styles.emptySubText}>다른 조건으로 검색해보세요.</Text>
-                </View>
-              }
+              data={recommendResults}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={item => item.trail_id?.toString() || item.id?.toString()}
+              renderItem={renderResultItem}
+              onMomentumScrollEnd={e => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / (screenWidth * 0.8 + 20))
+                setSelectedIndex(idx)
+              }}
+              style={{ flexGrow: 0 }}
             />
-          )}
-        </View>
-      ) : (
-        /* AI Tab Content */
-        <View style={styles.aiContainer}>
-          <Text style={styles.aiSubtitle}>AI에게 산책로를 추천 받아보세요.</Text>
-          <Text style={styles.aiTitle}>나에게 맞는 산책로는?</Text>
-          <View style={styles.aiCard}>
-            <View style={styles.aiImageContainer}>
-              <Image
-                source={require("../assets/ai-assistant2.png")}
-                style={styles.aiRobotImage}
-                resizeMode="contain"
-              />
+            {/* 인디케이터 */}
+            <View style={styles.indicatorContainer}>
+              {recommendResults.map((_, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.indicatorDot,
+                    selectedIndex === idx ? styles.indicatorActive : styles.indicatorInactive,
+                  ]}
+                />
+              ))}
             </View>
-            <TouchableOpacity style={styles.aiAnalysisButton}>
-              <Text style={styles.aiAnalysisButtonText}>나에게 맞는 산책로 분석</Text>
+            <TouchableOpacity
+              style={styles.detailButton}
+              onPress={() => {
+                setModalVisible(false)
+                navigation.navigate("CourseDetail", { trailId: recommendResults[selectedIndex].trail_id })
+              }}
+            >
+              <Text style={styles.detailButtonText}>이 코스 보기</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>닫기</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.aiDescription}>나의 플로깅 기록, 선호도를 바탕으로{"\n"}산책로를 추천 받아 보세요.</Text>
-          <TouchableOpacity style={styles.aiButton}>
-            <Text style={styles.aiButtonText}>AI 분석하기</Text>
-          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* 하단탭 예시: 키보드가 올라오면 숨김 */}
+      {!isKeyboardVisible && (
+        <View style={styles.tabBar}>
+          {/* 실제 하단탭 컴포넌트 또는 내용 삽입 */}
         </View>
       )}
     </SafeAreaView>
@@ -372,175 +296,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  tabContainer: {
-    backgroundColor: "#FFFFFF",
-  },
-  tabRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 15,
-  },
-  tabButton: {
-    flex: 1,
-    alignItems: "center",
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333333",
-  },
-  activeTabText: {
-    color: "#333333",
-  },
-  tabIndicatorContainer: {
-    position: "relative",
-    height: 4,
-  },
-  tabUnderline: {
-    position: "absolute",
-    width: "100%",
-    height: 4,
-    backgroundColor: "rgba(170, 178, 200, 0.2)",
-  },
-  tabIndicator: {
-    position: "absolute",
-    width: screenWidth * 0.5,
-    height: 4,
-    backgroundColor: "#418663",
-  },
-  contentContainer: {
-    flex: 1,
-    paddingHorizontal: screenWidth * 0.075,
-  },
-  filterBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 10,
-    zIndex: 10,
-  },
-  filterLeft: {
-    flexDirection: "row",
-    flex: 2,
-    gap: 10,
-  },
-  filterRight: {
-    flex: 1,
-    alignItems: "flex-end",
-  },
-  filterItem: {
-    flex: 1,
-  },
-  dropdown: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#999999",
-    borderWidth: 1,
-    borderRadius: 10,
-    minHeight: 25,
-    paddingHorizontal: 8,
-  },
-  dropdownContainer: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#999999",
-    borderRadius: 10,
-  },
-  dropdownText: {
-    fontSize: 12,
-    color: "#333333",
-    fontWeight: "500",
-  },
-  dropdownPlaceholder: {
-    fontSize: 12,
-    color: "#333333",
-    fontWeight: "500",
-  },
-  countText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333333",
-    marginBottom: 15,
-  },
-  listContainer: {
-    paddingBottom: 20,
-  },
-  courseItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-  },
-  courseImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 10,
-    marginRight: 15,
-  },
-  courseContent: {
-    flex: 1,
-  },
-  courseName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333333",
-    marginBottom: 5,
-  },
-  courseAddress: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "rgba(51, 51, 51, 0.6)",
-    marginBottom: 8,
-  },
-  tagContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  difficultyTag: {
-    paddingHorizontal: 12,
-    paddingVertical: 2,
-    borderRadius: 20,
-  },
-  reportTag: {
-    paddingHorizontal: 12,
-    paddingVertical: 2,
-    borderRadius: 20,
-  },
-  tagText: {
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  separator: {
-    height: 1,
-    backgroundColor: "rgba(217, 217, 217, 0.4)",
-    marginVertical: 5,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingTop: 50,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 14,
-    color: "#666",
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingTop: 100,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: "#999",
-    marginTop: 20,
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: "#CCC",
-    marginTop: 5,
-  },
-  // AI Tab Styles
   aiContainer: {
     flex: 1,
     paddingHorizontal: screenWidth * 0.067,
@@ -563,7 +318,7 @@ const styles = StyleSheet.create({
   },
   aiCard: {
     width: screenWidth * 0.867,
-    height: screenHeight * 0.386,
+    minHeight: screenHeight * 0.25,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     paddingVertical: 20,
@@ -602,6 +357,57 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#418663",
   },
+  storyInputContainer: {
+    width: "100%",
+    alignItems: "center",
+  },
+  storyInput: {
+    width: "100%",
+    minHeight: 70,
+    borderColor: "#C8DECB",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    fontSize: 14,
+    color: "#333",
+    backgroundColor: "#F8F8F8",
+    marginBottom: 10,
+    textAlignVertical: "top",
+  },
+  storySubmitButton: {
+    backgroundColor: "#418663",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  storySubmitButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  storyPreview: {
+    width: "100%",
+    alignItems: "center",
+  },
+  storyPreviewText: {
+    fontSize: 14,
+    color: "#333",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  storyEditButton: {
+    backgroundColor: "#C8DECB",
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  storyEditButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#418663",
+  },
   aiDescription: {
     fontSize: 14,
     fontWeight: "600",
@@ -622,5 +428,95 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#FFFFFF",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: screenWidth * 0.9,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    alignItems: "center",
+  },
+  resultCard: {
+    width: screenWidth * 0.8,
+    alignItems: "center",
+    marginRight: 20,
+  },
+  resultImage: {
+    width: "100%",
+    height: 140,
+    borderRadius: 12,
+    backgroundColor: "#EEE",
+    marginBottom: 12,
+  },
+  resultTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#333",
+    marginBottom: 6,
+  },
+  resultAddress: {
+    fontSize: 13,
+    color: "#666",
+    marginBottom: 10,
+  },
+  resultReason: {
+    fontSize: 14,
+    color: "#418663",
+    marginBottom: 18,
+    textAlign: "center",
+  },
+  detailButton: {
+    backgroundColor: "#418663",
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    marginBottom: 10,
+  },
+  detailButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  closeButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 20,
+  },
+  closeButtonText: {
+    color: "#999",
+    fontSize: 14,
+  },
+  tabBar: {
+    width: "100%",
+    backgroundColor: "#F8F8F8",
+    borderTopWidth: 1,
+    borderColor: "#E0E0E0",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    zIndex: 100,
+  },
+  indicatorContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  indicatorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginHorizontal: 4,
+  },
+  indicatorActive: {
+    backgroundColor: "#418663",
+  },
+  indicatorInactive: {
+    backgroundColor: "#C8DECB",
   },
 })
