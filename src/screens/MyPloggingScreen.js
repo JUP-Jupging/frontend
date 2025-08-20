@@ -126,90 +126,50 @@ export default function MyPloggingScreen() {
   }, [accessToken, activeTab]);
 
   // ✅ 플로깅 기록 클릭 핸들러 - 상세 조회 후 기록 페이지로 이동
-  const handlePloggingRecordPress = async (record) => {
-    try {
-      console.log('🔍 [MyPloggingScreen] 플로깅 기록 클릭:', record.ploggingId);
+  // MyPloggingScreen.js
+
+  // ✅ 플로깅 기록 클릭 핸들러 - 상세 조회 후 기록 페이지로 이동
+// MyPloggingScreen.js
+
+  // ✅ 플로깅 기록 클릭 핸들러 - API 호출 없이 기존 데이터를 직접 전달
+  const handlePloggingRecordPress = (record) => {
+    console.log('🔍 [MyPloggingScreen] 플로깅 기록 클릭 (데이터 직접 전달):', record);
+    
+    // 🔥 API 호출 없이, 클릭된 'record' 객체를 사용해 바로 데이터 구성
+    const transformedData = {
+      // 기본 정보 (record 객체에서 가져옴)
+      title: `${record.trailName || ''} ${record.trailTypeName || ''}`.trim() || "플로깅 기록",
+      date: formatUserFriendlyDate(record.ploggingDate),
+      location: record.cityName || "플로깅 경로",
       
-      // 로딩 시작
-      setIsLoading(true);
+      // 운동 정보 (record 객체에서 가져옴)
+      duration: formatPloggingTime(record.ploggingTime),
+      distance: formatDistance(record.distance),
+      difficulty: record.difficulty || "보통",
       
-      // 상세 정보 가져오기 (memberId는 user 정보에서 가져오거나 record에서 추출)
-      const memberId = user?.memberId || user?.id || 1; // 사용자 ID 가져오기
-      console.log('👤 [MyPloggingScreen] 사용할 memberId:', memberId);
+      // 이미지 정보 (record 객체에서 가져옴)
+      mapImage: record.imageUrl,
+      routeImage: record.imageUrl,
+
+      // 메타데이터 (record 객체에서 가져옴)
+      trailId: record.trailId,
+      ploggingId: record.ploggingId,
+      startTime: record.ploggingDate,
       
-      const detailData = await getPloggingDetail(record.ploggingId, memberId, accessToken);
-      console.log('📋 [MyPloggingScreen] 상세 데이터:', detailData);
+      // 쓰레기 정보 (목록에서는 상세 정보가 없으므로, 개수만 전달)
+      trashCount: record.trashCount || 0,
+      collectedTrash: [], // 상세 쓰레기 목록은 없으므로 빈 배열로 전달
       
-      // ✅ PloggingRecordScreen에서 기대하는 형태로 데이터 변환
-      const transformedData = {
-        // 기본 정보
-        title: detailData.trailTypeName || record.trailTypeName || "플로깅 기록",
-        date: formatUserFriendlyDate(detailData.displayDate),
-        location: detailData.trailTypeName || "플로깅 경로",
-        
-        // 운동 정보
-        duration: formatPloggingTime(detailData.ploggingTime),
-        distance: formatDistance(detailData.distance),
-        difficulty: detailData.difficulty || "보통",
-        
-        // 경로 및 이미지 정보
-        route: [], // 경로 좌표는 API에서 제공되지 않는 듯
-        trashLocations: detailData.trashInfo || [],
-        mapImage: detailData.imageUrl, // 플로깅 이미지
-        routeImage: detailData.imageUrl,
-        
-        // 메타데이터
-        trailId: detailData.trailId,
-        ploggingId: detailData.ploggingId,
-        startTime: detailData.ploggingDate2 || detailData.ploggingDate,
-        endTime: detailData.ploggingDate2 || detailData.ploggingDate,
-        
-        // 쓰레기 정보
-        trashCount: (detailData.trashInfo || []).length,
-        collectedTrash: (detailData.trashInfo || []).map((trash, index) => ({
-          id: trash.reportId || index,
-          type: determineTrashType(trash), // 쓰레기 타입 결정
-          amount: determineTrashAmount(trash), // 양 결정
-          location: `위도: ${trash.lat || 0}, 경도: ${trash.lng || 0}`,
-          title: determineTrashType(trash)
-        })),
-        
-        // 원본 상세 데이터도 포함
-        _detailData: detailData,
-        _originalRecord: record
-      };
-      
-      console.log('🎯 [MyPloggingScreen] 변환된 데이터:', transformedData);
-      
-      // PloggingRecordScreen으로 이동
-      navigation.navigate("PloggingRecordScreen", {
-        result: transformedData
-      });
-      
-    } catch (error) {
-      console.error('❌ [MyPloggingScreen] 플로깅 상세 조회 실패:', error);
-      // 에러 발생 시에도 기본 정보로 이동
-      const fallbackData = {
-        title: record.trailTypeName || "플로깅 기록",
-        date: formatUserFriendlyDate(record.displayDate),
-        location: record.trailTypeName || "플로깅 경로",
-        duration: formatPloggingTime(record.ploggingTime),
-        distance: formatDistance(record.distance),
-        difficulty: "보통",
-        route: [],
-        trashCount: record.trashCount || 0,
-        collectedTrash: [],
-        mapImage: record.imageUrl,
-        _originalRecord: record,
-        _error: error.message
-      };
-      
-      navigation.navigate("PloggingRecordScreen", {
-        result: fallbackData
-      });
-    } finally {
-      setIsLoading(false);
-    }
+      // 원본 데이터도 포함
+      _originalRecord: record
+    };
+
+    console.log('🎯 [MyPloggingScreen] 변환된 데이터:', transformedData);
+
+    // PloggingRecordScreen으로 즉시 이동
+    navigation.navigate("PloggingRecordScreen", {
+      result: transformedData
+    });
   };
 
   // ✅ 쓰레기 타입 결정 함수

@@ -6,7 +6,7 @@ import MapView, { Polyline, Marker } from "react-native-maps"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import { getTrailDetail } from "../api/trails"
 import { formatUserFriendlyDate, formatPloggingTime, formatDistance } from "../utils/timeUtils"
-import TrailImagesCarousel from "../components/TrailImagesCarousel" // 🔥 TrailImagesCarousel 추가
+import TrailImagesCarousel from "../components/TrailImagesCarousel"
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -91,8 +91,25 @@ export default function PloggingRecordScreen() {
   // 🔥 TrailImagesCarousel에서 이미지 클릭 처리
   const handleImagePress = (image, index) => {
     console.log(`이미지 클릭: ${image.label}, 인덱스: ${index}`)
-    // 이미지 확대 모달이나 상세보기 화면으로 이동 가능
-    // navigation.navigate('ImageDetailScreen', { imageUri: image.uri })
+  }
+
+  // 🔥 산책로 이름을 올바르게 조합하는 함수
+  const getTrailDisplayName = () => {
+    if (!trailDetail) return recordData?.title || "플로깅 기록"
+    
+    // trailName + trailTypeName 조합
+    const trailName = trailDetail.trailName || ""
+    const trailTypeName = trailDetail.trailTypeName || ""
+    
+    if (trailName && trailTypeName) {
+      return `${trailName} ${trailTypeName}`
+    } else if (trailName) {
+      return trailName
+    } else if (trailTypeName) {
+      return trailTypeName
+    } else {
+      return recordData?.title || "플로깅 기록"
+    }
   }
 
   const loadRecordData = async () => {
@@ -318,9 +335,23 @@ export default function PloggingRecordScreen() {
         {/* 🔥 기본 정보 섹션 - 산책로 이름을 메인 타이틀로 표시 */}
         <View style={styles.mainInfoSection}>
           <Text style={styles.recordTitle}>
-            {trailDetail?.trailName || trailDetail?.instlPlcNm || recordData.title}
+            {getTrailDisplayName()}
           </Text>
-          
+                    {/* 🔥 조건부 렌더링: 이미지가 있으면 TrailImagesCarousel, 없으면 fallback 메시지 */}
+          {trailDetail && (trailDetail.img1 || trailDetail.img2) ? (
+            <TrailImagesCarousel
+              trailId={trailDetail.trailId}
+              img1={trailDetail.img1}
+              img2={trailDetail.img2}
+              style={styles.imagesCarousel}
+              onImagePress={handleImagePress}
+            />
+          ) : (
+            <View style={styles.noImageContainer}>
+              <Icon name="image-not-supported" size={64} color="#CCCCCC" />
+              <Text style={styles.noImageText}>이미지가 존재하지 않습니다</Text>
+            </View>
+          )}
           {/* 통계 정보 그리드 */}
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
@@ -342,35 +373,6 @@ export default function PloggingRecordScreen() {
           </View>
         </View>
 
-        {/* 🔥 새로운 산책로 이미지 섹션 - TrailImagesCarousel 사용 */}
-        {trailDetail && (trailDetail.img1 || trailDetail.img2) && (
-          <View style={styles.trailSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>플로깅 경로</Text>
-              <Text style={styles.sectionSubtitle}>이번 플로깅에서 이동한 경로입니다</Text>
-            </View>
-            
-            {/* 🔥 TrailImagesCarousel 컴포넌트 사용 */}
-            <TrailImagesCarousel
-              trailId={trailDetail.trailId}
-              img1={trailDetail.img1}
-              img2={trailDetail.img2}
-              style={styles.imagesCarousel}
-              onImagePress={handleImagePress}
-            />
-            
-            {/* 산책로 기본 정보 */}
-            <View style={styles.trailInfo}>
-              <Text style={styles.trailName}>{trailDetail.trailName}</Text>
-              <Text style={styles.trailDescription}>{trailDetail.description || trailDetail.descriptionDetail}</Text>
-              <View style={styles.trailDetails}>
-                <Text style={styles.trailDetail}>📍 {trailDetail.cityName}</Text>
-                <Text style={styles.trailDetail}>📏 {trailDetail.length}</Text>
-                <Text style={styles.trailDetail}>⭐ {trailDetail.difficultyLevel}</Text>
-              </View>
-            </View>
-          </View>
-        )}
 
         {/* 🔥 경로 이미지 섹션 - 캡처된 지도가 있을 때만 표시 */}
         {recordData.mapImage && (
@@ -385,10 +387,7 @@ export default function PloggingRecordScreen() {
                 style={styles.routeImage}
                 resizeMode="cover"
               />
-              <View style={styles.routeImageOverlay}>
-                <Icon name="route" size={24} color="#FFFFFF" />
-                <Text style={styles.routeImageText}>총 거리: {recordData.distance}</Text>
-              </View>
+
             </View>
           </View>
         )}
@@ -508,6 +507,27 @@ const styles = StyleSheet.create({
     color: '#999999',
     fontWeight: '500',
   },
+
+  // 🔥 이미지가 없을 때 표시할 컨테이너 스타일 추가
+  noImageContainer: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+  },
+  noImageText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#999999',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
   
   mainInfoSection: {
     paddingHorizontal: PADDING_H,
@@ -543,7 +563,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // 🔥 새로운 산책로 섹션 스타일
+  // 🔥 수정된 산책로 섹션 스타일
   trailSection: {
     paddingHorizontal: PADDING_H,
     paddingVertical: screenHeight * 0.02,

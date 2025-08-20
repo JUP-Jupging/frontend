@@ -1,136 +1,89 @@
-// TrailImagesCarousel.js - 산책로 이미지 스크롤뷰 컴포넌트 (신규 생성)
-
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  ScrollView,
-  Image,
-  Text,
-  StyleSheet,
-  Dimensions,
-  ActivityIndicator,
-  TouchableOpacity
-} from 'react-native';
+// components/TrailImagesCarousel.js
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-const TrailImagesCarousel = ({ 
-  trailId, 
-  img1, 
-  img2,
-  style,
-  onImagePress 
-}) => {
+const TrailImagesCarousel = ({ trailId, img1, img2, style, onImagePress }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [imageLoadErrors, setImageLoadErrors] = useState({ img1: false, img2: false });
-  const [isLoading, setIsLoading] = useState(true);
+  const [imageErrors, setImageErrors] = useState({});
 
-  // 🔥 유효한 이미지들만 필터링 - null/undefined도 포함하여 기본 이미지 표시
+  // 이미지 배열 생성 (유효한 이미지만)
   const images = [
-    { id: 'img1', uri: img1, label: '산책로 이미지 1' },
-    { id: 'img2', uri: img2, label: '산책로 이미지 2' }
-  ].filter(img => img.uri && img.uri.trim() !== '' && img.uri !== 'string');
+    img1 && { uri: img1, label: '산책로 이미지 1', index: 0 },
+    img2 && { uri: img2, label: '산책로 이미지 2', index: 1 },
+  ].filter(Boolean);
 
-  // 🔥 이미지가 하나도 없으면 기본 이미지 하나 추가
-  if (images.length === 0) {
-    images.push({
-      id: 'placeholder',
-      uri: null,
-      label: '기본 이미지'
-    });
-  }
+  console.log('🖼️ [TrailImagesCarousel] 렌더링:', {
+    trailId,
+    img1: !!img1,
+    img2: !!img2,
+    imageCount: images.length
+  });
 
-  console.log(`[TrailImagesCarousel] 이미지 목록:`, images);
-
-  useEffect(() => {
-    // 이미지가 있으면 로딩 상태 해제
-    setIsLoading(false);
-  }, [images.length]);
-
-  // 🔥 이미지 로드 에러 처리
-  const handleImageError = (imageId) => {
-    console.warn(`[TrailImagesCarousel] 이미지 로드 실패: ${imageId}`);
-    setImageLoadErrors(prev => ({
-      ...prev,
-      [imageId]: true
-    }));
-  };
-
-  // 🔥 이미지 로드 성공 처리
-  const handleImageLoad = (imageId) => {
-    console.log(`[TrailImagesCarousel] 이미지 로드 성공: ${imageId}`);
-    setImageLoadErrors(prev => ({
-      ...prev,
-      [imageId]: false
-    }));
-  };
-
-  // 🔥 스크롤 위치 변경 감지
-  const handleScroll = (event) => {
-    const scrollPosition = event.nativeEvent.contentOffset.x;
-    const imageWidth = screenWidth * 0.8; // 이미지 너비
-    const newIndex = Math.round(scrollPosition / imageWidth);
-    setCurrentIndex(newIndex);
-  };
-
-  // 🔥 이미지가 없는 경우 - MainScreen과 동일한 스타일로 처리
-  if (isLoading) {
-    return (
-      <View style={[styles.container, style]}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color="#418663" />
-          <Text style={styles.loadingText}>이미지 로딩 중...</Text>
-        </View>
-      </View>
-    );
-  }
-
+  // 이미지가 없는 경우
   if (images.length === 0) {
     return (
       <View style={[styles.container, style]}>
         <View style={styles.noImageContainer}>
-          <Icon name="landscape" size={48} color="#CCC" />
-          <Text style={styles.noImageText}>이미지 없음</Text>
+          <Icon name="image-not-supported" size={48} color="#CCCCCC" />
+          <Text style={styles.noImageText}>이미지가 없습니다</Text>
         </View>
       </View>
     );
   }
 
-  // 🔥 이미지 렌더링 - MainScreen 스타일과 동일하게 처리
+  // 이미지 에러 처리
+  const handleImageError = (index) => {
+    console.warn(`⚠️ [TrailImagesCarousel] 이미지 ${index} 로드 실패`);
+    setImageErrors(prev => ({
+      ...prev,
+      [index]: true
+    }));
+  };
+
+  // 이미지 클릭 처리
+  const handleImagePress = (image) => {
+    console.log('🖼️ [TrailImagesCarousel] 이미지 클릭:', image.label);
+    if (onImagePress) {
+      onImagePress(image, image.index);
+    }
+  };
+
+  // 이미지 렌더링
   const renderImage = (image, index) => {
-    const hasError = imageLoadErrors[image.id];
-    
-    if (hasError || !image.uri) {
+    const hasError = imageErrors[image.index];
+
+    if (hasError) {
       return (
-        <View key={image.id || index} style={styles.imageContainer}>
-          <View style={styles.errorContainer}>
-            <Icon name="landscape" size={48} color="#CCC" />
-            <Text style={styles.errorText}>이미지 없음</Text>
+        <View key={`error-${index}`} style={styles.imageContainer}>
+          <View style={styles.errorImageContainer}>
+            <Icon name="broken-image" size={48} color="#CCCCCC" />
+            <Text style={styles.errorImageText}>이미지 로드 실패</Text>
           </View>
         </View>
       );
     }
 
     return (
-      <TouchableOpacity
-        key={image.id || index}
+      <TouchableOpacity 
+        key={`image-${index}`}
         style={styles.imageContainer}
-        onPress={() => onImagePress && onImagePress(image, index)}
-        activeOpacity={0.9}
+        onPress={() => handleImagePress(image)}
+        activeOpacity={0.8}
       >
         <Image
           source={{ uri: image.uri }}
           style={styles.image}
           resizeMode="cover"
-          onError={() => handleImageError(image.id)}
-          onLoad={() => handleImageLoad(image.id)}
-          onLoadStart={() => console.log(`이미지 로드 시작: ${image.id}`)}
+          onError={() => handleImageError(image.index)}
         />
         
-        {/* 🔥 이미지 번호 표시 */}
-        <View style={styles.imageNumber}>
-          <Text style={styles.imageNumberText}>{index + 1}</Text>
+        {/* 이미지 라벨 오버레이 */}
+        <View style={styles.imageOverlay}>
+          <Text style={styles.imageLabel}>{image.label}</Text>
+          <Icon name="fullscreen" size={20} color="#FFFFFF" />
         </View>
       </TouchableOpacity>
     );
@@ -138,38 +91,50 @@ const TrailImagesCarousel = ({
 
   return (
     <View style={[styles.container, style]}>
-      {/* 🔥 이미지 스크롤뷰 */}
-      <ScrollView
-        horizontal
-        pagingEnabled={images.length > 1}
-        showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={styles.scrollContainer}
-        style={styles.scrollView}
-      >
-        {images.map((image, index) => renderImage(image, index))}
-      </ScrollView>
+      {/* 이미지가 1개인 경우 */}
+      {images.length === 1 && (
+        <View style={styles.singleImageContainer}>
+          {renderImage(images[0], 0)}
+        </View>
+      )}
 
-      {/* 🔥 페이지 인디케이터 (이미지가 2개 이상일 때만) */}
-      {images.length > 1 && (
-        <View style={styles.paginationContainer}>
+      {/* 이미지가 2개인 경우 */}
+      {images.length === 2 && (
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(event) => {
+            const newIndex = Math.round(
+              event.nativeEvent.contentOffset.x / screenWidth
+            );
+            setCurrentIndex(newIndex);
+          }}
+          style={styles.scrollView}
+        >
+          {images.map((image, index) => renderImage(image, index))}
+        </ScrollView>
+      )}
+
+      {/* 페이지 인디케이터 (이미지가 2개일 때만) */}
+      {images.length === 2 && (
+        <View style={styles.indicatorContainer}>
           {images.map((_, index) => (
             <View
-              key={index}
+              key={`indicator-${index}`}
               style={[
-                styles.paginationDot,
-                index === currentIndex && styles.paginationDotActive
+                styles.indicator,
+                currentIndex === index && styles.activeIndicator
               ]}
             />
           ))}
         </View>
       )}
 
-      {/* 🔥 이미지 카운터 */}
+      {/* 이미지 카운터 */}
       <View style={styles.counterContainer}>
         <Text style={styles.counterText}>
-          {currentIndex + 1} / {images.length}
+          {images.length > 1 ? `${currentIndex + 1} / ${images.length}` : '1 / 1'}
         </Text>
       </View>
     </View>
@@ -178,135 +143,128 @@ const TrailImagesCarousel = ({
 
 const styles = StyleSheet.create({
   container: {
-    height: 200,
-    backgroundColor: '#F5F5F5',
     borderRadius: 12,
     overflow: 'hidden',
-    position: 'relative',
+    backgroundColor: '#F5F5F5',
   },
   
-  // 스크롤뷰 스타일
-  scrollView: {
-    flex: 1,
+  // 단일 이미지
+  singleImageContainer: {
+    width: '100%',
+    height: 200,
   },
-  scrollContainer: {
-    alignItems: 'center',
+  
+  // 스크롤뷰
+  scrollView: {
+    width: '100%',
+    height: 200,
   },
   
   // 이미지 컨테이너
   imageContainer: {
-    width: screenWidth * 0.8,
+    width: screenWidth - 40, // 패딩 고려
     height: 200,
-    marginHorizontal: 5,
-    borderRadius: 12,
-    overflow: 'hidden',
     position: 'relative',
   },
   
-  // 이미지 스타일
+  // 이미지
   image: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#F0F0F0',
   },
   
-  // 이미지 번호
-  imageNumber: {
+  // 이미지 오버레이
+  imageOverlay: {
     position: 'absolute',
-    top: 8,
-    left: 8,
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  imageNumberText: {
+  
+  imageLabel: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   
-  // 페이지 인디케이터
-  paginationContainer: {
-    position: 'absolute',
-    bottom: 12,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
+  // 에러 이미지
+  errorImageContainer: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F0F0F0',
     justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+  },
+  
+  errorImageText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#999999',
+    fontWeight: '500',
+  },
+  
+  // 이미지 없음
+  noImageContainer: {
+    height: 200,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+  },
+  
+  noImageText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#999999',
+    fontWeight: '500',
+  },
+  
+  // 페이지 인디케이터
+  indicatorContainer: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'row',
     gap: 6,
   },
-  paginationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  
+  indicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
-  paginationDotActive: {
+  
+  activeIndicator: {
     backgroundColor: '#FFFFFF',
-    transform: [{ scale: 1.2 }],
   },
   
   // 카운터
   counterContainer: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 16,
+    left: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    borderRadius: 12,
   },
+  
   counterText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
-  },
-  
-  // 로딩 상태
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  
-  // 이미지가 없음
-  noImageContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-  },
-  noImageText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  
-  // 에러 상태
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
   },
 });
 
