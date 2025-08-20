@@ -1,94 +1,151 @@
-import React from 'react';
-import { View } from 'react-native';
+// BottomTabNavigator.js - Safe Area 적용 버전
+
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation, useNavigationState } from '@react-navigation/native';
-import HomeStackNavigator from './HomeStackNavigator'; // 홈 탭 (메인 화면 + 플로깅 시작 화면)
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // 🔥 Safe Area 추가
+import HomeStackNavigator from './HomeStackNavigator';
 import WalkSearchScreen from '../screens/WalkSearchScreen';
 import ReportTrashScreen from '../screens/ReportTrashScreen';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { TouchableOpacity, Image } from 'react-native';
 import MyPageStackNavigator from './MyPageStackNavigator';
 import RecommendCourseStackNavigator from './RecommendCourseStackNavigator';
-import FloatingPloggingIndicator from '../components/FloatingPloggingIndicator'; // 🎯 플로깅 진행 상황을 보여주는 드래그 가능한 모달
-import SearchStackNavigator from './SearchStackNavigator'; // 👈 새로 만든 SearchStackNavigator를 import 합니다.
+import SearchStackNavigator from './SearchStackNavigator';
+
+// 🔥 원래 FloatingPloggingIndicator 복구
+import FloatingPloggingIndicator from '../components/FloatingPloggingIndicator';
 
 const Tab = createBottomTabNavigator();
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 /**
- * 🗂️ 하단 탭 네비게이터 컴포넌트
- * - 5개의 주요 탭으로 구성 (홈, 추천코스, 코스검색, 쓰레기제보, 마이페이지)
- * - 홈 탭에는 플로깅 시작 화면이 포함됨
+ * 🔥 Safe Area 적용된 커스텀 탭바
+ */
+function CustomTabBar({ state, descriptors, navigation }) {
+  const insets = useSafeAreaInsets(); // 🔥 Safe Area 값 가져오기
+  
+  return (
+    <View style={{
+      flexDirection: 'row',
+      backgroundColor: '#FFFFFF',
+      paddingBottom: Math.max(insets.bottom, 10), // 🔥 Safe Area bottom 적용 (최소 10)
+      paddingTop: 10,
+      paddingLeft: Math.max(insets.left, 0), // 🔥 좌측 Safe Area
+      paddingRight: Math.max(insets.right, 0), // 🔥 우측 Safe Area
+      borderTopWidth: 1,
+      borderTopColor: '#E0E0E0',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 8,
+    }}>
+      {state.routes.map((route, index) => {
+        const { options } = descriptors[route.key];
+        const label = options.tabBarLabel !== undefined 
+          ? options.tabBarLabel 
+          : options.title !== undefined 
+          ? options.title 
+          : route.name;
+
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        // 🔥 탭 아이콘 결정
+        let iconName;
+        switch (route.name) {
+          case '홈':
+            iconName = 'home';
+            break;
+          case '추천 코스':
+            iconName = 'explore';
+            break;
+          case '코스 검색':
+            iconName = 'search';
+            break;
+          case '쓰레기 제보':
+            iconName = 'delete';
+            break;
+          case '내 플로깅 기록':
+            iconName = 'person';
+            break;
+          default:
+            iconName = 'home';
+        }
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            accessibilityRole="button"
+            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={options.tabBarAccessibilityLabel}
+            testID={options.tabBarTestID}
+            onPress={onPress}
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              paddingVertical: 5,
+              minHeight: 50, // 🔥 최소 높이 보장
+            }}
+          >
+            <Icon 
+              name={iconName} 
+              size={24} 
+              color={isFocused ? '#4CAF50' : '#999'} 
+            />
+            <Text style={{
+              fontSize: 12,
+              color: isFocused ? '#4CAF50' : '#999',
+              marginTop: 2,
+              fontWeight: isFocused ? '600' : '400',
+            }}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * 🔥 탭 네비게이터
  */
 function TabNavigator() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
-          // 각 탭에 해당하는 아이콘 설정
-          let iconName;
-          switch (route.name) {
-            case '홈':
-              iconName = 'home';
-              break;
-            case '추천 코스':
-              iconName = 'explore';
-              break;
-            case '코스 검색':
-              iconName = 'search';
-              break;
-            case '쓰레기 제보':
-              iconName = 'delete';
-              break;
-            case '내 플로깅 기록':
-              iconName = 'person';
-              break;
-          }
-          return <Icon name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: '#4CAF50',
-        tabBarInactiveTintColor: '#999',
-        headerShown: true,
-      })}
+      screenOptions={{ 
+        headerShown: false,
+      }}
+      tabBar={(props) => <CustomTabBar {...props} />}
     >
-      {/* 🏠 홈 탭: HomeStackNavigator로 메인 화면과 플로깅 시작 화면을 관리 */}
-      <Tab.Screen name="홈" component={HomeStackNavigator} options={{ headerShown: false }} />
-
-      {/* 🗺️ 추천 코스 탭 */}
-      <Tab.Screen name="추천 코스" component={RecommendCourseStackNavigator} options={{ headerShown: false }} />
-
-      {/* 🔍 코스 검색 탭 */}
-      <Tab.Screen
-        name="코스 검색"
-        // component={WalkSearchScreen} // 👈 기존 코드
-        component={SearchStackNavigator} // 👈 새로 만든 화면 관리자로 교체!
-        options={{ headerShown: false }}
-      />
-
-      {/* 🗑️ 쓰레기 제보 탭 */}
-      <Tab.Screen name="쓰레기 제보" component={ReportTrashScreen} options={{ headerShown: false }} />
-
-      {/* 👤 마이페이지 탭 */}
-      <Tab.Screen name="내 플로깅 기록" component={MyPageStackNavigator} options={{ headerShown: false }} />
+      <Tab.Screen name="홈" component={HomeStackNavigator} />
+      <Tab.Screen name="추천 코스" component={RecommendCourseStackNavigator} />
+      <Tab.Screen name="코스 검색" component={SearchStackNavigator} />
+      <Tab.Screen name="쓰레기 제보" component={ReportTrashScreen} />
+      <Tab.Screen name="내 플로깅 기록" component={MyPageStackNavigator} />
     </Tab.Navigator>
   );
 }
 
 /**
- * 🎯 메인 내보내기 컴포넌트: BottomTabNavigator + FloatingPloggingIndicator
- * 
- * 기능:
- * 1. 하단 탭 네비게이션 제공
- * 2. 플로깅 진행 중일 때 FloatingPloggingIndicator를 화면 위에 오버레이로 표시
- * 3. 플로깅 시작 화면에서는 인디케이터를 숨김 (중복 방지)
- * 
- * FloatingPloggingIndicator 특징:
- * - 드래그 가능한 모달 형태
- * - 플로깅 진행 상황 실시간 표시 (시간, 거리, 쓰레기 개수)
- * - 접기/펼치기 기능
- * - 플로깅 화면으로 이동 버튼
+ * 🔥 메인 export 컴포넌트 (Safe Area 적용)
  */
 export default function BottomTabNavigator() {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets(); // 🔥 Safe Area 값 가져오기
 
   // 현재 활성화된 화면 이름을 더 정확하게 가져오기
   const currentRouteName = useNavigationState(state => {
@@ -107,13 +164,14 @@ export default function BottomTabNavigator() {
   const isPloggingScreen = currentRouteName === "PloggingStart" || currentRouteName === "PloggingRecord";
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ 
+      flex: 1,
+      // 🔥 Safe Area 적용으로 전체 화면이 안전 영역 내에 위치
+    }}>
       {/* 📱 하단 탭 네비게이터 */}
       <TabNavigator />
 
-      {/* 🎯 플로깅 진행 상황 인디케이터 (오버레이)
-          - 플로깅 중일 때만 표시
-          - 플로깅 시작 화면과 기록 화면에서는 숨김 */}
+      {/* 🔥 원래 FloatingPloggingIndicator 복구 (종료 기능 포함) */}
       <FloatingPloggingIndicator
         hideOnPlogging={isPloggingScreen}
       />

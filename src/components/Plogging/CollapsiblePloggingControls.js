@@ -1,13 +1,12 @@
-// CollapsiblePloggingControls.js - 접었다 펼 수 있는 플로깅 컨트롤
+// CollapsiblePloggingControls.js - 애니메이션 완전 제거 버전
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   TouchableOpacity, 
   Image, 
-  Animated,
   Dimensions
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -23,13 +22,11 @@ const CollapsiblePloggingControls = ({
   onResume,
   onEnd,
   onShowTrashList,
-  isCollapsed = false,           // 🔥 외부에서 제어 가능
-  onCollapseChange,              // 🔥 접힘 상태 변경 콜백
-  forceCollapse = false,         // 🔥 강제 접힘 (모달 열릴 때)
+  isCollapsed = false,
+  onCollapseChange,
+  forceCollapse = false,
 }) => {
   const [internalCollapsed, setInternalCollapsed] = useState(isCollapsed);
-  const heightAnim = useRef(new Animated.Value(isCollapsed ? 0 : 1)).current;
-  const opacityAnim = useRef(new Animated.Value(isCollapsed ? 0 : 1)).current;
 
   // 🔥 외부에서 강제 접힘 처리
   useEffect(() => {
@@ -38,37 +35,24 @@ const CollapsiblePloggingControls = ({
     }
   }, [forceCollapse, internalCollapsed]);
 
-  // 🔥 접힘/펼침 애니메이션 처리
+  // 🔥 단순한 상태 변경 (애니메이션 없음)
   const handleCollapse = (shouldCollapse) => {
     const newCollapsed = shouldCollapse !== undefined ? shouldCollapse : !internalCollapsed;
     
+    if (newCollapsed === internalCollapsed) return;
+    
     setInternalCollapsed(newCollapsed);
     
-    // 부모 컴포넌트에 상태 변경 알림
     if (onCollapseChange) {
       onCollapseChange(newCollapsed);
     }
-
-    // 애니메이션 실행
-    Animated.parallel([
-      Animated.timing(heightAnim, {
-        toValue: newCollapsed ? 0 : 1,
-        duration: 300,
-        useNativeDriver: false,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: newCollapsed ? 0 : 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
   };
 
   if (status === 'idle') {
     return null;
   }
 
-  // 🔥 접힌 상태일 때의 미니 컨트롤
+  // 🔥 접힌 상태
   if (internalCollapsed) {
     return (
       <View style={styles.collapsedContainer}>
@@ -78,24 +62,20 @@ const CollapsiblePloggingControls = ({
           activeOpacity={0.8}
         >
           <View style={styles.collapsedContent}>
-            {/* 상태 표시 점 */}
             <View style={[
               styles.statusDot, 
               { backgroundColor: status === 'running' ? '#4CAF50' : '#FFC107' }
             ]} />
             
-            {/* 시간 표시 */}
             <Text style={styles.collapsedTime}>
               {formatTime ? formatTime(time) : '00:00:00'}
             </Text>
             
-            {/* 쓰레기 개수 */}
             <View style={styles.collapsedTrashInfo}>
               <Icon name="delete" size={16} color="#666" />
               <Text style={styles.collapsedTrashCount}>{trashCount || 0}</Text>
             </View>
             
-            {/* 펼치기 아이콘 */}
             <Icon name="keyboard-arrow-up" size={20} color="#666" />
           </View>
         </TouchableOpacity>
@@ -103,22 +83,9 @@ const CollapsiblePloggingControls = ({
     );
   }
 
-  // 🔥 펼쳐진 상태일 때의 전체 컨트롤
+  // 🔥 펼쳐진 상태
   return (
-    <Animated.View 
-      style={[
-        styles.expandedContainer,
-        {
-          opacity: opacityAnim,
-          transform: [{
-            scaleY: heightAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.8, 1],
-            })
-          }]
-        }
-      ]}
-    >
+    <View style={styles.expandedContainer}>
       {/* 드래그 핸들 */}
       <View style={styles.dragHandle} />
       
@@ -134,7 +101,6 @@ const CollapsiblePloggingControls = ({
           </Text>
         </View>
         
-        {/* 접기 버튼 */}
         <TouchableOpacity 
           style={styles.collapseButton}
           onPress={() => handleCollapse(true)}
@@ -204,17 +170,17 @@ const CollapsiblePloggingControls = ({
           </TouchableOpacity>
         )}
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
+// 🔥 스타일은 그대로 유지 (기존과 동일)
 const styles = StyleSheet.create({
-  // 🔥 접힌 상태 스타일
   collapsedContainer: {
     position: 'absolute',
     bottom: 20,
     right: 20,
-    zIndex: 50, // 🔥 모달보다 낮은 z-index
+    zIndex: 50,
   },
   collapsedCard: {
     backgroundColor: '#FFFFFF',
@@ -250,8 +216,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#418663',
   },
-
-  // 🔥 펼쳐진 상태 스타일
   expandedContainer: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
@@ -265,10 +229,8 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 15,
     minHeight: 200,
-    zIndex: 50, // 🔥 모달보다 낮은 z-index
+    zIndex: 50,
   },
-
-  // 드래그 핸들
   dragHandle: {
     width: 40,
     height: 4,
@@ -277,8 +239,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 15,
   },
-
-  // 헤더
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -300,15 +260,11 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     backgroundColor: '#F5F5F5',
   },
-
-  // 상태 표시 점
   statusDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
   },
-
-  // 시간 표시
   timeContainer: {
     alignItems: 'center',
     marginBottom: 15,
@@ -325,16 +281,12 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     letterSpacing: 2,
   },
-
-  // 구분선
   divider: {
     width: '100%',
     height: 1,
     backgroundColor: '#EAEAEA',
     marginVertical: 15,
   },
-
-  // 쓰레기 정보
   trashInfoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -365,8 +317,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#418663',
   },
-
-  // 버튼 영역
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
