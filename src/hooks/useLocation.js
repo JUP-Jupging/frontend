@@ -46,8 +46,6 @@ export const useLocation = () => {
 
   // 두 좌표 간의 거리 계산 (미터 단위)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    console.log('[useLocation] 거리 계산:', { lat1, lon1, lat2, lon2 });
-    
     const R = 6371e3; // 지구 반지름 (미터)
     const φ1 = (lat1 * Math.PI) / 180;
     const φ2 = (lat2 * Math.PI) / 180;
@@ -60,7 +58,6 @@ export const useLocation = () => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     const distance = R * c;
-    console.log('[useLocation] 계산된 거리:', distance, 'm');
     return distance;
   };
 
@@ -109,8 +106,8 @@ export const useLocation = () => {
         
         console.log('[useLocation] 새 위치 수신:', { 
           ...newCoordinate, 
-          정확도: accuracy?.toFixed(1) + 'm',
-          속도: speed?.toFixed(1) + 'm/s'
+          "정확도": accuracy?.toFixed(1) + 'm',
+          "속도": speed?.toFixed(1) + 'm/s'
         });
 
         // GPS 정확도가 너무 낮으면 무시 (50미터 이상 오차)
@@ -126,15 +123,15 @@ export const useLocation = () => {
           longitude
         }));
 
-        // 맵 카메라를 새 위치로 이동 (플로깅 중일 때만)
-        if (isRunning && mapRef.current) {
-          mapRef.current.animateToRegion({
-            latitude,
-            longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }, 1000);
-        }
+        // 🔥 [수정] 자동 줌아웃(카메라 이동) 현상을 막기 위해 아래 코드를 주석 처리합니다.
+        // if (isRunning && mapRef.current) {
+        //   mapRef.current.animateToRegion({
+        //     latitude,
+        //     longitude,
+        //     latitudeDelta: 0.01,
+        //     longitudeDelta: 0.01,
+        //   }, 1000);
+        // }
 
         setRouteCoordinates(prevRoute => {
           // 거리 계산 (첫 번째 좌표가 아닌 경우에만)
@@ -148,10 +145,10 @@ export const useLocation = () => {
             );
             
             console.log('[useLocation] 📏 거리 계산:', {
-              이전위치: lastCoordinate,
-              현재위치: newCoordinate,
-              계산된거리: distance.toFixed(2) + 'm',
-              GPS정확도: accuracy?.toFixed(1) + 'm'
+              "이전 위치": lastCoordinate,
+              "현재 위치": newCoordinate,
+              "계산된 거리": distance.toFixed(2) + 'm',
+              "GPS 정확도": accuracy?.toFixed(1) + 'm'
             });
             
             // 더 세밀한 거리 체크: 1.5미터 이상 이동했을 때만 새로운 점 추가

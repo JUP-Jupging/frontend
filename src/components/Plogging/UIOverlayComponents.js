@@ -24,25 +24,7 @@ export const TrailInstructionCard = ({
   onTrailPress 
 }) => (
   <View style={styles.instructionCard}>
-    <Text style={styles.instructionTitle}>🎯 가장 가까운 산책로</Text>
-    <Text style={styles.instructionText}>
-      {trail.name}{"\n"}
-      거리: {trail.distanceToUser?.toFixed(0)}m
-    </Text>
-    <Text style={[
-      styles.instructionSubText,
-      { color: isNear ? "rgba(255, 255, 255, 0.9)" : "rgba(255, 193, 7, 0.9)" }
-    ]}>
-      {isNear ? "플로깅 시작 가능한 거리입니다" : "조금 더 가까이 이동해주세요"}
-    </Text>
-    {!isNear && onTrailPress && (
-      <TouchableOpacity 
-        style={styles.selectTrailButton}
-        onPress={onTrailPress}
-      >
-        <Text style={styles.selectTrailButtonText}>산책로 정보 보기</Text>
-      </TouchableOpacity>
-    )}
+
   </View>
 );
 
@@ -298,54 +280,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // 안내 카드
-  instructionCard: {
-    backgroundColor: "rgba(66, 134, 99, 0.9)",
-    borderRadius: 15,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    width: '100%',
-  },
-  instructionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  instructionText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  instructionSubText: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "rgba(255, 255, 255, 0.8)",
-    textAlign: "center",
-  },
-  selectTrailButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginTop: 8,
-    alignSelf: "center",
-  },
-  selectTrailButtonText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
+ 
   // 데이터 없음 카드
   noDataCard: {
     backgroundColor: "rgba(255, 193, 7, 0.1)",

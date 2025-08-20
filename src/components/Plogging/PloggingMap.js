@@ -1,20 +1,17 @@
-// components/Plogging/PloggingMap.js - null ì°¸ì¡° ì˜¤ë¥˜ í•´ê²° ë²„ì „
+// components/Plogging/PloggingMap.js
 
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import MapView, { Marker, Polyline, Circle } from 'react-native-maps';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-// ðŸ”¥ í˜„ìž¬ ìœ„ì¹˜ ë§ˆì»¤ (ì•ˆì „í•œ ë²„ì „)
+// 현재 위치 마커 컴포넌트 (개선된 애니메이션)
 const CurrentLocationMarker = () => {
   const pulseAnim = useRef(new Animated.Value(0)).current;
-  const isMounted = useRef(true);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const pulse = () => {
-      // ì»´í¬ë„ŒíŠ¸ê°€ ì‚´ì•„ìžˆì„ ë•Œë§Œ ì• ë‹ˆë©”ì´ì…˜ì„ ë°˜ë³µí•©ë‹ˆë‹¤.
-      if (!isMounted.current) return;
-
       Animated.sequence([
         Animated.timing(pulseAnim, { 
           toValue: 1, 
@@ -26,26 +23,40 @@ const CurrentLocationMarker = () => {
           duration: 1500, 
           useNativeDriver: true 
         }),
-      ]).start(pulse); // ì™„ë£Œë˜ë©´ ìžê¸° ìžì‹ (pulse)ì„ ë‹¤ì‹œ í˜¸ì¶œ
+      ]).start(() => pulse());
     };
+
+    const breathe = () => {
+      Animated.sequence([
+        Animated.timing(scaleAnim, { 
+          toValue: 1.15, 
+          duration: 800, 
+          useNativeDriver: true 
+        }),
+        Animated.timing(scaleAnim, { 
+          toValue: 1, 
+          duration: 800, 
+          useNativeDriver: true 
+        }),
+      ]).start(() => breathe());
+    };
+
     pulse();
-    
-    // 4. ì–¸ë§ˆìš´íŠ¸ë  ë•Œ refë¥¼ falseë¡œ ì„¤ì •í•´ ì• ë‹ˆë©”ì´ì…˜ ìž¬ê·€ í˜¸ì¶œì„ ë§‰ìŠµë‹ˆë‹¤.
-    return () => {
-      isMounted.current = false;
-    };
-  }, [pulseAnim]); // 3. ì˜ì¡´ì„± ë°°ì—´ì„ ìˆ˜ì •í•´ ìµœì´ˆ í•œ ë²ˆë§Œ ì‹¤í–‰ë˜ë„ë¡ í•©ë‹ˆë‹¤.
+    breathe();
+  }, [pulseAnim, scaleAnim]);
 
   const pulseScale = pulseAnim.interpolate({ 
     inputRange: [0, 1], 
-    outputRange: [1, 2.5] 
+    outputRange: [1, 3.5] 
   });
   const pulseOpacity = pulseAnim.interpolate({ 
     inputRange: [0, 1], 
-    outputRange: [0.6, 0] 
+    outputRange: [0.8, 0] 
   });
+
   return (
     <View style={styles.currentLocationContainer}>
+      {/* 외부 펄스 효과 */}
       <Animated.View style={[
         styles.currentLocationPulse,
         {
@@ -54,68 +65,233 @@ const CurrentLocationMarker = () => {
         },
       ]} />
       
-      <View style={styles.currentLocationMarker}>
-        <View style={styles.currentLocationInner} />
-      </View>
-    </View>
-  );
-};
-
-// ðŸ”¥ ì‚°ì±…ë¡œ ë§ˆì»¤ (ì•ˆì „í•œ ë²„ì „)
-const CourseMarker = ({ course, isSelected }) => {
-  return (
-    <View style={styles.courseMarkerContainer}>
-      <View style={[
-        styles.courseMarker, 
-        isSelected && styles.selectedCourseMarker
+      {/* 메인 마커 */}
+      <Animated.View style={[
+        styles.currentLocationMarker,
+        {
+          transform: [{ scale: scaleAnim }],
+        },
       ]}>
-        <Icon 
-          name="directions-walk" 
-          size={20} 
-          color={isSelected ? "#FFFFFF" : "#418663"} 
-        />
-      </View>
-      
-      {course.reportCount > 0 && (
-        <View style={styles.reportBadge}>
-          <Text style={styles.reportBadgeText}>{course.reportCount}</Text>
-        </View>
-      )}
+        <View style={styles.currentLocationInner} />
+      </Animated.View>
     </View>
   );
 };
 
-// ðŸ”¥ ì“°ë ˆê¸° ë§ˆì»¤ (ì•ˆì „í•œ ë²„ì „)
-const TrashMarker = ({ trash }) => {
+// 개선된 산책로 마커 컴포넌트
+const CourseMarker = ({ course, isSelected, onPress }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isSelected) {
+      Animated.sequence([
+        Animated.timing(scaleAnim, { 
+          toValue: 1.3, 
+          duration: 200, 
+          useNativeDriver: true 
+        }),
+        Animated.timing(scaleAnim, { 
+          toValue: 1.2, 
+          duration: 200, 
+          useNativeDriver: true 
+        }),
+      ]).start();
+
+      // 선택된 마커는 지속적으로 bounce
+      const bounce = () => {
+        Animated.sequence([
+          Animated.timing(bounceAnim, { 
+            toValue: 1, 
+            duration: 1000, 
+            useNativeDriver: true 
+          }),
+          Animated.timing(bounceAnim, { 
+            toValue: 0, 
+            duration: 1000, 
+            useNativeDriver: true 
+          }),
+        ]).start(() => isSelected && bounce());
+      };
+      bounce();
+    } else {
+      Animated.timing(scaleAnim, { 
+        toValue: 1, 
+        duration: 200, 
+        useNativeDriver: true 
+      }).start();
+    }
+  }, [isSelected, scaleAnim, bounceAnim]);
+
+  const bounceTranslate = bounceAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -10],
+  });
+
+  return (
+    <TouchableOpacity onPress={() => onPress(course)} activeOpacity={0.7}>
+      <Animated.View style={[
+        styles.courseMarkerContainer,
+        { 
+          transform: [
+            { scale: scaleAnim },
+            { translateY: isSelected ? bounceTranslate : 0 }
+          ] 
+        }
+      ]}>
+        <View style={[
+          styles.courseMarker, 
+          isSelected && styles.selectedCourseMarker
+        ]}>
+          <Icon 
+            name="directions-walk" 
+            size={24} 
+            color={isSelected ? "#FFFFFF" : "#418663"} 
+          />
+        </View>
+        
+        {/* 쓰레기 신고 수 배지 */}
+        {course.reportCount > 0 && (
+          <View style={styles.reportBadge}>
+            <Text style={styles.reportBadgeText}>{course.reportCount}</Text>
+          </View>
+        )}
+        
+        {/* 마커 레이블 (선택된 경우만 표시) */}
+        {isSelected && (
+          <View style={styles.courseLabel}>
+            <Text style={styles.courseLabelText} numberOfLines={1}>
+              {course.name}
+            </Text>
+          </View>
+        )}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+// 🔥 개선된 쓰레기 마커 컴포넌트 - 애니메이션 오류 해결
+const TrashMarker = ({ trash, onPress }) => {
+  const bounceAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const bounce = () => {
+      Animated.sequence([
+        Animated.timing(bounceAnim, { 
+          toValue: 1.1, // 🔥 스케일 값 줄임 (1.2 → 1.1)
+          duration: 1200, 
+          useNativeDriver: true 
+        }),
+        Animated.timing(bounceAnim, { 
+          toValue: 1, 
+          duration: 1200, 
+          useNativeDriver: true 
+        }),
+      ]).start(() => bounce());
+    };
+
+    const pulse = () => {
+      Animated.sequence([
+        Animated.timing(pulseAnim, { 
+          toValue: 1, 
+          duration: 800, 
+          useNativeDriver: true 
+        }),
+        Animated.timing(pulseAnim, { 
+          toValue: 0, 
+          duration: 800, 
+          useNativeDriver: true 
+        }),
+      ]).start(() => pulse());
+    };
+
+    // 🔥 애니메이션 시작 지연 추가
+    const bounceTimeout = setTimeout(bounce, 100);
+    const pulseTimeout = setTimeout(pulse, 200);
+
+    return () => {
+      clearTimeout(bounceTimeout);
+      clearTimeout(pulseTimeout);
+    };
+  }, [bounceAnim, pulseAnim]);
+
   const getTrashColor = (amount) => {
     switch(amount) {
-      case 'ë§ŽìŒ': return '#FF5722';
-      case 'ë³´í†µ': return '#FF9800';
-      case 'ì ìŒ': return '#4CAF50';
+      case '많음': return '#FF5722';
+      case '보통': return '#FF9800';
+      case '적음': return '#4CAF50';
       default: return '#797982';
     }
   };
 
+  const pulseOpacity = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0],
+  });
+
+  const pulseScale = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.8], // 🔥 스케일 값 줄임 (2 → 1.8)
+  });
+
+  // 🔥 클릭 핸들러에 디버깅 추가
+  const handlePress = () => {
+    console.log("🎯 [TrashMarker] === 마커 클릭됨 ===");
+    console.log("🎯 [TrashMarker] 클릭된 쓰레기:", trash);
+    console.log("🎯 [TrashMarker] 쓰레기 ID:", trash?.id);
+    console.log("🎯 [TrashMarker] 쓰레기 키들:", trash ? Object.keys(trash) : 'null');
+    console.log("🎯 [TrashMarker] onPress 함수:", typeof onPress);
+    
+    if (onPress && typeof onPress === 'function') {
+      console.log("🎯 [TrashMarker] onPress 호출 시작");
+      onPress(trash);
+      console.log("🎯 [TrashMarker] onPress 호출 완료");
+    } else {
+      console.warn("⚠️ [TrashMarker] onPress 함수가 없거나 함수가 아닙니다");
+    }
+  };
+
   return (
-    <View style={styles.trashMarkerContainer}>
-      <View style={[
-        styles.trashMarker,
-        { borderColor: getTrashColor(trash.amount) }
+    <TouchableOpacity 
+      onPress={handlePress} 
+      activeOpacity={0.7}
+      style={styles.trashMarkerContainer}
+      hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }} // 🔥 터치 영역 더 확대
+    >
+      <Animated.View style={[
+        { transform: [{ scale: bounceAnim }] }
       ]}>
-        <Icon 
-          name="delete" 
-          size={16} 
-          color={getTrashColor(trash.amount)} 
-        />
-      </View>
-      
-      <View style={[
-        styles.trashAmountBadge,
-        { backgroundColor: getTrashColor(trash.amount) }
-      ]}>
-        <Text style={styles.trashAmountText}>{trash.amount || 'ë³´í†µ'}</Text>
-      </View>
-    </View>
+        {/* 펄스 효과 */}
+        <Animated.View style={[
+          styles.trashPulse,
+          {
+            backgroundColor: getTrashColor(trash.amount),
+            opacity: pulseOpacity,
+            transform: [{ scale: pulseScale }],
+          }
+        ]} />
+        
+        <View style={[
+          styles.trashMarker,
+          { borderColor: getTrashColor(trash.amount) }
+        ]}>
+          <Icon 
+            name="delete" 
+            size={20} 
+            color={getTrashColor(trash.amount)} 
+          />
+        </View>
+        
+        {/* 쓰레기 양 표시 배지 */}
+        <View style={[
+          styles.trashAmountBadge,
+          { backgroundColor: getTrashColor(trash.amount) }
+        ]}>
+          <Text style={styles.trashAmountText}>{trash.amount}</Text>
+        </View>
+      </Animated.View>
+    </TouchableOpacity>
   );
 };
 
@@ -132,150 +308,29 @@ const PloggingMap = ({
   selectedCourseId,
   initialTrailPath 
 }) => {
-  // ðŸ”¥ ì•ˆì „í•œ ìƒíƒœ ê´€ë¦¬
-  const [mapMounted, setMapMounted] = useState(false);
-  const [safeMapReady, setSafeMapReady] = useState(false);
 
-  console.log("ðŸ—ºï¸ [PloggingMap] === ë Œë”ë§ (ì•ˆì „í•œ ë²„ì „) ===");
-  console.log("ðŸ—ºï¸ [PloggingMap] ì“°ë ˆê¸° ìœ„ì¹˜ ê°œìˆ˜:", trashLocations?.length || 0);
-  console.log("ðŸ—ºï¸ [PloggingMap] ê²½ë¡œ í¬ì¸íŠ¸ ê°œìˆ˜:", routeCoordinates?.length || 0);
-  console.log("ðŸ—ºï¸ [PloggingMap] ì‚°ì±…ë¡œ ê°œìˆ˜:", nearbyCourses?.length || 0);
+  // 🔥 디버깅 로그 추가
+  console.log("🗺️ [PloggingMap] === 렌더링 ===");
+  console.log("🗺️ [PloggingMap] 쓰레기 위치 개수:", trashLocations?.length || 0);
+  console.log("🗺️ [PloggingMap] onTrashMarkerPress 함수:", typeof onTrashMarkerPress);
+  
+  if (trashLocations && trashLocations.length > 0) {
+    console.log("🗺️ [PloggingMap] 첫 번째 쓰레기 데이터:", trashLocations[0]);
+    console.log("🗺️ [PloggingMap] 쓰레기 데이터 키들:", Object.keys(trashLocations[0]));
+  }
 
   const defaultRegion = {
     latitude: 37.5665,
     longitude: 126.9780,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
+    latitudeDelta: 0.008,
+    longitudeDelta: 0.008,
   };
 
   const initialRegion = currentLocation ? {
     ...currentLocation,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
+    latitudeDelta: 0.008,
+    longitudeDelta: 0.008,
   } : defaultRegion;
-
-  // ðŸ”¥ ì•ˆì „í•œ ë§ˆìš´íŠ¸ ì²˜ë¦¬
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMapMounted(true);
-    }, 100);
-
-    return () => {
-      clearTimeout(timer);
-      setMapMounted(false);
-    };
-  }, []);
-
-  // ðŸ”¥ ì•ˆì „í•œ ë§µ ì¤€ë¹„ ìƒíƒœ ì²˜ë¦¬
-  const handleMapReady = () => {
-    console.log('ðŸ—ºï¸ [PloggingMap] ì§€ë„ ì¤€ë¹„ ì™„ë£Œ');
-    setSafeMapReady(true);
-  };
-
-  // ðŸ”¥ ì•ˆì „í•œ ë§ˆì»¤ ë Œë”ë§ í•¨ìˆ˜
-  const renderCurrentLocationMarker = () => {
-    if (!currentLocation || !mapMounted || !safeMapReady) return null;
-
-    return (
-      <Marker
-        key="current-location"
-        coordinate={currentLocation}
-        anchor={{ x: 0.5, y: 0.5 }}
-        zIndex={1000}
-        tracksViewChanges={false}
-      >
-        <CurrentLocationMarker />
-      </Marker>
-    );
-  };
-
-  const renderTrashMarkers = () => {
-    if (!trashLocations || !mapMounted || !safeMapReady) return null;
-
-    return trashLocations
-      .filter(trash => !trash.isPicked)
-      .filter(trash => {
-        // ì¢Œí‘œ ìœ íš¨ì„± ê²€ì‚¬
-        if (!trash.coordinate || 
-            typeof trash.coordinate.latitude !== 'number' || 
-            typeof trash.coordinate.longitude !== 'number') {
-          console.warn(`âš ï¸ [PloggingMap] ì“°ë ˆê¸° ì¢Œí‘œ ë¬´íš¨:`, trash.coordinate);
-          return false;
-        }
-        return true;
-      })
-      .map((trash, index) => {
-        console.log(`ðŸ—‘ï¸ [PloggingMap] ì“°ë ˆê¸° ${index} ë Œë”ë§:`, {
-          id: trash.id,
-          lat: trash.coordinate.latitude,
-          lng: trash.coordinate.longitude,
-          amount: trash.amount
-        });
-        
-        return (
-          <Marker 
-            key={`trash-${trash.id || index}-${Math.random()}`} 
-            coordinate={trash.coordinate}
-            anchor={{ x: 0.5, y: 0.5 }}
-            zIndex={500}
-            tracksViewChanges={false}
-            onPress={() => {
-              console.log(`ðŸŽ¯ [PloggingMap] === ì“°ë ˆê¸° ë§ˆì»¤ ì§ì ‘ í´ë¦­ ===`);
-              console.log(`ðŸŽ¯ [PloggingMap] í´ë¦­ëœ ì“°ë ˆê¸° ID: ${trash.id}`);
-              
-              if (onTrashMarkerPress && typeof onTrashMarkerPress === 'function') {
-                console.log(`ðŸŽ¯ [PloggingMap] onTrashMarkerPress í˜¸ì¶œ ì‹œìž‘`);
-                try {
-                  onTrashMarkerPress(trash);
-                  console.log(`ðŸŽ¯ [PloggingMap] onTrashMarkerPress í˜¸ì¶œ ì™„ë£Œ`);
-                } catch (error) {
-                  console.error(`âŒ [PloggingMap] onTrashMarkerPress ì—ëŸ¬:`, error);
-                }
-              } else {
-                console.warn(`âš ï¸ [PloggingMap] onTrashMarkerPress í•¨ìˆ˜ê°€ ì—†ìŒ`);
-              }
-            }}
-          >
-            <TrashMarker trash={trash} />
-          </Marker>
-        );
-      });
-  };
-
-  const renderCourseMarkers = () => {
-    if (!nearbyCourses || !mapMounted || !safeMapReady) return null;
-
-    return nearbyCourses
-      .filter(course => {
-        if (!course.coordinate || 
-            typeof course.coordinate.latitude !== 'number' || 
-            typeof course.coordinate.longitude !== 'number') {
-          console.warn(`âš ï¸ [PloggingMap] ì‚°ì±…ë¡œ ${course.id} ì¢Œí‘œ ë¬´íš¨:`, course.coordinate);
-          return false;
-        }
-        return true;
-      })
-      .map((course) => (
-        <Marker 
-          key={`course-${course.id}`} 
-          coordinate={course.coordinate}
-          anchor={{ x: 0.5, y: 0.5 }}
-          zIndex={300}
-          tracksViewChanges={false}
-          onPress={() => {
-            console.log(`ðŸš¶ [PloggingMap] ì‚°ì±…ë¡œ ë§ˆì»¤ í´ë¦­: ${course.id}`);
-            if (onCourseMarkerPress && typeof onCourseMarkerPress === 'function') {
-              onCourseMarkerPress(course);
-            }
-          }}
-        >
-          <CourseMarker
-            course={course}
-            isSelected={selectedCourseId === course.id}
-          />
-        </Marker>
-      ));
-  };
 
   return (
     <View style={styles.mapContainer}>
@@ -283,103 +338,142 @@ const PloggingMap = ({
         ref={mapRef}
         style={styles.map}
         initialRegion={initialRegion}
-        onMapReady={handleMapReady}
+        onMapReady={() => console.log('🗺️ [PloggingMap] 지도 준비 완료')}
         loadingIndicatorColor="#418663"
         loadingBackgroundColor="#F5F5F5"
-        showsUserLocation={false}
-        showsMyLocationButton={false}
-        showsCompass={false}
-        showsScale={false}
-        showsBuildings={true}
-        showsTraffic={false}
-        showsIndoors={false}
-        rotateEnabled={true}
-        scrollEnabled={true}
-        zoomEnabled={true}
-        pitchEnabled={false}
-        // ðŸ”¥ ì¶”ê°€ ì•ˆì „ì„± ì˜µì…˜
-        moveOnMarkerPress={false}
-        showsPointsOfInterest={false}
-        provider="google" // Google Maps ì‚¬ìš© (ë” ì•ˆì •ì )
       >
-        {/* ðŸ”¥ ì•ˆì „í•œ ë Œë”ë§ ì¡°ê±´ */}
-        {mapMounted && safeMapReady && (
+        {mapReady && (
           <>
-            {/* í˜„ìž¬ ìœ„ì¹˜ ë§ˆì»¤ */}
-            {renderCurrentLocationMarker()}
+            {/* 현재 위치 커스텀 마커 */}
+            {currentLocation && (
+              <Marker
+                coordinate={currentLocation}
+                anchor={{ x: 0.5, y: 0.5 }}
+                zIndex={1000}
+              >
+                <CurrentLocationMarker />
+              </Marker>
+            )}
 
-            {/* ì‚°ì±…ë¡œ ì „ì²´ ê²½ë¡œ (ì ì„ ) */}
+            {/* 선택된 산책로의 전체 경로 표시 (점선) */}
             {initialTrailPath && initialTrailPath.length > 1 && (
               <Polyline
                 coordinates={initialTrailPath}
-                strokeColor="rgba(65, 134, 99, 0.5)"
-                strokeWidth={4}
-                lineDashPattern={[8, 4]}
+                strokeColor="rgba(65, 134, 99, 0.6)"
+                strokeWidth={5}
+                lineDashPattern={[10, 5]}
                 lineJoin="round"
                 lineCap="round"
               />
             )}
 
-            {/* í”Œë¡œê¹… ê²½ë¡œ (ì‹¤ì„ ) */}
+            {/* 사용자가 이동한 경로 (플로깅 중) - 실선 */}
             {routeCoordinates && routeCoordinates.length > 1 && (
               <Polyline
                 coordinates={routeCoordinates}
                 strokeColor="#418663"
-                strokeWidth={5}
+                strokeWidth={7}
                 lineJoin="round"
                 lineCap="round"
               />
             )}
 
-            {/* ì“°ë ˆê¸° ë§ˆì»¤ë“¤ */}
-            {renderTrashMarkers()}
-
-            {/* ì‚°ì±…ë¡œ ë§ˆì»¤ë“¤ */}
-            {renderCourseMarkers()}
-
-            {/* ì„ íƒëœ ì‚°ì±…ë¡œ ì£¼ë³€ ë°˜ê²½ */}
-            {selectedCourseId && nearbyCourses && (() => {
-              const selectedCourse = nearbyCourses.find(c => c.id === selectedCourseId);
-              if (!selectedCourse || !selectedCourse.coordinate) return null;
+            {/* 🔥 쓰레기 위치 마커 - 수거되지 않은 것만 표시 */}
+            {trashLocations && trashLocations
+              .filter(trash => !trash.isPicked) // 🔥 수거되지 않은 쓰레기만 필터링
+              .map((trash, index) => {
+              console.log(`🗑️ [PloggingMap] 쓰레기 ${index} 마커 렌더링:`, {
+                id: trash.id,
+                coordinate: trash.coordinate,
+                amount: trash.amount,
+                hasId: !!trash.id,
+                hasCoordinate: !!trash.coordinate,
+                isPicked: trash.isPicked // 🔥 수거 상태 로깅
+              });
               
               return (
-                <Circle
-                  center={selectedCourse.coordinate}
-                  radius={300}
-                  strokeColor="rgba(65, 134, 99, 0.4)"
-                  fillColor="rgba(65, 134, 99, 0.1)"
-                  strokeWidth={2}
-                />
+                <Marker 
+                  key={`trash-${trash.id || index}`} 
+                  coordinate={trash.coordinate}
+                  onPress={() => {
+                    console.log(`🎯 [PloggingMap] Marker onPress 호출 - 쓰레기 ${trash.id}`);
+                    console.log(`🎯 [PloggingMap] 전달할 쓰레기 데이터:`, trash);
+                    if (onTrashMarkerPress) {
+                      console.log(`🎯 [PloggingMap] onTrashMarkerPress 함수 호출`);
+                      onTrashMarkerPress(trash);
+                    } else {
+                      console.warn(`⚠️ [PloggingMap] onTrashMarkerPress 함수가 없습니다`);
+                    }
+                  }}
+                  tracksViewChanges={false} // 🔥 성능 최적화 및 이벤트 안정성
+                >
+                  <TrashMarker 
+                    trash={trash} 
+                    onPress={(clickedTrash) => {
+                      console.log(`🎯 [PloggingMap] TrashMarker onPress - 쓰레기 ${clickedTrash?.id}`);
+                      if (onTrashMarkerPress) {
+                        onTrashMarkerPress(clickedTrash);
+                      }
+                    }}
+                  />
+                </Marker>
               );
-            })()}
+            })}
+
+            {/* 근처 산책로 마커 */}
+            {nearbyCourses && nearbyCourses.map((course) => (
+              <Marker key={`course-${course.id}`} coordinate={course.coordinate}>
+                <CourseMarker
+                  course={course}
+                  isSelected={selectedCourseId === course.id}
+                  onPress={onCourseMarkerPress}
+                />
+              </Marker>
+            ))}
+
+            {/* 선택된 산책로 주변 반경 표시 */}
+            {selectedCourseId && nearbyCourses && (
+              (() => {
+                const selectedCourse = nearbyCourses.find(c => c.id === selectedCourseId);
+                return selectedCourse ? (
+                  <Circle
+                    center={selectedCourse.coordinate}
+                    radius={500}
+                    strokeColor="rgba(65, 134, 99, 0.3)"
+                    fillColor="rgba(65, 134, 99, 0.1)"
+                    strokeWidth={2}
+                  />
+                ) : null;
+              })()
+            )}
           </>
         )}
       </MapView>
 
-      {/* ë¡œë”© ì˜¤ë²„ë ˆì´ */}
-      {(isLoading || !safeMapReady) && (
+      {/* 로딩 오버레이 */}
+      {(isLoading || !mapReady) && (
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingContent}>
             <Text style={styles.loadingText}>
-              {isLoading ? "ì§€ë„ë¥¼ ë¶ˆëŸ¬ì˜¤ëŠ” ì¤‘..." : "ì§€ë„ ì¤€ë¹„ ì¤‘..."}
+              {isLoading ? "지도를 불러오는 중..." : "지도 준비 중..."}
             </Text>
           </View>
         </View>
       )}
 
-      {/* ì§€ë„ í†µê³„ ì •ë³´ */}
-      {safeMapReady && (
-        <View style={styles.statsContainer}>
-          {routeCoordinates && routeCoordinates.length > 0 && (
-            <View style={styles.statItem}>
-              <Icon name="timeline" size={14} color="#418663" />
-              <Text style={styles.statText}>{routeCoordinates.length}ê°œ í¬ì¸íŠ¸</Text>
+      {/* 지도 범례 */}
+      {mapReady && (nearbyCourses?.length > 0 || trashLocations?.length > 0) && (
+        <View style={styles.legendContainer}>
+          {nearbyCourses?.length > 0 && (
+            <View style={styles.legendItem}>
+              <Icon name="directions-walk" size={16} color="#418663" />
+              <Text style={styles.legendText}>산책로</Text>
             </View>
           )}
-          {trashLocations && trashLocations.length > 0 && (
-            <View style={styles.statItem}>
-              <Icon name="delete" size={14} color="#FF9800" />
-              <Text style={styles.statText}>{trashLocations.filter(t => !t.isPicked).length}ê°œ ì“°ë ˆê¸°</Text>
+          {trashLocations?.length > 0 && (
+            <View style={styles.legendItem}>
+              <Icon name="delete" size={16} color="#FF9800" />
+              <Text style={styles.legendText}>쓰레기</Text>
             </View>
           )}
         </View>
@@ -389,7 +483,7 @@ const PloggingMap = ({
 };
 
 const styles = StyleSheet.create({
-  // ê¸°ë³¸ ì»¨í…Œì´ë„ˆ
+  // 기본 맵 컨테이너
   mapContainer: { 
     flex: 1, 
     backgroundColor: "#F5F5F5",
@@ -398,17 +492,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ë¡œë”© ì˜¤ë²„ë ˆì´
+  // 로딩 오버레이
   loadingOverlay: { 
     position: 'absolute', 
     top: 0, 
     left: 0, 
     right: 0, 
     bottom: 0, 
-    backgroundColor: 'rgba(245, 245, 245, 0.8)', 
+    backgroundColor: 'rgba(245, 245, 245, 0.9)', 
     justifyContent: 'center', 
     alignItems: 'center',
-    zIndex: 9999,
   },
   loadingContent: {
     backgroundColor: '#FFFFFF',
@@ -427,143 +520,158 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // í˜„ìž¬ ìœ„ì¹˜ ë§ˆì»¤
+  // 현재 위치 마커
   currentLocationContainer: { 
     alignItems: 'center', 
     justifyContent: 'center',
-    width: 24,
-    height: 24,
   },
   currentLocationPulse: { 
     position: 'absolute', 
-    width: 16, 
-    height: 16, 
-    borderRadius: 8, 
+    width: 20, 
+    height: 20, 
+    borderRadius: 10, 
     backgroundColor: '#4A90E2',
   },
   currentLocationMarker: { 
-    width: 16, 
-    height: 16, 
-    borderRadius: 8, 
+    width: 20, 
+    height: 20, 
+    borderRadius: 10, 
     backgroundColor: '#FFFFFF', 
-    borderWidth: 3, 
+    borderWidth: 4, 
     borderColor: '#4A90E2', 
     shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.3, 
-    shadowRadius: 3, 
-    elevation: 5,
+    shadowOffset: { width: 0, height: 3 }, 
+    shadowOpacity: 0.4, 
+    shadowRadius: 4, 
+    elevation: 8,
   },
   currentLocationInner: {
     flex: 1,
-    borderRadius: 4,
+    borderRadius: 6,
     backgroundColor: '#4A90E2',
-    margin: 1,
+    margin: 2,
   },
 
-  // ì‚°ì±…ë¡œ ë§ˆì»¤
+  // 산책로 마커
   courseMarkerContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
   },
   courseMarker: { 
-    width: 36, 
-    height: 36, 
+    width: 48, 
+    height: 48, 
     backgroundColor: "#FFFFFF", 
-    borderRadius: 18, 
-    borderWidth: 2, 
+    borderRadius: 24, 
+    borderWidth: 3, 
     borderColor: "#418663", 
     justifyContent: "center", 
     alignItems: "center", 
     shadowColor: "#000", 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.25, 
-    shadowRadius: 4, 
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.3, 
+    shadowRadius: 6, 
+    elevation: 8,
   },
   selectedCourseMarker: { 
     backgroundColor: "#418663",
     borderColor: "#2E5945",
-    borderWidth: 3,
+    borderWidth: 4,
   },
   reportBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -5,
+    right: -5,
     backgroundColor: '#FF5722',
-    borderRadius: 8,
-    width: 16,
-    height: 16,
+    borderRadius: 10,
+    width: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#FFFFFF',
   },
   reportBadgeText: {
     color: '#FFFFFF',
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: 'bold',
   },
+  courseLabel: {
+    marginTop: 5,
+    backgroundColor: 'rgba(65, 134, 99, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    maxWidth: 120,
+  },
+  courseLabelText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 
-  // ì“°ë ˆê¸° ë§ˆì»¤
+  // 쓰레기 마커
   trashMarkerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
+  trashPulse: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+  },
   trashMarker: { 
-    width: 32, 
-    height: 32, 
+    width: 40, 
+    height: 40, 
     backgroundColor: "#FFFFFF", 
-    borderRadius: 16, 
-    borderWidth: 2, 
+    borderRadius: 20, 
+    borderWidth: 3, 
     justifyContent: "center", 
     alignItems: "center", 
     shadowColor: "#000", 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.25, 
-    shadowRadius: 3, 
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 }, 
+    shadowOpacity: 0.3, 
+    shadowRadius: 5, 
+    elevation: 6,
   },
   trashAmountBadge: {
     position: 'absolute',
-    bottom: -4,
-    right: -4,
-    borderRadius: 6,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+    bottom: -5,
+    right: -5,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderWidth: 1,
     borderColor: '#FFFFFF',
-    minWidth: 12,
   },
   trashAmountText: {
     color: '#FFFFFF',
-    fontSize: 7,
+    fontSize: 10,
     fontWeight: 'bold',
-    textAlign: 'center',
   },
 
-  // í†µê³„ ì •ë³´
-  statsContainer: {
+  // 범례
+  legendContainer: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 20,
+    right: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 8,
     padding: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  statItem: {
+  legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 1,
+    marginVertical: 2,
   },
-  statText: {
-    marginLeft: 4,
-    fontSize: 11,
+  legendText: {
+    marginLeft: 6,
+    fontSize: 12,
     color: '#333',
     fontWeight: '500',
   },

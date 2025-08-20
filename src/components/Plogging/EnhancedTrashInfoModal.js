@@ -1,159 +1,122 @@
-// EnhancedTrashInfoModal.js - ì“°ë ˆê¸° ì •ë³´ ëª¨ë‹¬ (ìˆ˜ì •ëœ ë²„ì „)
+// EnhancedTrashInfoModal.js - 탭바 통합 방식에 맞게 간소화된 버전
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Modal, 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  ScrollView, 
-  StyleSheet, 
+import {
+  Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
   Dimensions,
   Image,
   ActivityIndicator,
   Alert
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { getReportById, markReportPicked } from '../../api/report'; // ðŸ”¥ API ì§ì ‘ import
-import { useAuth } from '../../stores/useAuth'; // ðŸ”¥ ì¸ì¦ ì •ë³´ ì¶”ê°€
-import { usePloggingContext } from '../../contexts/PloggingContext'; // ðŸ”¥ ì»¨í…ìŠ¤íŠ¸ ì¶”ê°€
+import { getReportById, markReportPicked } from '../../api/report';
+import { useAuth } from '../../stores/useAuth';
+import { usePloggingContext } from '../../contexts/PloggingContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: screenWidth } = Dimensions.get("window");
 
 /**
- * ê°œì„ ëœ ì“°ë ˆê¸° ì •ë³´ ëª¨ë‹¬ ì»´í¬ë„ŒíŠ¸
+ * 개선된 쓰레기 정보 모달 컴포넌트 - 탭바 통합 버전 (간소화)
  */
-const EnhancedTrashInfoModal = ({ 
-  visible, 
-  trashId, 
-  onClose, 
+const EnhancedTrashInfoModal = ({
+  visible,
+  trashId,
+  onClose,
   onPickSuccess,
-  onModalStateChange
+  onModalStateChange,
 }) => {
-  // ðŸ”¥ ì¸ì¦ ì •ë³´ ê°€ì ¸ì˜¤ê¸°
+  // ✅ [수정] 모든 훅 호출을 컴포넌트 최상단으로 이동시킵니다.
   const { accessToken } = useAuth();
-  
-  // ðŸ”¥ í”Œë¡œê¹… ì»¨í…ìŠ¤íŠ¸ì—ì„œ ì“°ë ˆê¸° ìƒì„¸ ì •ë³´ ì¡°íšŒ í•¨ìˆ˜ ê°€ì ¸ì˜¤ê¸°
   const { getTrashDetails } = usePloggingContext();
-  
-  // ë¡œì»¬ ìƒíƒœ
+  const insets = useSafeAreaInsets();
+
+  // 로컬 상태 훅
   const [trashDetails, setTrashDetails] = useState(null);
   const [isPickingTrash, setIsPickingTrash] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [imageLoadError, setImageLoadError] = useState(false);
 
-  console.log('[EnhancedTrashInfoModal] === ì»´í¬ë„ŒíŠ¸ ë Œë”ë§ ===', { 
-    visible, 
-    trashId,
-    trashIdType: typeof trashId,
-    hasDetails: !!trashDetails,
-    isLoadingDetails,
-    hasAccessToken: !!accessToken
-  });
-
-  // ëª¨ë‹¬ ìƒíƒœ ë³€ê²½ ì‹œ ë¶€ëª¨ì—ê²Œ ì•Œë¦¼
+  // useEffect 훅
   useEffect(() => {
     if (onModalStateChange) {
       onModalStateChange(visible);
     }
   }, [visible, onModalStateChange]);
 
-  /**
-   * ðŸ”¥ ì“°ë ˆê¸° ìƒì„¸ ì •ë³´ ë¡œë“œ
-   */
   useEffect(() => {
-    console.log(`ðŸŽ¯ [EnhancedTrashInfoModal] useEffect í˜¸ì¶œ:`, {
-      visible,
-      trashId,
-      trashIdType: typeof trashId,
-      trashIdValue: trashId
-    });
-    
     if (visible && trashId) {
-      console.log(`ðŸŽ¯ [EnhancedTrashInfoModal] ì¡°ê±´ ë§Œì¡± - loadTrashDetails í˜¸ì¶œ`);
       loadTrashDetails();
     } else {
-      console.log(`ðŸŽ¯ [EnhancedTrashInfoModal] ì¡°ê±´ ë¶ˆë§Œì¡± - ìƒíƒœ ì´ˆê¸°í™”`);
-      console.log(`ðŸŽ¯ [EnhancedTrashInfoModal] visible: ${visible}, trashId: ${trashId}`);
-      // ëª¨ë‹¬ì´ ë‹«ížˆë©´ ìƒíƒœ ì´ˆê¸°í™”
       resetModalState();
     }
   }, [visible, trashId]);
 
+
+  // --- 이하 함수 정의 (순서 변경 없음) ---
+
   /**
-   * ðŸ”¥ ì“°ë ˆê¸° ìƒì„¸ ì •ë³´ ë¡œë“œ (ì»¨í…ìŠ¤íŠ¸ ìš°ì„ , API fallback)
+   * 쓰레기 상세 정보 로드 (컨텍스트 우선, API fallback)
    */
   const loadTrashDetails = async () => {
     try {
       setIsLoadingDetails(true);
-      console.log(`ðŸ” [EnhancedTrashInfoModal] === ì“°ë ˆê¸° ì •ë³´ ë¡œë“œ ì‹œìž‘ ===`);
-      console.log(`ðŸ” [EnhancedTrashInfoModal] trashId:`, trashId);
-      console.log(`ðŸ” [EnhancedTrashInfoModal] accessToken:`, accessToken ? 'ì¡´ìž¬í•¨' : 'ì—†ìŒ');
-      
-      // ðŸ”¥ 1ì°¨: ì»¨í…ìŠ¤íŠ¸ì—ì„œ ì“°ë ˆê¸° ìƒì„¸ ì •ë³´ ì¡°íšŒ ì‹œë„
+      console.log(`🔍 [EnhancedTrashInfoModal] === 쓰레기 정보 로드 시작 ===`);
+
+      // 1차: 컨텍스트에서 쓰레기 상세 정보 조회 시도
       let trashFromContext = null;
       if (getTrashDetails && typeof getTrashDetails === 'function') {
-        console.log(`ðŸ” [EnhancedTrashInfoModal] ì»¨í…ìŠ¤íŠ¸ì—ì„œ ì“°ë ˆê¸° ì •ë³´ ì¡°íšŒ ì‹œë„...`);
         trashFromContext = getTrashDetails(trashId);
-        console.log(`ðŸ” [EnhancedTrashInfoModal] ì»¨í…ìŠ¤íŠ¸ ì¡°íšŒ ê²°ê³¼:`, trashFromContext ? 'ìžˆìŒ' : 'ì—†ìŒ');
       }
-      
+
       let reportData = null;
-      
+
       if (trashFromContext) {
-        // ì»¨í…ìŠ¤íŠ¸ì—ì„œ ë°ì´í„°ë¥¼ ì°¾ì€ ê²½ìš°
-        console.log(`ðŸ” [EnhancedTrashInfoModal] ì»¨í…ìŠ¤íŠ¸ ë°ì´í„° ì‚¬ìš©`);
+        // 컨텍스트에서 데이터를 찾은 경우
         reportData = trashFromContext.originalData || trashFromContext;
       } else {
-        // ðŸ”¥ 2ì°¨: APIë¥¼ í†µí•´ ì“°ë ˆê¸° ìƒì„¸ ì •ë³´ ê°€ì ¸ì˜¤ê¸°
-        console.log(`ðŸ” [EnhancedTrashInfoModal] getReportById API í˜¸ì¶œ ì‹œìž‘...`);
+        // 2차: API를 통해 쓰레기 상세 정보 가져오기
         reportData = await getReportById(trashId, accessToken);
-        console.log(`ðŸ” [EnhancedTrashInfoModal] API ì‘ë‹µ ë°›ìŒ:`, reportData ? 'OK' : 'NULL');
       }
-      
+
       if (reportData) {
-        console.log(`ðŸ” [EnhancedTrashInfoModal] formatReportData í˜¸ì¶œ ì‹œìž‘...`);
-        // API ì‘ë‹µì„ ë‚´ë¶€ í˜•ì‹ìœ¼ë¡œ ë³€í™˜
+        // API 응답을 내부 형식으로 변환
         const formattedDetails = formatReportData(reportData);
-        console.log(`ðŸ” [EnhancedTrashInfoModal] í¬ë§·íŒ… ì™„ë£Œ:`, formattedDetails);
-        
         setTrashDetails(formattedDetails);
         setImageLoadError(false);
-        console.log('âœ… [EnhancedTrashInfoModal] ìƒì„¸ ì •ë³´ ë¡œë“œ ì™„ë£Œ!');
+        console.log('✅ [EnhancedTrashInfoModal] 상세 정보 로드 완료!');
       } else {
-        console.warn(`âš ï¸ [EnhancedTrashInfoModal] ì‘ë‹µì´ null/undefinedìž…ë‹ˆë‹¤`);
+        console.warn(`⚠️ [EnhancedTrashInfoModal] 응답이 null/undefined입니다`);
         setTrashDetails(null);
       }
-      
+
     } catch (error) {
-      console.error(`âŒ [EnhancedTrashInfoModal] ì“°ë ˆê¸° ${trashId} ì •ë³´ ë¡œë“œ ì‹¤íŒ¨:`, error);
-      console.error(`âŒ [EnhancedTrashInfoModal] ì—ëŸ¬ ìƒì„¸:`, {
-        message: error.message,
-        stack: error.stack,
-        status: error.status,
-        payload: error.payload
-      });
+      console.error(`❌ [EnhancedTrashInfoModal] 쓰레기 ${trashId} 정보 로드 실패:`, error);
       setTrashDetails(null);
     } finally {
       setIsLoadingDetails(false);
-      console.log(`ðŸ” [EnhancedTrashInfoModal] === ì“°ë ˆê¸° ì •ë³´ ë¡œë“œ ì¢…ë£Œ ===`);
     }
   };
 
   /**
-   * ðŸ”¥ API ì‘ë‹µ ë°ì´í„°ë¥¼ ë‚´ë¶€ í˜•ì‹ìœ¼ë¡œ ë³€í™˜
+   * API 응답 데이터를 내부 형식으로 변환
    */
   const formatReportData = (reportData) => {
-    // ì¹´í…Œê³ ë¦¬ë³„ ìƒì„¸ ì •ë³´ ìƒì„±
+    // 카테고리별 상세 정보 생성
     const categoryDetails = [];
     const categories = [
-      { key: 'paper', name: 'ì¢…ì´', color: '#8BC34A' },
-      { key: 'can', name: 'ìº”', color: '#FF9800' },
-      { key: 'plastic', name: 'í”Œë¼ìŠ¤í‹±', color: '#2196F3' },
-      { key: 'vinyl', name: 'ë¹„ë‹', color: '#9C27B0' },
-      { key: 'glass', name: 'ìœ ë¦¬', color: '#4CAF50' },
-      { key: 'styro', name: 'ìŠ¤í‹°ë¡œí¼', color: '#FFC107' },
-      { key: 'battery', name: 'ê±´ì „ì§€', color: '#F44336' }
+      { key: 'paper', name: '종이', color: '#8BC34A' },
+      { key: 'can', name: '캔', color: '#FF9800' },
+      { key: 'plastic', name: '플라스틱', color: '#2196F3' },
+      { key: 'vinyl', name: '비닐', color: '#9C27B0' },
+      { key: 'glass', name: '유리', color: '#4CAF50' },
+      { key: 'styro', name: '스티로폼', color: '#FFC107' },
+      { key: 'battery', name: '건전지', color: '#F44336' }
     ];
 
     let totalCount = 0;
@@ -169,18 +132,18 @@ const EnhancedTrashInfoModal = ({
       }
     });
 
-    // ì“°ë ˆê¸° ì–‘ ê³„ì‚°
+    // 쓰레기 양 계산
     const getAmount = (total) => {
-      if (total >= 10) return 'ë§ŽìŒ';
-      if (total >= 5) return 'ë³´í†µ';
-      return 'ì ìŒ';
+      if (total >= 10) return '많음';
+      if (total >= 5) return '보통';
+      return '적음';
     };
 
     const getAmountColor = (amount) => {
       switch(amount) {
-        case 'ë§ŽìŒ': return '#FF5722';
-        case 'ë³´í†µ': return '#FF9800';
-        case 'ì ìŒ': return '#4CAF50';
+        case '많음': return '#FF5722';
+        case '보통': return '#FF9800';
+        case '적음': return '#4CAF50';
         default: return '#797982';
       }
     };
@@ -189,8 +152,8 @@ const EnhancedTrashInfoModal = ({
 
     return {
       id: reportData.reportId,
-      title: reportData.title || 'ì“°ë ˆê¸° ì‹ ê³ ',
-      location: `ìœ„ë„: ${reportData.lat?.toFixed(4)}, ê²½ë„: ${reportData.lng?.toFixed(4)}`,
+      title: reportData.title || '쓰레기 신고',
+      location: `위도: ${reportData.lat?.toFixed(4)}, 경도: ${reportData.lng?.toFixed(4)}`,
       amount: amount,
       totalCount: totalCount,
       color: getAmountColor(amount),
@@ -198,13 +161,12 @@ const EnhancedTrashInfoModal = ({
       isPicked: reportData.isPicked === 'Y',
       imageUrl: reportData.imageUrl,
       reportDate: reportData.createdAt || new Date().toISOString(),
-      // ì›ë³¸ ë°ì´í„°ë„ ë³´ê´€
       originalData: reportData
     };
   };
 
   /**
-   * ëª¨ë‹¬ ìƒíƒœ ì´ˆê¸°í™”
+   * 모달 상태 초기화
    */
   const resetModalState = () => {
     setTrashDetails(null);
@@ -214,121 +176,88 @@ const EnhancedTrashInfoModal = ({
   };
 
   /**
-   * ðŸ”¥ APIë¥¼ í†µí•œ ì“°ë ˆê¸° ì¤ê¸° ì²˜ë¦¬
+   * API를 통한 쓰레기 줍기 처리
    */
-const handlePickTrash = async () => {
-  console.log(`ðŸŽ¯ [handlePickTrash] === ì“°ë ˆê¸° ì¤ê¸° ì‹œìž‘ ===`);
-  console.log(`ðŸŽ¯ [handlePickTrash] trashDetails:`, !!trashDetails);
-  console.log(`ðŸŽ¯ [handlePickTrash] isPickingTrash:`, isPickingTrash);
-  
-  if (!trashDetails || isPickingTrash) {
-    console.log(`ðŸŽ¯ [handlePickTrash] ì¡°ê±´ ë¶ˆë§Œì¡±ìœ¼ë¡œ ë¦¬í„´`);
-    return;
-  }
-
-  // ì´ë¯¸ ì£¼ìš´ ì“°ë ˆê¸°ì¸ì§€ í™•ì¸
-  if (trashDetails.isPicked) {
-    console.log(`ðŸŽ¯ [handlePickTrash] ì´ë¯¸ ì£¼ìš´ ì“°ë ˆê¸°`);
-    Alert.alert(
-      'ì´ë¯¸ ì£¼ìš´ ì“°ë ˆê¸°',
-      'ì´ ì“°ë ˆê¸°ëŠ” ì´ë¯¸ ë‹¤ë¥¸ ì‚¬ìš©ìžê°€ ì£¼ì› ìŠµë‹ˆë‹¤.',
-      [{ text: 'í™•ì¸' }]
-    );
-    return;
-  }
-
-  try {
-    setIsPickingTrash(true);
-    console.log(`ðŸŽ¯ [handlePickTrash] markReportPicked API í˜¸ì¶œ ì‹œìž‘...`);
-    console.log(`ðŸŽ¯ [handlePickTrash] trashId: ${trashId}, accessToken: ${accessToken ? 'ìžˆìŒ' : 'ì—†ìŒ'}`);
-
-    // ðŸ”¥ API í˜¸ì¶œ - HTTP 200ì´ë©´ ì„±ê³µ
-    const result = await markReportPicked(trashId, accessToken);
-    
-    console.log(`ðŸŽ¯ [handlePickTrash] API ì‘ë‹µ:`, result);
-    console.log(`ðŸŽ¯ [handlePickTrash] API ì‘ë‹µ íƒ€ìž…:`, typeof result);
-    
-    // ðŸ”¥ ì—¬ê¸°ì— ë„ë‹¬í–ˆë‹¤ë©´ ì„±ê³µ (HTTP 200) - ì‘ë‹µ ë‚´ìš©ê³¼ ìƒê´€ì—†ì´ ì„±ê³µ ì²˜ë¦¬
-    console.log(`âœ… [handlePickTrash] ì“°ë ˆê¸° ${trashId} ì¤ê¸° ì„±ê³µ (HTTP 200)`);
-    
-    // ìƒíƒœ ì—…ë°ì´íŠ¸
-    setTrashDetails(prev => ({
-      ...prev,
-      isPicked: true
-    }));
-    
-    // ë¶€ëª¨ ì»´í¬ë„ŒíŠ¸ì— ì„±ê³µ ì•Œë¦¼
-    if (onPickSuccess) {
-      console.log(`ðŸŽ¯ [handlePickTrash] onPickSuccess ì½œë°± í˜¸ì¶œ`);
-      onPickSuccess(trashDetails);
+  const handlePickTrash = async () => {
+    if (!trashDetails || isPickingTrash) {
+      return;
     }
-    
-    // ì„±ê³µ ì•Œë¦¼
-    Alert.alert(
-      'ìˆ˜ê±° ì™„ë£Œ',
-      'ì“°ë ˆê¸°ë¥¼ ì„±ê³µì ìœ¼ë¡œ ìˆ˜ê±°í–ˆìŠµë‹ˆë‹¤!',
-      [{ text: 'í™•ì¸', onPress: onClose }]
-    );
 
-  } catch (error) {
-    // ðŸ”¥ ì‹¤ì œ ì—ëŸ¬(ë„¤íŠ¸ì›Œí¬, 4xx, 5xx)ë§Œ ì—¬ê¸°ì„œ ì²˜ë¦¬
-    console.error('âŒ [handlePickTrash] ì“°ë ˆê¸° ì¤ê¸° ì¤‘ ì˜¤ë¥˜:', error);
-    console.error('âŒ [handlePickTrash] ì—ëŸ¬ ìƒì„¸:', {
-      message: error.message,
-      stack: error.stack,
-      status: error.status,
-      response: error.response
-    });
-    
-    // ðŸ”¥ êµ¬ì²´ì ì¸ ì—ëŸ¬ ë©”ì‹œì§€ ì œê³µ
-    let errorMessage = 'ì“°ë ˆê¸° ìˆ˜ê±° ì¤‘ ì˜¤ë¥˜ê°€ ë°œìƒí–ˆìŠµë‹ˆë‹¤.';
-    
-    if (error.status === 404) {
-      errorMessage = 'í•´ë‹¹ ì“°ë ˆê¸° ì‹ ê³ ë¥¼ ì°¾ì„ ìˆ˜ ì—†ìŠµë‹ˆë‹¤.';
-    } else if (error.status === 403) {
-      errorMessage = 'ì“°ë ˆê¸° ìˆ˜ê±° ê¶Œí•œì´ ì—†ìŠµë‹ˆë‹¤.';
-    } else if (error.status === 409) {
-      errorMessage = 'ì´ë¯¸ ìˆ˜ê±°ëœ ì“°ë ˆê¸°ìž…ë‹ˆë‹¤.';
-    } else if (error.message && error.message.includes('Network')) {
-      errorMessage = 'ë„¤íŠ¸ì›Œí¬ ì—°ê²°ì„ í™•ì¸í•´ì£¼ì„¸ìš”.';
+    if (trashDetails.isPicked) {
+      Alert.alert(
+        '이미 주운 쓰레기',
+        '이 쓰레기는 이미 다른 사용자가 주웠습니다.',
+        [{ text: '확인' }]
+      );
+      return;
     }
-    
-    Alert.alert(
-      'ì˜¤ë¥˜ ë°œìƒ',
-      errorMessage,
-      [{ text: 'í™•ì¸' }]
-    );
-  } finally {
-    setIsPickingTrash(false);
-    console.log(`ðŸŽ¯ [handlePickTrash] === ì“°ë ˆê¸° ì¤ê¸° ì¢…ë£Œ ===`);
-  }
-};
+
+    try {
+      setIsPickingTrash(true);
+      
+      const result = await markReportPicked(trashId, accessToken);
+      console.log(`✅ [handlePickTrash] 쓰레기 ${trashId} 줍기 성공`);
+      
+      setTrashDetails(prev => ({
+        ...prev,
+        isPicked: true
+      }));
+      
+      if (onPickSuccess) {
+        onPickSuccess(trashDetails);
+      }
+      
+      Alert.alert(
+        '수거 완료',
+        '쓰레기를 성공적으로 수거했습니다!',
+        [{ text: '확인', onPress: onClose }]
+      );
+
+    } catch (error) {
+      console.error('❌ [handlePickTrash] 쓰레기 줍기 중 오류:', error);
+      
+      let errorMessage = '쓰레기 수거 중 오류가 발생했습니다.';
+      
+      if (error.status === 404) {
+        errorMessage = '해당 쓰레기 신고를 찾을 수 없습니다.';
+      } else if (error.status === 403) {
+        errorMessage = '쓰레기 수거 권한이 없습니다.';
+      } else if (error.status === 409) {
+        errorMessage = '이미 수거된 쓰레기입니다.';
+      } else if (error.message && error.message.includes('Network')) {
+        errorMessage = '네트워크 연결을 확인해주세요.';
+      }
+      
+      Alert.alert('오류 발생', errorMessage, [{ text: '확인' }]);
+    } finally {
+      setIsPickingTrash(false);
+    }
+  };
+
   /**
-   * ëª¨ë‹¬ ë‹«ê¸° ì²˜ë¦¬
+   * 모달 닫기 처리
    */
   const handleClose = () => {
     if (isPickingTrash) {
-      return; // ì¤ê¸° ì²˜ë¦¬ ì¤‘ì—ëŠ” ë‹«ê¸° ë°©ì§€
+      return;
     }
-    
-    console.log('[EnhancedTrashInfoModal] ëª¨ë‹¬ ë‹«ê¸°');
     onClose();
   };
 
   /**
-   * ì¹´í…Œê³ ë¦¬ ì•„ì´í…œ ë Œë”ë§
+   * 카테고리 아이템 렌더링
    */
   const renderCategoryItem = (category) => (
     <View key={category.type} style={styles.categoryItem}>
       <View style={[styles.categoryColor, { backgroundColor: category.color }]} />
       <Text style={styles.categoryText}>
-        {category.type} ({category.count}ê°œ)
+        {category.type} ({category.count}개)
       </Text>
     </View>
   );
 
   /**
-   * ì´ë¯¸ì§€ ë Œë”ë§ (ìžˆëŠ” ê²½ìš°ë§Œ)
+   * 이미지 렌더링 (있는 경우만)
    */
   const renderTrashImage = () => {
     if (!trashDetails?.imageUrl || imageLoadError) {
@@ -337,12 +266,12 @@ const handlePickTrash = async () => {
 
     return (
       <View style={styles.imageSection}>
-        <Text style={styles.sectionLabel}>ì‹ ê³  ì´ë¯¸ì§€</Text>
+        <Text style={styles.sectionLabel}>신고 이미지</Text>
         <Image
           source={{ uri: trashDetails.imageUrl }}
           style={styles.trashImage}
           onError={() => {
-            console.warn('âš ï¸ [EnhancedTrashInfoModal] ì´ë¯¸ì§€ ë¡œë“œ ì‹¤íŒ¨');
+            console.warn('⚠️ [EnhancedTrashInfoModal] 이미지 로드 실패');
             setImageLoadError(true);
           }}
           resizeMode="cover"
@@ -352,20 +281,18 @@ const handlePickTrash = async () => {
   };
 
   /**
-   * ì¤ê¸° ë²„íŠ¼ ë Œë”ë§
+   * 줍기 버튼 렌더링
    */
   const renderPickButton = () => {
-    // ì´ë¯¸ ì£¼ìš´ ì“°ë ˆê¸°ì¸ ê²½ìš°
     if (trashDetails?.isPicked) {
       return (
         <View style={[styles.pickButton, styles.pickedButton]}>
           <Icon name="check-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-          <Text style={styles.pickedButtonText}>ì´ë¯¸ ìˆ˜ê±°ë¨</Text>
+          <Text style={styles.pickedButtonText}>이미 수거됨</Text>
         </View>
       );
     }
 
-    // ì¤ê¸° ê°€ëŠ¥í•œ ê²½ìš°
     return (
       <TouchableOpacity 
         style={[styles.pickButton, isPickingTrash && styles.pickingButton]} 
@@ -375,19 +302,19 @@ const handlePickTrash = async () => {
         {isPickingTrash ? (
           <>
             <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.pickButtonText}>ì²˜ë¦¬ ì¤‘...</Text>
+            <Text style={styles.pickButtonText}>처리 중...</Text>
           </>
         ) : (
           <>
             <Icon name="cleaning-services" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.pickButtonText}>ì¤ê¸°</Text>
+            <Text style={styles.pickButtonText}>줍기</Text>
           </>
         )}
       </TouchableOpacity>
     );
   };
 
-  // ëª¨ë‹¬ì´ ë³´ì´ì§€ ì•Šìœ¼ë©´ null ë°˜í™˜
+  // ✅ [수정] 모든 훅 호출이 끝난 후에 조건부 return을 실행합니다.
   if (!visible) {
     return null;
   }
@@ -401,15 +328,15 @@ const handlePickTrash = async () => {
       statusBarTranslucent={true}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          {/* í—¤ë” */}
+        <View style={[styles.modalContent, { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
+          {/* 헤더 */}
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
-              <Text style={styles.modalTitle}>ì“°ë ˆê¸° ì •ë³´</Text>
+              <Text style={styles.modalTitle}>쓰레기 정보</Text>
               {trashDetails?.isPicked && (
                 <View style={styles.pickedBadge}>
                   <Icon name="check-circle" size={16} color="#4CAF50" />
-                  <Text style={styles.pickedBadgeText}>ìˆ˜ê±°ë¨</Text>
+                  <Text style={styles.pickedBadgeText}>수거됨</Text>
                 </View>
               )}
             </View>
@@ -422,57 +349,56 @@ const handlePickTrash = async () => {
             </TouchableOpacity>
           </View>
 
-          {/* ë‚´ìš© */}
+          {/* 내용 */}
           <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-            {/* ðŸ”¥ ë¡œë”© ìƒíƒœ */}
+            {/* 로딩 상태 */}
             {isLoadingDetails && (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#418663" />
-                <Text style={styles.loadingText}>ì •ë³´ë¥¼ ë¶ˆëŸ¬ì˜¤ëŠ” ì¤‘...</Text>
+                <Text style={styles.loadingText}>정보를 불러오는 중...</Text>
               </View>
             )}
 
-            {/* ðŸ”¥ ë°ì´í„°ê°€ ìžˆì„ ë•Œë§Œ í‘œì‹œ */}
+            {/* 데이터가 있을 때만 표시 */}
             {!isLoadingDetails && trashDetails && (
               <>
-                {/* ê¸°ë³¸ ì •ë³´ ì„¹ì…˜ */}
                 <View style={styles.infoSection}>
-                  <Text style={styles.sectionLabel}>ì œëª©</Text>
+                  <Text style={styles.sectionLabel}>제목</Text>
                   <Text style={styles.infoValue}>{trashDetails.title}</Text>
                 </View>
 
                 <View style={styles.infoSection}>
-                  <Text style={styles.sectionLabel}>ìœ„ì¹˜</Text>
+                  <Text style={styles.sectionLabel}>위치</Text>
                   <Text style={styles.infoValue}>{trashDetails.location}</Text>
                 </View>
 
                 <View style={styles.infoSection}>
-                  <Text style={styles.sectionLabel}>ì“°ë ˆê¸° ì–‘</Text>
+                  <Text style={styles.sectionLabel}>쓰레기 양</Text>
                   <View style={styles.amountContainer}>
                     <View style={[
                       styles.amountIndicator, 
                       { backgroundColor: trashDetails.color }
                     ]} />
                     <Text style={[styles.infoValue, { marginLeft: 8 }]}>
-                      {trashDetails.amount} (ì´ {trashDetails.totalCount}ê°œ)
+                      {trashDetails.amount} (총 {trashDetails.totalCount}개)
                     </Text>
                   </View>
                 </View>
 
-                {/* ì¹´í…Œê³ ë¦¬ë³„ ìƒì„¸ ì •ë³´ */}
+                {/* 카테고리별 상세 정보 */}
                 {trashDetails.categoryDetails && trashDetails.categoryDetails.length > 0 && (
                   <View style={styles.infoSection}>
-                    <Text style={styles.sectionLabel}>ì“°ë ˆê¸° ì¢…ë¥˜</Text>
+                    <Text style={styles.sectionLabel}>쓰레기 종류</Text>
                     <View style={styles.categoryContainer}>
                       {trashDetails.categoryDetails.map(renderCategoryItem)}
                     </View>
                   </View>
                 )}
 
-                {/* ì‹ ê³  ë‚ ì§œ */}
+                {/* 신고 날짜 */}
                 {trashDetails.reportDate && (
                   <View style={styles.infoSection}>
-                    <Text style={styles.sectionLabel}>ì‹ ê³  ë‚ ì§œ</Text>
+                    <Text style={styles.sectionLabel}>신고 날짜</Text>
                     <Text style={styles.infoValue}>
                       {new Date(trashDetails.reportDate).toLocaleDateString('ko-KR', {
                         year: 'numeric',
@@ -485,27 +411,27 @@ const handlePickTrash = async () => {
                   </View>
                 )}
 
-                {/* ì´ë¯¸ì§€ (ìžˆëŠ” ê²½ìš°) */}
+                {/* 이미지 (있는 경우) */}
                 {renderTrashImage()}
               </>
             )}
 
-            {/* ðŸ”¥ ë°ì´í„° ë¡œë“œ ì‹¤íŒ¨ */}
+            {/* 데이터 로드 실패 */}
             {!isLoadingDetails && !trashDetails && (
               <View style={styles.errorContainer}>
                 <Icon name="error" size={48} color="#FF5722" />
-                <Text style={styles.errorText}>ì“°ë ˆê¸° ì •ë³´ë¥¼ ë¶ˆëŸ¬ì˜¬ ìˆ˜ ì—†ìŠµë‹ˆë‹¤</Text>
+                <Text style={styles.errorText}>쓰레기 정보를 불러올 수 없습니다</Text>
                 <TouchableOpacity 
                   style={styles.retryButton}
                   onPress={loadTrashDetails}
                 >
-                  <Text style={styles.retryButtonText}>ë‹¤ì‹œ ì‹œë„</Text>
+                  <Text style={styles.retryButtonText}>다시 시도</Text>
                 </TouchableOpacity>
               </View>
             )}
           </ScrollView>
 
-          {/* í•˜ë‹¨ ë²„íŠ¼ */}
+          {/* 하단 버튼 */}
           {!isLoadingDetails && trashDetails && (
             <View style={styles.modalFooter}>
               {renderPickButton()}
@@ -522,20 +448,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.6)",
     justifyContent: "flex-end",
-    paddingBottom: 80, // ðŸ”¥ ë°”í…€ ë„¤ë¹„ê²Œì´í„° ë†’ì´ë§Œí¼ ì—¬ë°± ì¶”ê°€ (ì¼ë°˜ì ìœ¼ë¡œ 60-80px)
   },
   modalContent: {
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: "70%", // ðŸ”¥ ë†’ì´ ë” ì¤„ìž„ (75% â†’ 70%)
-    paddingBottom: 20,
+    maxHeight: "70%",
     zIndex: 1000,
     elevation: 1000,
-    marginHorizontal: 10, // ðŸ”¥ ì¢Œìš° ì—¬ë°± ì¶”ê°€
+    marginHorizontal: 10,
   },
   
-  // í—¤ë” ìŠ¤íƒ€ì¼
+  // 헤더 스타일
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -580,13 +504,13 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   
-  // ë‚´ìš© ìŠ¤íƒ€ì¼
+  // 내용 스타일
   modalBody: {
     padding: 20,
     maxHeight: 400,
   },
   
-  // ðŸ”¥ ë¡œë”© ì»¨í…Œì´ë„ˆ
+  // 로딩 컨테이너
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -598,7 +522,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   
-  // ðŸ”¥ ì—ëŸ¬ ì»¨í…Œì´ë„ˆ
+  // 에러 컨테이너
   errorContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -638,7 +562,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   
-  // ì“°ë ˆê¸° ì–‘ í‘œì‹œ
+  // 쓰레기 양 표시
   amountContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -649,7 +573,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   
-  // ì¹´í…Œê³ ë¦¬ ìŠ¤íƒ€ì¼
+  // 카테고리 스타일
   categoryContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -677,7 +601,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   
-  // ì´ë¯¸ì§€ ìŠ¤íƒ€ì¼
+  // 이미지 스타일
   imageSection: {
     marginTop: 8,
   },
@@ -688,7 +612,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F5",
   },
   
-  // í•˜ë‹¨ ë²„íŠ¼ ìŠ¤íƒ€ì¼
+  // 하단 버튼 스타일
   modalFooter: {
     paddingHorizontal: 20,
     paddingTop: 16,
@@ -732,3 +656,4 @@ const styles = StyleSheet.create({
 });
 
 export default EnhancedTrashInfoModal;
+
