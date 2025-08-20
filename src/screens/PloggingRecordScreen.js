@@ -4,8 +4,9 @@ import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Dim
 import { useNavigation, useRoute } from "@react-navigation/native"
 import MapView, { Polyline, Marker } from "react-native-maps"
 import Icon from "react-native-vector-icons/MaterialIcons"
-import { getTrailDetail } from "../api/trails" // 🔥 산책로 상세정보 API 추가
-import { formatUserFriendlyDate, formatPloggingTime, formatDistance } from "../utils/timeUtils" // ✅ 시간 유틸리티 import
+import { getTrailDetail } from "../api/trails"
+import { formatUserFriendlyDate, formatPloggingTime, formatDistance } from "../utils/timeUtils"
+import TrailImagesCarousel from "../components/TrailImagesCarousel" // 🔥 TrailImagesCarousel 추가
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -21,9 +22,9 @@ export default function PloggingRecordScreen() {
   const [recordData, setRecordData] = useState(null)
   const [trashList, setTrashList] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [trailDetail, setTrailDetail] = useState(null) // 🔥 산책로 상세정보 상태 추가
-  const [currentImageIndex, setCurrentImageIndex] = useState(0) // 🔥 현재 이미지 인덱스
-  const [dataSource, setDataSource] = useState('unknown') // ✅ 데이터 소스 추적
+  const [trailDetail, setTrailDetail] = useState(null)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [dataSource, setDataSource] = useState('unknown')
 
   // 네비게이션 함수들
   const goToHome = () => navigation.navigate("Main")
@@ -36,7 +37,6 @@ export default function PloggingRecordScreen() {
     loadRecordData()
     loadTrashList()
   }, [])
-  
 
   // 🔥 trailDetail이 업데이트될 때마다 이미지 상태 로깅
   useEffect(() => {
@@ -44,45 +44,23 @@ export default function PloggingRecordScreen() {
       console.log("📄 [PloggingRecord] trailDetail 업데이트됨:")
       console.log("  - img1:", trailDetail.img1)
       console.log("  - img2:", trailDetail.img2)
-      console.log("  - 기타 이미지 필드들:", {
-        imageUrl: trailDetail.imageUrl,
-        image: trailDetail.image,
-        images: trailDetail.images,
-        picture: trailDetail.picture,
-        photo: trailDetail.photo
-      })
     }
   }, [trailDetail])
 
-  // 🔥 산책로 상세정보 로드 함수 추가
+  // 🔥 산책로 상세 정보 로드 함수
   const loadTrailDetail = async (trailId) => {
     try {
-      console.log("🔍 [PloggingRecord] 산책로 상세정보 로드 시작:", trailId)
-      console.log("🔍 [PloggingRecord] trailId 타입:", typeof trailId)
-      console.log("🔍 [PloggingRecord] trailId 값:", JSON.stringify(trailId))
+      console.log("🔍 [PloggingRecord] 산책로 상세 정보 로드 시작:", trailId)
       
       const detail = await getTrailDetail(trailId)
-      console.log("✅ [PloggingRecord] 산책로 상세정보 로드 성공")
-      console.log("📋 [PloggingRecord] 상세정보 전체:", JSON.stringify(detail, null, 2))
+      console.log("✅ [PloggingRecord] 산책로 상세 정보 로드 성공")
       console.log("🖼️ [PloggingRecord] img1:", detail?.img1)
       console.log("🖼️ [PloggingRecord] img2:", detail?.img2)
-      console.log("🖼️ [PloggingRecord] imageUrl:", detail?.imageUrl)
-      console.log("🖼️ [PloggingRecord] 모든 이미지 관련 필드:", {
-        img1: detail?.img1,
-        img2: detail?.img2,
-        imageUrl: detail?.imageUrl,
-        image: detail?.image,
-        images: detail?.images,
-        picture: detail?.picture,
-        photo: detail?.photo
-      })
       
       setTrailDetail(detail)
       return detail
     } catch (error) {
-      console.error("❌ [PloggingRecord] 산책로 상세정보 로드 실패:", error)
-      console.error("❌ [PloggingRecord] 에러 상세:", error.message)
-      console.error("❌ [PloggingRecord] 에러 스택:", error.stack)
+      console.error("❌ [PloggingRecord] 산책로 상세 정보 로드 실패:", error)
       return null
     }
   }
@@ -110,64 +88,11 @@ export default function PloggingRecordScreen() {
     )
   }
 
-  // 🔥 메인 히어로 이미지 생성 함수 (산책로 이미지 우선)
-  const getHeroImages = () => {
-    console.log("🖼️ [PloggingRecord] getHeroImages 호출")
-    console.log("🔍 [PloggingRecord] trailDetail 상태:", !!trailDetail)
-    console.log("🔍 [PloggingRecord] trailDetail 전체:", JSON.stringify(trailDetail, null, 2))
-    
-    const images = []
-    
-    // 🔥 산책로 이미지들만 추가 (img1, img2)
-    if (trailDetail?.img1) {
-      console.log("✅ [PloggingRecord] img1 추가:", trailDetail.img1)
-      images.push({
-        uri: trailDetail.img1,
-        type: 'trail',
-        label: '🏞️ 산책로 이미지 1'
-      })
-    } else {
-      console.log("❌ [PloggingRecord] img1 없음")
-    }
-    
-    if (trailDetail?.img2) {
-      console.log("✅ [PloggingRecord] img2 추가:", trailDetail.img2)
-      images.push({
-        uri: trailDetail.img2,
-        type: 'trail',
-        label: '🏞️ 산책로 이미지 2'
-      })
-    } else {
-      console.log("❌ [PloggingRecord] img2 없음")
-    }
-    
-    // ✅ 플로깅 기록 이미지도 추가 (있는 경우)
-    if (recordData?.mapImage && recordData.mapImage !== trailDetail?.img1 && recordData.mapImage !== trailDetail?.img2) {
-      console.log("✅ [PloggingRecord] 플로깅 기록 이미지 추가:", recordData.mapImage)
-      images.push({
-        uri: recordData.mapImage,
-        type: 'plogging',
-        label: '📸 플로깅 기록 이미지'
-      })
-    }
-    
-    // 이미지가 없으면 기본 이미지 (이제 아이콘으로 대체됨)
-    if (images.length === 0) {
-      console.log("⚠️ [PloggingRecord] 이미지가 없어 기본 이미지 사용")
-      images.push({
-        uri: null, // null로 설정하면 ImageWithFallback에서 아이콘으로 대체
-        type: 'placeholder',
-        label: '🏞️ 플로깅 기록'
-      })
-    }
-    
-    console.log("📋 [PloggingRecord] 최종 이미지 배열:", images.map(img => ({
-      type: img.type,
-      label: img.label,
-      hasUri: !!img.uri
-    })))
-    
-    return images
+  // 🔥 TrailImagesCarousel에서 이미지 클릭 처리
+  const handleImagePress = (image, index) => {
+    console.log(`이미지 클릭: ${image.label}, 인덱스: ${index}`)
+    // 이미지 확대 모달이나 상세보기 화면으로 이동 가능
+    // navigation.navigate('ImageDetailScreen', { imageUri: image.uri })
   }
 
   const loadRecordData = async () => {
@@ -178,7 +103,6 @@ export default function PloggingRecordScreen() {
       if (route.params?.result) {
         console.log("✅ [PloggingRecord] 플로깅 결과 데이터 수신:", route.params.result)
         
-        // ✅ 데이터 소스 확인
         const result = route.params.result;
         
         if (result._detailData) {
@@ -201,8 +125,8 @@ export default function PloggingRecordScreen() {
           difficulty: result.difficulty || "보통",
           route: result.route || result.routeCoordinates || [],
           trashLocations: result.trashLocations || [],
-          mapImage: result.mapImage, // 🔥 캡처된 지도 이미지
-          routeImage: result.routeImage || result.mapImage, // 🔥 경로 이미지
+          mapImage: result.mapImage,
+          routeImage: result.routeImage || result.mapImage,
           startTime: result.startTime,
           endTime: result.endTime,
         };
@@ -210,9 +134,9 @@ export default function PloggingRecordScreen() {
         console.log("📋 [PloggingRecord] 변환된 데이터:", transformedData);
         setRecordData(transformedData);
         
-        // 🔥 산책로 ID가 있으면 상세정보 로드
+        // 🔥 산책로 ID가 있으면 상세 정보 로드
         if (result.trailId) {
-          console.log("🔍 [PloggingRecord] 산책로 ID 발견, 상세정보 로드:", result.trailId)
+          console.log("🔍 [PloggingRecord] 산책로 ID 발견, 상세 정보 로드:", result.trailId)
           await loadTrailDetail(result.trailId)
         }
         
@@ -232,7 +156,6 @@ export default function PloggingRecordScreen() {
       console.log("⚠️ [PloggingRecord] route.params 없음, 기본 데이터 사용")
       setDataSource('fallback')
       
-      // 시뮬레이션: 더미 데이터 사용
       await new Promise(resolve => setTimeout(resolve, 500))
       
       const dummyData = {
@@ -240,8 +163,8 @@ export default function PloggingRecordScreen() {
         title: "남산",
         date: formatUserFriendlyDate(new Date().toISOString()),
         location: "서울",
-        duration: formatPloggingTime("2910"), // 48분 30초
-        distance: formatDistance(5110), // 5.11km
+        duration: formatPloggingTime("2910"),
+        distance: formatDistance(5110),
         trashCount: 0,
         difficulty: "쉬움",
         route: [
@@ -257,7 +180,6 @@ export default function PloggingRecordScreen() {
       setRecordData(dummyData)
     } catch (error) {
       console.error("❌ [PloggingRecord] 기록 데이터 로드 실패:", error)
-      // 에러 시 빈 데이터
       const emptyData = {
         title: "플로깅 기록 없음",
         date: formatUserFriendlyDate(new Date().toISOString()),
@@ -277,9 +199,7 @@ export default function PloggingRecordScreen() {
 
   const loadTrashList = async () => {
     try {
-      // ✅ route.params에서 전달받은 결과 데이터가 있는지 확인
       if (route.params?.result) {
-        // 실제 플로깅 결과에서 수집된 쓰레기 목록 사용
         const result = route.params.result;
         if (result.collectedTrash && result.collectedTrash.length > 0) {
           console.log("✅ [PloggingRecord] 수집된 쓰레기 데이터 사용:", result.collectedTrash)
@@ -290,8 +210,6 @@ export default function PloggingRecordScreen() {
             location: trash.location || `${trash.amount || '보통'} 크기`,
             tag: "수집됨",
             image: "https://via.placeholder.com/75x75/E8F5E8/4CAF50?text=Collected",
-            
-            // ✅ 스웨거 응답의 쓰레기 세부 정보 추가
             details: {
               paper: trash.paper || 0,
               can: trash.can || 0,
@@ -312,10 +230,8 @@ export default function PloggingRecordScreen() {
         }
       }
       
-      // ✅ API 호출로 쓰레기 목록 로드 (route.params가 없는 경우에만)
       console.log("⚠️ [PloggingRecord] route.params 없음, 더미 쓰레기 데이터 사용")
       
-      // 시뮬레이션: 더미 데이터 (실제 플로깅 데이터가 없을 때만 사용)
       const dummyTrashList = [
         {
           id: 1,
@@ -385,7 +301,6 @@ export default function PloggingRecordScreen() {
         <TouchableOpacity style={styles.backButton} onPress={goToHome}>
           <Icon name="close" size={24} color="#333" />
         </TouchableOpacity>
-        {/* 🔥 헤더 제목 추가 */}
         <Text style={styles.headerTitle}>플로깅 기록</Text>
         <TouchableOpacity style={styles.profileButton} onPress={goToMyPloggingRecords}>
           <Image 
@@ -400,37 +315,7 @@ export default function PloggingRecordScreen() {
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
       >
-        {/* 🔥 산책로 이미지를 우선으로 하는 히어로 이미지 */}
-        <View style={styles.heroImageContainer}>
-          <ImageWithFallback
-            source={getHeroImages()[currentImageIndex]?.uri ? { uri: getHeroImages()[currentImageIndex].uri } : null}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
-          {/* 페이지 인디케이터 */}
-          <View style={styles.pageIndicator}>
-            {getHeroImages().map((_, index) => (
-              <View 
-                key={index} 
-                style={[
-                  styles.indicatorDot, 
-                  index === currentImageIndex && styles.activeDot
-                ]} 
-              />
-            ))}
-          </View>
-        </View>
-
-        {/* ✅ 데이터 소스 디버그 정보 (개발용) */}
-        {__DEV__ && recordData?._dataSource && (
-          <View style={styles.debugInfo}>
-            <Text style={styles.debugText}>
-              데이터 소스: {recordData._dataSource} | 이미지 수: {getHeroImages().length}
-            </Text>
-          </View>
-        )}
-
-        {/* 🔥 수정된 기본 정보 - 산책로 이름을 메인 타이틀로 표시 */}
+        {/* 🔥 기본 정보 섹션 - 산책로 이름을 메인 타이틀로 표시 */}
         <View style={styles.mainInfoSection}>
           <Text style={styles.recordTitle}>
             {trailDetail?.trailName || trailDetail?.instlPlcNm || recordData.title}
@@ -457,12 +342,42 @@ export default function PloggingRecordScreen() {
           </View>
         </View>
 
-        {/* 🔥 경로 이미지 섹션 - 통계 정보와 주운 쓰레기 사이에 추가 */}
-        {recordData.mapImage && (
-          <View style={styles.routeImageSection}>
+        {/* 🔥 새로운 산책로 이미지 섹션 - TrailImagesCarousel 사용 */}
+        {trailDetail && (trailDetail.img1 || trailDetail.img2) && (
+          <View style={styles.trailSection}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>플로깅 경로</Text>
               <Text style={styles.sectionSubtitle}>이번 플로깅에서 이동한 경로입니다</Text>
+            </View>
+            
+            {/* 🔥 TrailImagesCarousel 컴포넌트 사용 */}
+            <TrailImagesCarousel
+              trailId={trailDetail.trailId}
+              img1={trailDetail.img1}
+              img2={trailDetail.img2}
+              style={styles.imagesCarousel}
+              onImagePress={handleImagePress}
+            />
+            
+            {/* 산책로 기본 정보 */}
+            <View style={styles.trailInfo}>
+              <Text style={styles.trailName}>{trailDetail.trailName}</Text>
+              <Text style={styles.trailDescription}>{trailDetail.description || trailDetail.descriptionDetail}</Text>
+              <View style={styles.trailDetails}>
+                <Text style={styles.trailDetail}>📍 {trailDetail.cityName}</Text>
+                <Text style={styles.trailDetail}>📏 {trailDetail.length}</Text>
+                <Text style={styles.trailDetail}>⭐ {trailDetail.difficultyLevel}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* 🔥 경로 이미지 섹션 - 캡처된 지도가 있을 때만 표시 */}
+        {recordData.mapImage && (
+          <View style={styles.routeImageSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>기록된 경로</Text>
+              <Text style={styles.sectionSubtitle}>실제 플로깅한 경로의 기록입니다</Text>
             </View>
             <View style={styles.routeImageContainer}>
               <ImageWithFallback
@@ -558,7 +473,6 @@ const styles = StyleSheet.create({
   backButton: {
     padding: screenWidth * 0.012,
   },
-  // 🔥 헤더 제목 스타일 추가
   headerTitle: {
     fontSize: screenWidth * 0.045,
     fontWeight: "700",
@@ -578,25 +492,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: screenHeight * 0.04,
   },
-  heroImageContainer: {
-    height: HERO_HEIGHT,
-    position: 'relative',
-  },
-  
-  // 🔥 새로운 스크롤뷰 스타일들
-  imageScrollView: {
-    flex: 1,
-  },
-  imageSlide: {
-    width: screenWidth,
-    height: '100%',
-    position: 'relative',
-  },
-  
-  heroImage: {
-    width: '100%',
-    height: '100%',
-  },
   
   // 🔥 Fallback 이미지 스타일 추가
   fallbackImageContainer: {
@@ -612,41 +507,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999999',
     fontWeight: '500',
-  },
-  
-  pageIndicator: {
-    position: 'absolute',
-    bottom: screenHeight * 0.02,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: screenWidth * 0.015,
-  },
-  indicatorDot: {
-    width: screenWidth * 0.02,
-    height: screenWidth * 0.02,
-    borderRadius: screenWidth * 0.01,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  activeDot: {
-    backgroundColor: '#4CAF50',
-  },
-  
-  // 🔥 이미지 타입 라벨 스타일 수정
-  imageTypeLabel: {
-    position: 'absolute',
-    top: screenHeight * 0.02,
-    right: screenWidth * 0.04,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  imageLabelText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
   },
   
   mainInfoSection: {
@@ -681,6 +541,48 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#333333",
     textAlign: "center",
+  },
+
+  // 🔥 새로운 산책로 섹션 스타일
+  trailSection: {
+    paddingHorizontal: PADDING_H,
+    paddingVertical: screenHeight * 0.02,
+    backgroundColor: "#F8F9FA",
+  },
+  imagesCarousel: {
+    marginBottom: 16,
+  },
+  trailInfo: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  trailName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2E2E2E',
+    marginBottom: 8,
+  },
+  trailDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  trailDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  trailDetail: {
+    fontSize: 13,
+    color: '#418663',
+    fontWeight: '500',
   },
 
   // 🔥 경로 이미지 섹션 스타일 추가
@@ -846,20 +748,5 @@ const styles = StyleSheet.create({
     fontSize: screenWidth * 0.04,
     fontWeight: "600",
     color: "#333333",
-  },
-  
-  // 🔥 디버그 정보 스타일 추가
-  debugInfo: {
-    backgroundColor: "rgba(255, 193, 7, 0.1)",
-    paddingHorizontal: PADDING_H,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  debugText: {
-    fontSize: 12,
-    color: "#FF8F00",
-    fontWeight: "500",
-    textAlign: "center",
   },
 });
