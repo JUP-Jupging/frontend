@@ -18,7 +18,6 @@ const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
     isMounted.current = true;
     
     return () => {
-      console.log('[FloatingPloggingIndicator] 컴포넌트 언마운트 - 정리 작업');
       isMounted.current = false;
     };
   }, []);
@@ -154,7 +153,6 @@ const FloatingPloggingIndicator = ({ hideOnPlogging = false }) => {
   const goToPloggingScreen = () => {
     if (!isMounted.current) return;
     
-    console.log('[FloatingPloggingIndicator] 플로깅 화면으로 이동');
     
     try {
       const navigationTimer = setTimeout(() => {

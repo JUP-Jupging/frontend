@@ -19,7 +19,6 @@ export const useAuth = create(
 
       // 유저 정보 저장(선택)
       setUser: (user) => set({ user }),
-
       // 로그아웃(로컬 상태만)
       logout: () => set({ accessToken: null, refreshToken: null, user: null }),
 

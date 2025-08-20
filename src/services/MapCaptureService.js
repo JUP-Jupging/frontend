@@ -1,7 +1,7 @@
-// MapCaptureService.js - 지도 캡처 관련 로직 분리
+// MapCaptureService.js - takeSnapshot 옵션 수정
 
 /**
- * 지도 캡처 서비스
+ * 🔥 수정된 지도 캡처 서비스
  */
 export class MapCaptureService {
   constructor() {
@@ -9,134 +9,78 @@ export class MapCaptureService {
   }
 
   /**
-   * 지도에 경로가 모두 보이도록 자동 줌 조절
+   * 🔥 안전한 takeSnapshot (옵션 단순화)
    */
-  fitRouteToMap(routeCoordinates, mapRef, options = {}) {
-    if (!routeCoordinates || routeCoordinates.length === 0 || !mapRef?.current) {
-      console.warn('⚠️ [MapCaptureService] 경로 데이터 또는 지도 ref가 없습니다');
-      return;
-    }
-
-    try {
-      console.log("🎯 [MapCaptureService] 경로에 맞게 지도 줌 조절 시작");
-
-      // 경계 계산
-      let minLat = routeCoordinates[0].latitude;
-      let maxLat = routeCoordinates[0].latitude;
-      let minLng = routeCoordinates[0].longitude;
-      let maxLng = routeCoordinates[0].longitude;
-
-      routeCoordinates.forEach(coord => {
-        minLat = Math.min(minLat, coord.latitude);
-        maxLat = Math.max(maxLat, coord.latitude);
-        minLng = Math.min(minLng, coord.longitude);
-        maxLng = Math.max(maxLng, coord.longitude);
-      });
-
-      // 여백 추가
-      const paddingPercent = options.padding || 0.1;
-      const latPadding = (maxLat - minLat) * paddingPercent || 0.01;
-      const lngPadding = (maxLng - minLng) * paddingPercent || 0.01;
-
-      const region = {
-        latitude: (minLat + maxLat) / 2,
-        longitude: (minLng + maxLng) / 2,
-        latitudeDelta: (maxLat - minLat + latPadding * 2),
-        longitudeDelta: (maxLng - minLng + lngPadding * 2),
-      };
-
-      console.log("🎯 [MapCaptureService] 지도 줌 조절:", {
-        경로점수: routeCoordinates.length,
-        중심: `${region.latitude.toFixed(4)}, ${region.longitude.toFixed(4)}`,
-        범위: `${region.latitudeDelta.toFixed(4)} x ${region.longitudeDelta.toFixed(4)}`
-      });
-
-      // 지도 영역 조절
-      const animationDuration = options.animationDuration || 1000;
-      mapRef.current.animateToRegion(region, animationDuration);
-
-      return region;
-
-    } catch (error) {
-      console.error("❌ [MapCaptureService] 지도 줌 조절 실패:", error);
-      return null;
-    }
-  }
-
-  /**
-   * 좌표 배열을 포함하는 최적 지도 영역 조절
-   */
-  fitCoordinatesToMap(coordinates, mapRef, options = {}) {
-    if (!coordinates || coordinates.length === 0 || !mapRef?.current) {
-      console.warn('⚠️ [MapCaptureService] 좌표 데이터 또는 지도 ref가 없습니다');
-      return;
-    }
-
-    try {
-      console.log("🎯 [MapCaptureService] 좌표 기반 지도 줌 조절");
-
-      // 기본 padding 설정
-      const defaultPadding = {
-        top: options.paddingTop || 100,
-        right: options.paddingRight || 100,
-        bottom: options.paddingBottom || 100,
-        left: options.paddingLeft || 100
-      };
-
-      // fitToCoordinates 사용
-      mapRef.current.fitToCoordinates(coordinates, {
-        edgePadding: defaultPadding,
-        animated: options.animated !== false,
-      });
-
-      console.log("✅ [MapCaptureService] 좌표 기반 줌 조절 완료");
-
-    } catch (error) {
-      console.error("❌ [MapCaptureService] 좌표 기반 줌 조절 실패:", error);
-    }
-  }
-
-  /**
-   * ViewShot을 사용한 지도 캡처
-   */
-  async captureMapWithViewShot(viewShotRef, options = {}) {
+  async captureMapSimple(mapRef, options = {}) {
     if (this.isCapturing) {
-      console.warn('⚠️ [MapCaptureService] 이미 캡처 진행 중입니다');
+      console.warn('⚠️ [MapCapture] 이미 캡처 중');
       return null;
     }
 
-    if (!viewShotRef?.current) {
-      console.warn("⚠️ [MapCaptureService] ViewShot ref가 없습니다");
+    console.log("📸 [MapCapture] === 단순 캡처 시작 ===");
+
+    if (!mapRef?.current) {
+      console.error("❌ [MapCapture] mapRef가 없음");
+      return null;
+    }
+
+    if (typeof mapRef.current.takeSnapshot !== 'function') {
+      console.error("❌ [MapCapture] takeSnapshot 메서드 없음");
       return null;
     }
 
     try {
       this.isCapturing = true;
-      console.log("📸 [MapCaptureService] 지도 캡처 시작");
+      
+      // 🔥 충분한 대기 시간
+      console.log("⏳ [MapCapture] 대기 중...");
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // 캡처 전 대기 시간
-      const waitTime = options.waitTime || 1000;
-      if (waitTime > 0) {
-        console.log(`⏳ [MapCaptureService] ${waitTime}ms 대기 중...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
-
-      // ViewShot 캡처 옵션
-      const captureOptions = {
-        format: options.format || 'png',
-        quality: options.quality || 0.9,
-        result: options.result || 'tmpfile',
-        ...options.captureOptions
+      // 🔥 최소한의 안전한 옵션만 사용
+      const snapshotOptions = {
+        format: 'png',
+        quality: 0.8,
+        result: 'base64'  // 🔥 tmpfile 대신 base64 사용
       };
 
-      // 캡처 실행
-      const imageUri = await viewShotRef.current.capture(captureOptions);
-      
-      console.log("✅ [MapCaptureService] 지도 캡처 성공:", imageUri);
-      return imageUri;
+      console.log("📸 [MapCapture] takeSnapshot 호출:", snapshotOptions);
+      const result = await mapRef.current.takeSnapshot(snapshotOptions);
+
+      console.log("📸 [MapCapture] takeSnapshot 결과:");
+      console.log("  - 타입:", typeof result);
+      console.log("  - 길이:", result ? result.length : 0);
+
+      if (result && typeof result === 'string' && result.length > 0) {
+        // 🔥 base64를 data URI로 변환
+        const dataUri = result.startsWith('data:') ? result : `data:image/png;base64,${result}`;
+        console.log("✅ [MapCapture] 캡처 성공!");
+        return dataUri;
+      } else {
+        console.error("❌ [MapCapture] 캡처 실패 - 빈 결과");
+        return null;
+      }
 
     } catch (error) {
-      console.error("❌ [MapCaptureService] 지도 캡처 실패:", error);
+      console.error("❌ [MapCapture] 캡처 에러:", error);
+      console.error("❌ [MapCapture] 에러 메시지:", error.message);
+      
+      // 🔥 다른 옵션으로 재시도
+      try {
+        console.log("🔄 [MapCapture] 다른 옵션으로 재시도");
+        const fallbackResult = await mapRef.current.takeSnapshot({
+          format: 'png',
+          quality: 0.5
+          // result 옵션 제거
+        });
+        
+        if (fallbackResult) {
+          console.log("✅ [MapCapture] 재시도 성공!");
+          return fallbackResult;
+        }
+      } catch (retryError) {
+        console.error("❌ [MapCapture] 재시도도 실패:", retryError);
+      }
+      
       return null;
     } finally {
       this.isCapturing = false;
@@ -144,81 +88,105 @@ export class MapCaptureService {
   }
 
   /**
-   * 경로와 마커를 모두 포함한 최적 캡처
+   * 🔥 ViewShot 폴백
    */
-  async captureOptimalView(params) {
-    const {
-      viewShotRef,
-      mapRef,
-      routeCoordinates,
-      trashLocations,
-      options = {}
-    } = params;
+  async captureWithViewShot(viewShotRef) {
+    if (!viewShotRef?.current) {
+      console.error("❌ [MapCapture] viewShotRef 없음");
+      return null;
+    }
 
     try {
-      console.log("🎯 [MapCaptureService] 최적 뷰 캡처 시작");
-
-      // 모든 좌표 수집
-      const allCoordinates = [];
+      console.log("📸 [MapCapture] ViewShot 폴백 시작");
       
-      // 경로 좌표 추가
-      if (routeCoordinates && routeCoordinates.length > 0) {
-        allCoordinates.push(...routeCoordinates);
-      }
-      
-      // 쓰레기 위치 좌표 추가
-      if (trashLocations && trashLocations.length > 0) {
-        trashLocations.forEach(trash => {
-          if (trash.coordinate) {
-            allCoordinates.push(trash.coordinate);
-          }
-        });
-      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // 좌표가 있으면 최적 뷰로 조정
-      if (allCoordinates.length > 0) {
-        this.fitCoordinatesToMap(allCoordinates, mapRef, {
-          paddingTop: 150,
-          paddingRight: 150,
-          paddingBottom: 150,
-          paddingLeft: 150,
-          animated: true,
-          ...options.fitOptions
-        });
-
-        // 지도 조정 완료 대기
-        await new Promise(resolve => setTimeout(resolve, options.adjustWaitTime || 2000));
-      }
-
-      // 캡처 실행
-      const imageUri = await this.captureMapWithViewShot(viewShotRef, {
-        waitTime: options.captureWaitTime || 500,
-        ...options.captureOptions
+      const result = await viewShotRef.current.capture({
+        format: 'png',
+        quality: 0.8
       });
 
-      return imageUri;
+      if (result) {
+        console.log("✅ [MapCapture] ViewShot 성공:", result.substring(0, 50));
+        return result;
+      } else {
+        console.error("❌ [MapCapture] ViewShot 실패");
+        return null;
+      }
 
     } catch (error) {
-      console.error("❌ [MapCaptureService] 최적 뷰 캡처 실패:", error);
+      console.error("❌ [MapCapture] ViewShot 에러:", error);
       return null;
     }
   }
 
   /**
-   * 캡처 상태 확인
+   * 🔥 메인 캡처 함수
    */
-  isCaptureInProgress() {
-    return this.isCapturing;
-  }
+  async captureMap(params) {
+    const { mapRef, viewShotRef, routeCoordinates } = params;
 
-  /**
-   * 캡처 취소 (진행 중인 경우)
-   */
-  cancelCapture() {
-    if (this.isCapturing) {
-      console.log("🚫 [MapCaptureService] 캡처 취소");
-      this.isCapturing = false;
+    console.log("🎯 [MapCapture] === 메인 캡처 시작 ===");
+
+    // 1️⃣ 간단한 줌 조절 (경로가 있으면)
+    if (routeCoordinates && routeCoordinates.length > 2 && mapRef?.current) {
+      try {
+        console.log("🎯 [MapCapture] 경로 기반 줌 조절");
+        
+        const lats = routeCoordinates.map(p => p.latitude);
+        const lngs = routeCoordinates.map(p => p.longitude);
+        
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        
+        const centerLat = (minLat + maxLat) / 2;
+        const centerLng = (minLng + maxLng) / 2;
+        const deltaLat = Math.max((maxLat - minLat) * 1.3, 0.005); // 최소 500m
+        const deltaLng = Math.max((maxLng - minLng) * 1.3, 0.005);
+
+        const region = {
+          latitude: centerLat,
+          longitude: centerLng,
+          latitudeDelta: deltaLat,
+          longitudeDelta: deltaLng
+        };
+
+        console.log("🎯 [MapCapture] 줌 조절:", region);
+        mapRef.current.animateToRegion(region, 1000);
+        
+        // 줌 완료 대기
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+      } catch (zoomError) {
+        console.error("❌ [MapCapture] 줌 조절 실패:", zoomError);
+      }
     }
+
+    // 2️⃣ takeSnapshot 시도
+    console.log("📸 [MapCapture] takeSnapshot 시도");
+    let result = await this.captureMapSimple(mapRef);
+    
+    if (result) {
+      console.log("✅ [MapCapture] takeSnapshot 성공");
+      return result;
+    }
+
+    // 3️⃣ ViewShot 폴백
+    if (viewShotRef) {
+      console.log("📸 [MapCapture] ViewShot 폴백 시도");
+      result = await this.captureWithViewShot(viewShotRef);
+      
+      if (result) {
+        console.log("✅ [MapCapture] ViewShot 성공");
+        return result;
+      }
+    }
+
+    // 4️⃣ 모든 방법 실패
+    console.error("❌ [MapCapture] 모든 캡처 방법 실패");
+    return null;
   }
 }
 

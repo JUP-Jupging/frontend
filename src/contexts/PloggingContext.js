@@ -25,10 +25,8 @@ export const PloggingProvider = ({ children }) => {
   // 컨텍스트 생명주기 관리
   useEffect(() => {
     contextRef.current.isActive = true;
-    console.log('🚀 [PloggingContext] 컨텍스트 활성화');
     
     return () => {
-      console.log('🔄 [PloggingContext] 컨텍스트 정리 시작');
       contextRef.current.isActive = false;
       
       // 플로깅 진행 중이면 위치 추적 중단
@@ -38,7 +36,6 @@ export const PloggingProvider = ({ children }) => {
       
       // 쓰레기 데이터 정리
       trashDataHook.clearAllTrashData();
-      console.log('✅ [PloggingContext] 컨텍스트 정리 완료');
     };
   }, []);
   
@@ -49,10 +46,8 @@ export const PloggingProvider = ({ children }) => {
       
       if (ploggingHook.status === "running" || ploggingHook.status === "paused") {
         if (nextAppState === 'background' || nextAppState === 'inactive') {
-          console.log('📱 [PloggingContext] 앱이 백그라운드로 전환됨');
           setIsBackgroundMode(true);
         } else if (nextAppState === 'active') {
-          console.log('📱 [PloggingContext] 앱이 포그라운드로 전환됨');
           setIsBackgroundMode(false);
           
           // 플로깅 중이면 위치 추적 재개
@@ -81,7 +76,6 @@ export const PloggingProvider = ({ children }) => {
       }
 
       try {
-        console.log('🚀 [PloggingContext] 플로깅 시작 처리 시작');
         
         // 1️⃣ 현재 위치 확인
         const location = await locationHook.getCurrentLocation();
@@ -93,11 +87,9 @@ export const PloggingProvider = ({ children }) => {
         // 2️⃣ 산책로 정보 저장
         if (trailInfo) {
           setCurrentTrailInfo(trailInfo);
-          console.log('🎯 [PloggingContext] 산책로 정보 설정:', trailInfo);
 
           // 3️⃣ 해당 산책로의 쓰레기 데이터 로드
           if (trailInfo.id) {
-            console.log(`🗑️ [PloggingContext] 산책로 ${trailInfo.id}의 쓰레기 데이터 로드 시작`);
             await trashDataHook.loadTrashDataForTrail(trailInfo.id);
           }
         }
@@ -106,7 +98,6 @@ export const PloggingProvider = ({ children }) => {
         ploggingHook.startPlogging();
         locationHook.startLocationTracking(true);
         
-        console.log('✅ [PloggingContext] 플로깅 시작 완료');
         return true;
 
       } catch (error) {
@@ -122,7 +113,6 @@ export const PloggingProvider = ({ children }) => {
     pausePlogging: () => {
       if (!contextRef.current.isActive) return;
       
-      console.log('⏸️ [PloggingContext] 플로깅 일시정지');
       ploggingHook.pausePlogging();
       locationHook.stopLocationTracking();
     },
@@ -133,7 +123,6 @@ export const PloggingProvider = ({ children }) => {
     resumePlogging: () => {
       if (!contextRef.current.isActive) return;
       
-      console.log('▶️ [PloggingContext] 플로깅 재개');
       ploggingHook.resumePlogging();
       locationHook.startLocationTracking(true);
     },
@@ -143,7 +132,6 @@ export const PloggingProvider = ({ children }) => {
      * @returns {Object} 플로깅 결과 데이터
      */
     endPlogging: () => {
-      console.log('🏁 [PloggingContext] 플로깅 종료 처리 시작');
 
       // 플로깅 결과 데이터 수집
       const result = {
@@ -193,7 +181,6 @@ export const PloggingProvider = ({ children }) => {
     addTrash: () => {
       if (!contextRef.current.isActive) return;
       
-      console.log('🗑️ [PloggingContext] 쓰레기 카운트 증가');
       ploggingHook.pickTrash(); // 단순 카운트 증가
     },
 
@@ -204,7 +191,6 @@ export const PloggingProvider = ({ children }) => {
     addCollectedTrashItem: (trash) => {
       if (!contextRef.current.isActive) return;
       
-      console.log('📝 [PloggingContext] 수집 쓰레기 추가 (레거시):', trash?.id);
       setCollectedTrash(prev => [...prev, trash]);
     },
 
@@ -215,7 +201,6 @@ export const PloggingProvider = ({ children }) => {
     setCurrentTrailInfo: (trailInfo) => {
       if (!contextRef.current.isActive) return;
       
-      console.log('🎯 [PloggingContext] 산책로 정보 업데이트:', trailInfo);
       setCurrentTrailInfo(trailInfo);
     },
 

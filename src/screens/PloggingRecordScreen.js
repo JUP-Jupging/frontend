@@ -110,7 +110,7 @@ export default function PloggingRecordScreen() {
     )
   }
 
-  // 🔥 이미지 배열 생성 함수 (산책로 이미지만)
+  // 🔥 메인 히어로 이미지 생성 함수 (산책로 이미지 우선)
   const getHeroImages = () => {
     console.log("🖼️ [PloggingRecord] getHeroImages 호출")
     console.log("🔍 [PloggingRecord] trailDetail 상태:", !!trailDetail)
@@ -380,11 +380,13 @@ export default function PloggingRecordScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 헤더 */}
+      {/* 🔥 수정된 헤더 - "플로깅 기록" 텍스트 추가 */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={goToHome}>
           <Icon name="close" size={24} color="#333" />
         </TouchableOpacity>
+        {/* 🔥 헤더 제목 추가 */}
+        <Text style={styles.headerTitle}>플로깅 기록</Text>
         <TouchableOpacity style={styles.profileButton} onPress={goToMyPloggingRecords}>
           <Image 
             source={require("../assets/user.png")} 
@@ -398,10 +400,10 @@ export default function PloggingRecordScreen() {
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
       >
-        {/* 🔥 캡처된 지도 이미지 또는 대표 이미지 */}
+        {/* 🔥 산책로 이미지를 우선으로 하는 히어로 이미지 */}
         <View style={styles.heroImageContainer}>
           <ImageWithFallback
-            source={recordData.mapImage ? { uri: recordData.mapImage } : null}
+            source={getHeroImages()[currentImageIndex]?.uri ? { uri: getHeroImages()[currentImageIndex].uri } : null}
             style={styles.heroImage}
             resizeMode="cover"
           />
@@ -428,9 +430,11 @@ export default function PloggingRecordScreen() {
           </View>
         )}
 
-        {/* 기본 정보 */}
+        {/* 🔥 수정된 기본 정보 - 산책로 이름을 메인 타이틀로 표시 */}
         <View style={styles.mainInfoSection}>
-          <Text style={styles.recordTitle}>{recordData.title}</Text>
+          <Text style={styles.recordTitle}>
+            {trailDetail?.trailName || trailDetail?.instlPlcNm || recordData.title}
+          </Text>
           
           {/* 통계 정보 그리드 */}
           <View style={styles.statsGrid}>
@@ -448,7 +452,7 @@ export default function PloggingRecordScreen() {
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>난이도</Text>
-              <Text style={styles.statValue}>{recordData.difficulty}</Text>
+              <Text style={styles.statValue}>{trailDetail?.difficultyLevel || recordData.difficulty}</Text>
             </View>
           </View>
         </View>
@@ -553,6 +557,13 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: screenWidth * 0.012,
+  },
+  // 🔥 헤더 제목 스타일 추가
+  headerTitle: {
+    fontSize: screenWidth * 0.045,
+    fontWeight: "700",
+    color: "#333333",
+    textAlign: "center",
   },
   profileButton: {
     padding: screenWidth * 0.012,

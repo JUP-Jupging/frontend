@@ -48,7 +48,12 @@ export default function MainScreen({ navigation }) {
   const { currentLocation, getCurrentLocation } = useLocation();
   
   const [selectedTag, setSelectedTag] = useState("가까운 곳")
-  const [todayPloggingRecords, setTodayPloggingRecords] = useState([]) // 🔥 오늘의 플로깅 기록
+  // 🔥 오늘의 플로깅 기록 상태를 객체로 초기화
+  const [todayPloggingRecords, setTodayPloggingRecords] = useState({
+    totalTime: 0,
+    totalDistance: 0,
+    totalTrashCount: 0
+  });
   const [currentPloggingTrail, setCurrentPloggingTrail] = useState(null) // 🔥 현재 플로깅 중인 산책로 정보
   const [nearbyTrails, setNearbyTrails] = useState([]) // 가까운 산책로들
   const [trashyTrails, setTrashyTrails] = useState([]) // 쓰레기 많은 산책로들
@@ -201,7 +206,48 @@ export default function MainScreen({ navigation }) {
     }
   }
 
-  // 🔥 오늘의 플로깅 기록 가져오기 (완료된 기록만)
+  // 🔥 날짜 유틸리티 함수들 추가
+  const isValidDate = (date) => {
+    return date instanceof Date && !isNaN(date.getTime());
+  };
+
+  const parseDate = (dateInput) => {
+    if (!dateInput) return null;
+    
+    try {
+      let date;
+      
+      if (typeof dateInput === 'string') {
+        // ISO 형식 문자열 처리
+        date = new Date(dateInput);
+      } else if (dateInput instanceof Date) {
+        date = dateInput;
+      } else if (typeof dateInput === 'number') {
+        // 타임스탬프 처리
+        date = new Date(dateInput);
+      } else {
+        return null;
+      }
+      
+      return isValidDate(date) ? date : null;
+    } catch (error) {
+      console.error('날짜 파싱 오류:', error);
+      return null;
+    }
+  };
+
+  const formatDateToString = (date) => {
+    if (!isValidDate(date)) return null;
+    
+    try {
+      return date.toISOString().split('T')[0]; // YYYY-MM-DD
+    } catch (error) {
+      console.error('날짜 포맷팅 오류:', error);
+      return null;
+    }
+  };
+
+  // 🔥 오늘의 플로깅 기록 가져오기 (완료된 기록만) - 날짜 처리 개선
   const fetchTodayPloggingRecords = async () => {
     try {
       setLoading(true);
@@ -209,7 +255,11 @@ export default function MainScreen({ navigation }) {
 
       if (!accessToken) {
         console.warn('⚠️ [MainScreen] 액세스 토큰 없음 - 로그인 필요');
-        setTodayPloggingRecords([]);
+        setTodayPloggingRecords({
+          totalTime: 0,
+          totalDistance: 0,
+          totalTrashCount: 0
+        });
         return;
       }
 
@@ -219,36 +269,89 @@ export default function MainScreen({ navigation }) {
 
       if (!allRecords || allRecords.length === 0) {
         console.log('📝 [MainScreen] 플로깅 기록 없음');
-        setTodayPloggingRecords([]);
+        setTodayPloggingRecords({
+          totalTime: 0,
+          totalDistance: 0,
+          totalTrashCount: 0
+        });
         return;
       }
 
-      // 오늘 날짜 필터링
-      const today = new Date();
+      // 오늘 날짜 필터링 - 안전한 날짜 처리
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD
 
+      console.log('📅 [MainScreen] 오늘 날짜:', todayString);
+
       const todayRecords = allRecords.filter(record => {
-        if (!record.ploggingTime) return false;
+        if (!record.ploggingTime) {
+          console.log('⚠️ [MainScreen] ploggingTime 없는 기록:', record);
+          return false;
+        }
         
-        const recordDate = new Date(record.ploggingTime).toISOString().split('T')[0];
-        return recordDate === todayString;
+        try {
+          // 안전한 날짜 파싱
+          let recordDate;
+          
+          // ISO 형식인지 확인
+          if (typeof record.ploggingTime === 'string') {
+            // 문자열인 경우 Date 객체로 변환
+            recordDate = new Date(record.ploggingTime);
+            
+            // 유효한 날짜인지 확인
+            if (isNaN(recordDate.getTime())) {
+              console.warn('⚠️ [MainScreen] 유효하지 않은 날짜:', record.ploggingTime);
+              return false;
+            }
+          } else if (record.ploggingTime instanceof Date) {
+            recordDate = record.ploggingTime;
+          } else {
+            console.warn('⚠️ [MainScreen] 알 수 없는 날짜 형식:', record.ploggingTime);
+            return false;
+          }
+          
+          // 날짜를 YYYY-MM-DD 형식으로 변환
+          const recordDateOnly = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate());
+          const recordDateString = recordDateOnly.toISOString().split('T')[0];
+          
+          console.log('📅 [MainScreen] 기록 날짜:', recordDateString, '오늘:', todayString);
+          
+          return recordDateString === todayString;
+        } catch (error) {
+          console.error('❌ [MainScreen] 날짜 파싱 오류:', error, '원본 데이터:', record.ploggingTime);
+          return false;
+        }
       });
 
       console.log('✅ [MainScreen] 오늘의 플로깅 기록:', todayRecords.length, '개');
 
       // 오늘의 총 통계 계산
       const todayStats = todayRecords.reduce((acc, record) => {
-        acc.totalTime += record.duration || 0; // 초 단위
-        acc.totalDistance += record.distance || 0; // 미터 단위
-        acc.totalTrashCount += record.trashCount || 0;
+        // 안전한 숫자 변환
+        const duration = typeof record.duration === 'number' ? record.duration : (parseFloat(record.duration) || 0);
+        const distance = typeof record.distance === 'number' ? record.distance : (parseFloat(record.distance) || 0);
+        const trashCount = typeof record.trashCount === 'number' ? record.trashCount : (parseInt(record.trashCount) || 0);
+        
+        acc.totalTime += duration; // 초 단위
+        acc.totalDistance += distance; // 미터 단위  
+        acc.totalTrashCount += trashCount;
+        
         return acc;
       }, { totalTime: 0, totalDistance: 0, totalTrashCount: 0 });
 
+      console.log('📊 [MainScreen] 오늘의 총 통계:', todayStats);
+      
       setTodayPloggingRecords(todayStats);
 
     } catch (error) {
       console.error('❌ [MainScreen] 오늘의 플로깅 기록 조회 실패:', error);
-      setTodayPloggingRecords([]);
+      // 오류 발생시 기본값 설정
+      setTodayPloggingRecords({
+        totalTime: 0,
+        totalDistance: 0,
+        totalTrashCount: 0
+      });
     } finally {
       setLoading(false);
     }

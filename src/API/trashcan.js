@@ -11,7 +11,6 @@ export const getAllTrashCans = async () => {
     const { data } = await axios.get(`${BASE_URL}/trash-can`, {
       timeout: 15000,
     });
-    console.log("전체 휴지통 데이터 조회 성공:", data.items.length);
     return data; // { items: [...] }
   } catch (error) {
     console.error("getAllTrashCans Error:", error.response?.data || error.message);

@@ -28,8 +28,7 @@ export const getTrailDetail = async (trailId) => {
 
 export const getTrailList = async (filters = {}) => {
   try {
-    console.log('📡 [API] getTrailList 호출 시작');
-    console.log('- filters:', filters);
+
     
     const { cityName, difficultyLevel } = filters;
     const params = new URLSearchParams();
@@ -38,20 +37,15 @@ export const getTrailList = async (filters = {}) => {
     if (difficultyLevel) params.append('difficultyLevel', difficultyLevel);
     
     const url = `${BASE_URL}/trails?${params.toString()}`;
-    console.log('- 요청 URL:', url);
     
     const response = await fetch(url);
-    console.log('- 응답 상태:', response.status);
     
     if (!response.ok) {
-      console.error('❌ [API] getTrailList HTTP 오류:', response.status);
       throw new Error(`HTTP error: ${response.status}`);
     }
     
     const data = await response.json();
-    console.log('✅ [API] getTrailList 성공');
-    console.log('- 응답 데이터 길이:', Array.isArray(data) ? data.length : '배열 아님');
-    
+
     return data;
   } catch (error) {
     console.error('❌ [API] getTrailList 실패:', error.message);
@@ -61,14 +55,10 @@ export const getTrailList = async (filters = {}) => {
 
 export const searchTrails = async (keyword) => {
   try {
-    console.log('📡 [API] searchTrails 호출 시작');
-    console.log('- keyword:', keyword);
-    
+
     const url = `${BASE_URL}/trails/search?keyword=${encodeURIComponent(keyword)}`;
-    console.log('- 요청 URL:', url);
     
     const response = await fetch(url);
-    console.log('- 응답 상태:', response.status);
     
     if (!response.ok) {
       console.error('❌ [API] searchTrails HTTP 오류:', response.status);
@@ -76,9 +66,7 @@ export const searchTrails = async (keyword) => {
     }
     
     const data = await response.json();
-    console.log('✅ [API] searchTrails 성공');
-    console.log('- 응답 데이터 길이:', Array.isArray(data) ? data.length : '배열 아님');
-    
+
     return data;
   } catch (error) {
     console.error('❌ [API] searchTrails 실패:', error.message);
@@ -89,10 +77,7 @@ export const searchTrails = async (keyword) => {
 // 🔥 재추가 - 가까운 산책로 여러개 반환 (백엔드에서 거리순 정렬해서 보내줌)
 export const getNearbyTrails = async (latitude, longitude) => {
   try {
-    console.log('📡 [API] getNearbyTrails 호출 시작');
-    console.log('- latitude:', latitude);
-    console.log('- longitude:', longitude);
-    
+
     // 파라미터 유효성 검사
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
       throw new Error('위도와 경도는 숫자여야 합니다');
@@ -104,7 +89,6 @@ export const getNearbyTrails = async (latitude, longitude) => {
     
     // 스웨거 문서에 따라 userLatitude, userLongitude 파라미터 사용
     const url = `${BASE_URL}/trails/nearby?userLat=${latitude}&userLong=${longitude}`;
-    console.log('- 요청 URL:', url);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -114,7 +98,6 @@ export const getNearbyTrails = async (latitude, longitude) => {
       }
     });
     
-    console.log('📨 [API] getNearbyTrails 응답 받음 - 상태:', response.status);
     
     if (!response.ok) {
       console.error('❌ [API] getNearbyTrails HTTP 오류:', response.status);
@@ -131,14 +114,10 @@ export const getNearbyTrails = async (latitude, longitude) => {
     }
     
     const data = await response.json();
-    console.log('✅ [API] getNearbyTrails 성공');
-    console.log('- 응답 데이터 타입:', typeof data);
-    
+
     // 🔥 응답 구조 확인을 위한 상세 로깅
     if (data && data.items && Array.isArray(data.items)) {
-      console.log('- 📦 items 배열 형태로 응답 받음');
-      console.log('- 📊 총 산책로 수:', data.items.length);
-      
+
       // 첫 3개 산책로 정보 출력
       data.items.slice(0, 3).forEach((trail, index) => {
         console.log(`- 🚶 산책로 ${index + 1}:`, {
@@ -154,9 +133,7 @@ export const getNearbyTrails = async (latitude, longitude) => {
       
       return data.items;
     } else if (Array.isArray(data)) {
-      console.log('- 📦 직접 배열 형태로 응답 받음');
-      console.log('- 📊 총 산책로 수:', data.length);
-      
+
       // 첫 3개 산책로 정보 출력
       data.slice(0, 3).forEach((trail, index) => {
         console.log(`- 🚶 산책로 ${index + 1}:`, {
@@ -193,10 +170,7 @@ export const getNearbyTrails = async (latitude, longitude) => {
 // 🔥 메인 API - 가장 가까운 산책로 1개만 반환
 export const getNearestTrail = async (latitude, longitude) => {
   try {
-    console.log('📡 [API] getNearestTrail 호출 시작');
-    console.log('- latitude:', latitude);
-    console.log('- longitude:', longitude);
-    
+
     // 파라미터 유효성 검사
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
       throw new Error('위도와 경도는 숫자여야 합니다');
@@ -208,7 +182,6 @@ export const getNearestTrail = async (latitude, longitude) => {
     
     // 백엔드 API 스펙에 맞춰 변수명 수정: userLat/userLong
     const url = `${BASE_URL}/trails/nearest?userLat=${latitude}&userLong=${longitude}`;
-    console.log('- 요청 URL:', url);
     
     const response = await fetch(url, {
       method: 'GET',
@@ -218,7 +191,6 @@ export const getNearestTrail = async (latitude, longitude) => {
       }
     });
     
-    console.log('📨 [API] 응답 받음 - 상태:', response.status);
     
     if (!response.ok) {
       console.error('❌ [API] getNearestTrail HTTP 오류:', response.status);
@@ -235,22 +207,16 @@ export const getNearestTrail = async (latitude, longitude) => {
     }
     
     const data = await response.json();
-    console.log('✅ [API] getNearestTrail 성공');
-    console.log('- 응답 데이터 타입:', typeof data);
-    
+
     // 🔥 단일 객체인지 배열인지 확인
     if (Array.isArray(data)) {
-      console.log('- 배열 응답, 길이:', data.length);
       if (data.length > 0) {
-        console.log('- 첫 번째 산책로:', data[0].trailName);
         return data[0]; // 첫 번째 항목만 반환
       } else {
-        console.log('- 빈 배열 응답');
         return null;
       }
     } else if (data && typeof data === 'object') {
-      console.log('- 단일 객체 응답');
-      console.log('- 산책로 이름:', data.trailName);
+
       return data;
     } else {
       console.log('- 예상치 못한 응답 형식:', data);
