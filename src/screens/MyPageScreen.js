@@ -6,7 +6,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Image, SafeAreaView, ScrollVi
 import Icon from "react-native-vector-icons/MaterialIcons"
 import CommonModal from "../components/CommonModal"
 import { launchImageLibrary } from 'react-native-image-picker'
-import { getMyPage, updateProfileImage, updateNickname, updateActivityRegion } from "../api/mypage";
+import { getMyPage, updateProfileImage, updateNickname, updateActivityRegion, withdraw } from "../api/mypage";
 import { useAuth } from "../stores/useAuth";
 import { forceClearAuth } from '../utils/forceClearAuth'; // 함수 경로에 맞게 수정
 
@@ -45,7 +45,6 @@ export default function MyPageScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      console.log("마이페이지 Access Token:", accessToken);
       async function fetchUser() {
         try {
           const data = await getMyPage(accessToken);
@@ -60,43 +59,16 @@ export default function MyPageScreen({ navigation }) {
     }, [accessToken])
   );
 
- useFocusEffect(
-    useCallback(() => {
-      async function fetchUser() {
-        try {
-           const data = await getMyPage(accessToken);
-           setUser(data);
-          setProfileImage(data.profileImageUrl ? { uri: data.profileImageUrl } : require("../assets/profile.png"));
-          setRegion(data.activityRegion || "지역을 선택하세요");
-     } catch (e) {
-          console.error("유저 정보 불러오기 실패:", e);
-          // 401, 403 같은 인증 에러 발생 시 강제 로그아웃 처리도 가능
-          // if (e.response?.status === 401) {
-          //   await forceClearAuth();
-          //   navigation.reset({ index: 0, routes: [{ name: "Login" }] });
-          // }
-        }
-      }
-      if (accessToken) fetchUser();
-    }, [accessToken])
-  );
-
-  // 2. handleDeleteAccount 함수를 async로 변경하고 로직을 수정합니다.
-  const handleDeleteAccount = async () => {
+  // 계정 삭제
+  const handleDeleteAccount = async () => {
     try {
-      // 서버에 회원탈퇴 API 호출
       await withdraw(accessToken); 
       console.log("계정 삭제 API 호출 성공");
     } catch (error) {
-      // API 호출이 실패하더라도(예: 이미 DB에서 삭제된 유저) 에러만 기록합니다.
-      // 어차피 finally에서 로그아웃 처리는 동일하게 진행됩니다.
       console.error("계정 삭제 API 호출 실패:", error);
     } finally {
-      // API 성공/실패와 관계없이 항상 실행됩니다.
-      setModalVisible(false); // 모달 닫기
-      await forceClearAuth(); // 로컬 데이터(AsyncStorage, Zustand) 삭제
-      
-      // 로그인 화면으로 리셋
+      setModalVisible(false);
+      await forceClearAuth();
       navigation.reset({
         index: 0,
         routes: [{ name: "Login" }],
@@ -120,8 +92,8 @@ export default function MyPageScreen({ navigation }) {
         console.error('사진 선택 중 오류 발생:', response.error);
       } else if (response.assets && response.assets.length > 0) {
         const selectedImage = response.assets[0];
-        setPendingProfileImage(selectedImage); // 임시 저장
-        setConfirmProfileModal(true); // 변경 확인 모달 띄우기
+        setPendingProfileImage(selectedImage);
+        setConfirmProfileModal(true);
       }
     });
   };
@@ -130,7 +102,7 @@ export default function MyPageScreen({ navigation }) {
   const handleConfirmProfileChange = async () => {
     if (!pendingProfileImage) return;
     setConfirmProfileModal(false);
-    setProfileImage({ uri: pendingProfileImage.uri }); // UI에 바로 반영
+    setProfileImage({ uri: pendingProfileImage.uri });
     try {
       await updateProfileImage(accessToken, {
         uri: pendingProfileImage.uri,
@@ -157,7 +129,6 @@ export default function MyPageScreen({ navigation }) {
       await updateActivityRegion(accessToken, selectedRegion);
       setRegion(selectedRegion);
       setConfirmRegionModal(false);
-      // 필요시 getMyPage로 최신 정보 반영
     } catch (e) {
       console.error("활동 지역 변경 실패:", e);
       setConfirmRegionModal(false);
@@ -190,7 +161,7 @@ export default function MyPageScreen({ navigation }) {
             <Text style={styles.infoLabel}>닉네임</Text>
             <Text style={styles.infoValue}>{user?.appNickname || "닉네임 없음"}</Text>
             <TouchableOpacity onPress={() => {
-              navigation.navigate("ChangeNickname", { onChange: handleChangeNickname });
+              navigation.navigate("ChangeNickname", { currentNickname: user?.appNickname });
             }}>
               <Icon name="chevron-right" size={24} color="#131214" />
             </TouchableOpacity>
@@ -259,7 +230,7 @@ export default function MyPageScreen({ navigation }) {
         onConfirm={handleConfirmRegionChange}
       />
       {/* 계정 삭제 확인 모달 */}
-<CommonModal
+      <CommonModal
         visible={modalVisible}
         message="정말 계정을 삭제하시겠습니까?"
         onCancel={() => setModalVisible(false)}
