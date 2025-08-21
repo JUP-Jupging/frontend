@@ -89,21 +89,20 @@ export default function RecommendCourseScreen({ navigation }) {
   }, [])
 )
   // 추천 결과 카드 렌더
-  const renderResultItem = ({ item }) => (
-    <View style={styles.resultCard}>
-      <Image
-        source={item.img1 ? { uri: item.img1 } : require("../assets/ai-assistant2.png")}
-        style={styles.resultImage}
-        resizeMode="cover"
-      />
-      <Text style={styles.resultTitle}>{item.trail_name || item.title}</Text>
-      <Text style={styles.resultAddress}>{item.lot_number_address}</Text>
-      <Text style={styles.resultReason}>
-            {item.reason
-              ? item.reason.replace(/\. /g, ".\n").replace(/([가-힣]) /g, "$1\n")
-              : ""}
-      </Text>    
-    </View>
+const renderResultItem = ({ item }) => (
+  <View style={styles.resultCard}>
+    <Image
+      source={item.img1 ? { uri: item.img1 } : require("../assets/ai-assistant2.png")}
+      style={styles.resultImage}
+      resizeMode="cover"
+    />
+    <Text style={styles.resultTitle}>{item.trail_name || item.title}</Text>
+    <Text style={styles.resultAddress}>{item.lot_number_address}</Text>
+    {/* reason 줄바꿈 없이 원래대로 출력 */}
+    <Text style={styles.resultReason}>
+      {item.reason}
+    </Text>
+  </View>
   )
 
   return (
