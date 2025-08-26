@@ -210,6 +210,63 @@ function PloggingStartScreen({ navigation, route }) {
     }
   };
 
+  // PloggingStartScreen.js에서 헤더 부분 수정
+
+// PloggingStartScreen.js에서 헤더 부분 수정
+
+// PloggingStartScreen.js에서 헤더 부분 수정
+
+// 헤더에 전달할 산책로 정보 계산 함수
+const getTrailInfoForHeader = useCallback(() => {
+  // 플로깅이 진행 중이 아니면 null 반환
+  if (status === "idle") {
+    return null;
+  }
+
+  console.log("🔍 [PloggingStart] 헤더용 산책로 정보 수집:", {
+    entryMode: state.entryMode,
+    hasSelectedRoute: !!state.selectedRoute,
+    hasNearestTrail: !!state.nearestTrail,
+    hasCourseInfo: !!state.courseInfo
+  });
+
+  // 1. 선택된 루트 정보가 있는 경우 (우선순위 높음)
+  if (state.selectedRoute) {
+    console.log("✅ [PloggingStart] selectedRoute 사용:", state.selectedRoute);
+    return {
+      trailTypeName: state.selectedRoute.trailTypeName || null,
+      trailName: state.selectedRoute.name,
+      name: state.selectedRoute.name
+    };
+  }
+
+  // 2. 코스 상세에서 온 경우의 코스 정보
+  if (state.courseInfo) {
+    console.log("✅ [PloggingStart] courseInfo 사용:", state.courseInfo);
+    return {
+      trailTypeName: state.courseInfo.trailTypeName || null,
+      trailName: state.courseInfo.name,
+      name: state.courseInfo.name
+    };
+  }
+
+  // 3. 근처 산책로 정보가 있는 경우
+  if (state.nearestTrail) {
+    console.log("✅ [PloggingStart] nearestTrail 사용:", state.nearestTrail);
+    // nearestTrail에서 직접 정보 가져오기
+    const trailName = state.nearestTrail.name || state.nearestTrail.trailName;
+    return {
+      trailTypeName: state.nearestTrail.trailTypeName || null,
+      trailName: trailName,
+      name: trailName
+    };
+  }
+
+  console.log("❌ [PloggingStart] 산책로 정보 없음");
+  return null;
+}, [status, state.selectedRoute, state.courseInfo, state.nearestTrail]);
+
+
   // ðŸŽ¯ CourseDetail ì§„ìž… ì²˜ë¦¬
   const handleCourseDetailEntry = (routeParams) => {
     const { selectedRoute, trailStartCoords, trailFullPath } = routeParams;
@@ -877,10 +934,12 @@ const handleTrashMarkerPress = useCallback((trash) => {
   return (
     <SafeAreaView style={styles.container}>
       {/* í—¤ë” */}
-      <PloggingHeader 
-        status={status}
-        onBack={handleHeaderBack}
-      />
+    {/* 헤더 */}
+    <PloggingHeader 
+      status={status}
+      onBack={handleHeaderBack}
+      trailInfo={getTrailInfoForHeader()}
+    />
 
       {/* ê±°ë¦¬ ì •ë³´ ë“± */}
       {state.trailStartCoords && state.distanceToTrail !== null && (

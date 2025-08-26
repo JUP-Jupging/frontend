@@ -274,15 +274,7 @@ export default function WalkSearchScreen({ navigation }) {
       {/* 필터 영역 */}
       {showFilters && (
         <View style={styles.filterContainer}>
-          <View style={styles.filterRow}>
-            <Text style={styles.filterLabel}>지역:</Text>
-            <TextInput
-              style={styles.filterInput}
-              placeholder="예: 서울, 부산"
-              value={filters.cityName}
-              onChangeText={(text) => setFilters(prev => ({ ...prev, cityName: text }))}
-            />
-          </View>
+
           <View style={styles.filterRow}>
             <Text style={styles.filterLabel}>난이도:</Text>
             <View style={styles.difficultyContainer}>

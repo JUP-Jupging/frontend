@@ -263,66 +263,68 @@ export default function CourseDetailScreen({ navigation, route }) {
   const goToMyPloggingRecords = () => navigation.navigate("내 플로깅 기록")
 
   // 플로깅 시작 함수 (거리 체크 포함)
-  const startPlogging = async () => {
-    if (!courseData) {
-      Alert.alert("오류", "코스 정보를 불러올 수 없습니다.")
-      return
-    }
+  // CourseDetailScreen.js의 startPlogging 함수 수정
 
-    // 현재 위치 확인
-    if (!currentLocation) {
-      Alert.alert(
-        "위치 정보 필요",
-        "현재 위치를 확인해주세요.",
-        [
-          { text: "위치 새로고침", onPress: getCurrentLocation },
-          { text: "취소", style: "cancel" }
-        ]
-      )
-      return
-    }
-
-    // 거리 계산
-    const distance = calculateDistance(
-      currentLocation.latitude,
-      currentLocation.longitude,
-      courseData.spotLatitude,
-      courseData.spotLongitude
-    )
-
-    console.log(`🎯 [CourseDetailScreen] 산책로와의 거리: ${distance.toFixed(0)}m`)
-
-    // 거리 체크
-    if (distance > MAX_DISTANCE_TO_START) {
-      Alert.alert(
-        "산책로와 거리가 너무 멉니다",
-        `현재 산책로에서 ${distance.toFixed(0)}m 떨어져 있습니다.\n${MAX_DISTANCE_TO_START}m 이내로 가까이 이동해주세요.`,
-        [{ text: "확인" }]
-      )
-      return
-    }
-
-    // 거리가 적절하면 플로깅 시작 화면으로 이동
-    navigation.navigate("PloggingStart", {
-      selectedRoute: {
-        id: courseData.id,
-        name: courseData.name,
-        location: courseData.address,
-        difficulty: courseData.level,
-        distance: courseData.length,
-        duration: courseData.duration,
-        latitude: courseData.spotLatitude,
-        longitude: courseData.spotLongitude,
-      },
-      trailStartCoords: {
-        latitude: courseData.spotLatitude,
-        longitude: courseData.spotLongitude,
-      },
-      courseName: courseData.name,
-      // 추후 API에서 실제 경로 데이터를 가져와야 함
-      trailFullPath: [], // TODO: API에서 실제 경로 데이터 가져오기
-    })
+const startPlogging = async () => {
+  if (!courseData) {
+    Alert.alert("오류", "코스 정보를 불러올 수 없습니다.")
+    return
   }
+
+  // 현재 위치 확인
+  if (!currentLocation) {
+    Alert.alert(
+      "위치 정보 필요",
+      "현재 위치를 확인해주세요.",
+      [
+        { text: "위치 새로고침", onPress: getCurrentLocation },
+        { text: "취소", style: "cancel" }
+      ]
+    )
+    return
+  }
+
+  // 거리 계산
+  const distance = calculateDistance(
+    currentLocation.latitude,
+    currentLocation.longitude,
+    courseData.spotLatitude,
+    courseData.spotLongitude
+  )
+
+  console.log(`🎯 [CourseDetailScreen] 산책로와의 거리: ${distance.toFixed(0)}m`)
+
+  // 거리 체크
+  if (distance > MAX_DISTANCE_TO_START) {
+    Alert.alert(
+      "산책로와 거리가 너무 멉니다",
+      `현재 산책로에서 ${distance.toFixed(0)}m 떨어져 있습니다.\n${MAX_DISTANCE_TO_START}m 이내로 가까이 이동해주세요.`,
+      [{ text: "확인" }]
+    )
+    return
+  }
+
+  // 거리가 적절하면 플로깅 시작 화면으로 이동
+  navigation.navigate("PloggingStart", {
+    selectedRoute: {
+      id: courseData.id,
+      name: courseData.name,
+      trailTypeName: courseData.trailTypeName, // ⭐ 이 부분이 중요!
+      location: courseData.address,
+      difficulty: courseData.level,
+      distance: courseData.length,
+      duration: courseData.duration,
+      latitude: courseData.spotLatitude,
+      longitude: courseData.spotLongitude,
+    },
+    trailStartCoords: {
+      latitude: courseData.spotLatitude,
+      longitude: courseData.spotLongitude,
+    },
+    courseName: courseData.name,
+    trailFullPath: [], 
+  })
+}
 
   // 이미지 렌더링 함수
   const renderImageItem = ({ item, index }) => (
@@ -444,6 +446,7 @@ export default function CourseDetailScreen({ navigation, route }) {
 
         {/* Course Info */}
         <View style={styles.courseInfoContainer}>
+          <Text style={styles.courseTypeName}>{courseData.trailTypeName}</Text>
           <Text style={styles.courseName}>{courseData.name}</Text>
           <Text style={styles.courseAddress}>{courseData.address}</Text>
 
@@ -634,10 +637,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: PADDING_H,
     paddingVertical: 20,
   },
-  courseName: {
+  courseTypeName:{
     fontFamily: "Pretendard Variable",
     fontWeight: "700",
     fontSize: 24,
+    lineHeight: 30,
+    color: "#333333",
+    marginBottom: 8,
+  },
+  courseName: {
+    fontFamily: "Pretendard Variable",
+    fontWeight: "700",
+    fontSize: 22,
     lineHeight: 30,
     color: "#333333",
     marginBottom: 8,
