@@ -41,7 +41,7 @@ export default function PloggingRecordScreen() {
   // 🔥 trailDetail이 업데이트될 때마다 이미지 상태 로깅
   useEffect(() => {
     if (trailDetail) {
-      console.log("📄 [PloggingRecord] trailDetail 업데이트됨:")
+      console.log("📊 [PloggingRecord] trailDetail 업데이트됨:")
       console.log("  - img1:", trailDetail.img1)
       console.log("  - img2:", trailDetail.img2)
     }
@@ -123,10 +123,10 @@ export default function PloggingRecordScreen() {
         const result = route.params.result;
         
         if (result._detailData) {
-          console.log("📊 [PloggingRecord] 마이페이지에서 온 상세 데이터")
+          console.log("📋 [PloggingRecord] 마이페이지에서 온 상세 데이터")
           setDataSource('mypage')
         } else {
-          console.log("📊 [PloggingRecord] 플로깅 종료 후 실시간 데이터")
+          console.log("📋 [PloggingRecord] 플로깅 종료 후 실시간 데이터")
           setDataSource('realtime')
         }
         
@@ -148,10 +148,10 @@ export default function PloggingRecordScreen() {
           endTime: result.endTime,
         };
         
-        console.log("📋 [PloggingRecord] 변환된 데이터:", transformedData);
+        console.log("📊 [PloggingRecord] 변환된 데이터:", transformedData);
         setRecordData(transformedData);
         
-        // 🔥 산책로 ID가 있으면 상세 정보 로드
+        // � 산책로 ID가 있으면 상세 정보 로드
         if (result.trailId) {
           console.log("🔍 [PloggingRecord] 산책로 ID 발견, 상세 정보 로드:", result.trailId)
           await loadTrailDetail(result.trailId)
@@ -392,51 +392,7 @@ export default function PloggingRecordScreen() {
           </View>
         )}
 
-        {/* 주운 쓰레기 섹션 */}
-        <View style={styles.trashSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>주운 쓰레기</Text>
-            <Text style={styles.sectionSubtitle}>플로깅중 주운 쓰레기 기록입니다</Text>
-          </View>
 
-          {trashList.length > 0 ? (
-            trashList.map((trash, index) => (
-              <View key={trash.id} style={styles.trashCard}>
-                <View style={styles.trashCardLeft}>
-                  <View style={styles.trashNumber}>
-                    <Text style={styles.trashNumberText}>{trash.number}</Text>
-                  </View>
-                  <View style={styles.trashInfo}>
-                    <Text style={styles.trashType}>{trash.type}</Text>
-                    <Text style={styles.trashLocation}>{trash.location}</Text>
-                    
-                    {/* ✅ 쓰레기 세부 정보 표시 */}
-                    {trash.details && (
-                      <Text style={styles.trashDetails}>
-                        {formatTrashDetails(trash.details)}
-                      </Text>
-                    )}
-                    
-                    <View style={styles.trashTagContainer}>
-                      <Text style={styles.trashTag}>#{trash.tag}</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.trashImageContainer}>
-                  <ImageWithFallback
-                    source={{ uri: trash.image || "https://via.placeholder.com/75x75/E8F5E8/4CAF50?text=Trash" }}
-                    style={styles.trashImage} 
-                  />
-                </View>
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyTrashContainer}>
-              <Icon name="delete-outline" size={64} color="#CCCCCC" />
-              <Text style={styles.emptyTrashText}>아직 주운 쓰레기가 없습니다</Text>
-            </View>
-          )}
-        </View>
 
         {/* 하단 버튼들 */}
         <View style={styles.bottomButtons}>

@@ -164,7 +164,8 @@ export const getMyPloggingRecords = async (accessToken) => {
 
     console.log('✅ [API] getMyPloggingRecords 성공:', data?.length || 0, '개');
     return data;
-  } catch (error) {
+  } catch (error)
+    {
     console.error('❌ [API] getMyPloggingRecords 실패:', error);
     throw error;
   }

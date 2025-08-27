@@ -7,9 +7,10 @@ import { useNavigation } from "@react-navigation/native"
 import Icon from "react-native-vector-icons/MaterialIcons"
 import { getMyPage } from "../api/mypage";
 import { getMyReports } from "../api/report";
-import { getMyPloggingRecords, getPloggingDetail } from "../api/plog"; // ✅ 상세 조회 API 추가
+import { getMyPloggingRecords, getPloggingDetail } from "../api/plog";
+import { getTrailDetail } from "../api/trails"; // 🔥 산책로 상세 정보 API 추가
 import { useAuth } from "../stores/useAuth";
-import { formatUserFriendlyDate, formatPloggingTime, formatDistance, formatPloggingCardInfo } from "../utils/timeUtils"; // ✅ 시간 유틸리티 import
+import { formatUserFriendlyDate, formatPloggingTime, formatDistance, formatPloggingCardInfo } from "../utils/timeUtils";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
@@ -18,18 +19,19 @@ export default function MyPloggingScreen() {
   const [activeTab, setActiveTab] = useState("플로깅")
   const [user, setUser] = useState(null);
   const [reports, setReports] = useState([]);
-  const [ploggingRecords, setPloggingRecords] = useState([]); // ✅ 플로깅 기록 상태
-  const [isLoading, setIsLoading] = useState(false); // ✅ 로딩 상태 추가
+  const [ploggingRecords, setPloggingRecords] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const accessToken = useAuth((s) => s.accessToken);
 
-  // 🔥 이미지 컴포넌트 - 에러 처리 추가
+  // 🔥 개선된 이미지 컴포넌트 - 디폴트 "이미지 없음" 표시
   const ImageWithFallback = ({ source, style, ...props }) => {
     const [hasError, setHasError] = useState(false)
     
     if (hasError || !source?.uri) {
       return (
         <View style={[style, styles.fallbackImageContainer]}>
-          <Icon name="image-not-supported" size={24} color="#CCCCCC" />
+          <Icon name="image" size={20} color="#CCCCCC" />
+          <Text style={styles.fallbackImageText}>이미지 없음</Text>
         </View>
       )
     }
@@ -71,28 +73,50 @@ export default function MyPloggingScreen() {
     if (accessToken && activeTab === "신고") fetchReports();
   }, [accessToken, activeTab]);
 
-  // ✅ 플로깅 기록 가져오기 - 시간 유틸리티 적용
+  // 🔥 산책로 이미지를 가져오는 함수
+  const fetchTrailImage = async (trailId) => {
+    try {
+      console.log(`🗺️ [MyPloggingScreen] trailId ${trailId}의 이미지 가져오기 시작`);
+      const trailDetail = await getTrailDetail(trailId);
+      
+      // � 스웨거 스펙에 맞춰 img1을 우선으로, img2를 백업으로 사용
+      const trailImageUrl = trailDetail?.img1 || trailDetail?.img2;
+      
+      console.log(`🗺️ [MyPloggingScreen] trailId ${trailId} 상세 정보:`, {
+        img1: trailDetail?.img1,
+        img2: trailDetail?.img2,
+        selected: trailImageUrl
+      });
+      
+      return trailImageUrl;
+    } catch (error) {
+      console.error(`❌ [MyPloggingScreen] trailId ${trailId} 이미지 가져오기 실패:`, error);
+      return null;
+    }
+  };
+
+  // ✅ 플로깅 기록 가져오기 - 산책로 이미지까지 포함
   useEffect(() => {
     async function fetchPloggingRecords() {
       try {
         setIsLoading(true);
-        console.log('📋 [MyPloggingScreen] 플로깅 기록 가져오기 시작');
+        console.log('🏃 [MyPloggingScreen] 플로깅 기록 가져오기 시작');
         
         const data = await getMyPloggingRecords(accessToken);
-        console.log('📋 [MyPloggingScreen] 가져온 원본 데이터:', data);
+        console.log('🏃 [MyPloggingScreen] 가져온 원본 데이터:', data);
         
         // ✅ 시간 유틸리티를 사용해서 표시용 정보 생성
-        const formattedRecords = (Array.isArray(data) ? data : []).map((record, index) => {
+        const baseRecords = (Array.isArray(data) ? data : []).map((record, index) => {
           
           // 🔥 ploggingTime 안전 처리
           const safePloggingTime = record.ploggingTime === "string" ? "0" : record.ploggingTime;
           
           const cardInfo = formatPloggingCardInfo({
             ...record,
-            ploggingTime: safePloggingTime // 안전한 값으로 교체
+            ploggingTime: safePloggingTime
           });
           
-          console.log(`📋 [MyPloggingScreen] 기록 ${index + 1} 포맷팅:`, {
+          console.log(`🏃 [MyPloggingScreen] 기록 ${index + 1} 포맷팅:`, {
             original: record,
             safePloggingTime: safePloggingTime,
             formatted: cardInfo
@@ -100,18 +124,54 @@ export default function MyPloggingScreen() {
           
           return {
             ...record,
-            ploggingTime: safePloggingTime, // 🔥 원본도 안전한 값으로 업데이트
-            // 표시용 정보 추가
+            ploggingTime: safePloggingTime,
             displayInfo: cardInfo,
-            // 기존 필드들도 유지하되 포맷된 버전 추가
             formattedDate: cardInfo.date,
             formattedTime: cardInfo.time,
-            formattedDistance: cardInfo.distance
+            formattedDistance: cardInfo.distance,
+            // 🔥 초기에는 플로깅 맵 이미지 사용, 나중에 산책로 이미지로 교체
+            displayImageUrl: record.imageUrl,
+            isLoadingTrailImage: true
           };
         });
         
-        console.log('✅ [MyPloggingScreen] 최종 포맷된 기록들:', formattedRecords);
-        setPloggingRecords(formattedRecords);
+        console.log('✅ [MyPloggingScreen] 기본 포맷된 기록들:', baseRecords);
+        setPloggingRecords(baseRecords);
+        
+        // 🔥 각 기록의 산책로 이미지를 비동기로 가져오기
+        console.log('🗺️ [MyPloggingScreen] 산책로 이미지들 가져오기 시작');
+        const updatedRecords = await Promise.all(
+          baseRecords.map(async (record) => {
+            if (record.trailId) {
+              try {
+                const trailImageUrl = await fetchTrailImage(record.trailId);
+                console.log(`🎯 [MyPloggingScreen] 기록 ${record.ploggingId}의 산책로 이미지 결과:`, trailImageUrl);
+                return {
+                  ...record,
+                  displayImageUrl: trailImageUrl || record.imageUrl, // 산책로 이미지(img1/img2)가 없으면 플로깅 맵 이미지 사용
+                  trailImageUrl: trailImageUrl,
+                  isLoadingTrailImage: false
+                };
+              } catch (error) {
+                console.error(`❌ [MyPloggingScreen] trailId ${record.trailId} 이미지 로드 실패:`, error);
+                return {
+                  ...record,
+                  displayImageUrl: record.imageUrl, // 에러 시 플로깅 맵 이미지 사용
+                  isLoadingTrailImage: false
+                };
+              }
+            } else {
+              return {
+                ...record,
+                isLoadingTrailImage: false
+              };
+            }
+          })
+        );
+        
+        console.log('🎯 [MyPloggingScreen] 산책로 이미지 포함 최종 기록들:', updatedRecords);
+        setPloggingRecords(updatedRecords);
+        
       } catch (e) {
         console.error("❌ [MyPloggingScreen] 플로깅 기록 불러오기 실패:", e);
         setPloggingRecords([]);
@@ -125,15 +185,9 @@ export default function MyPloggingScreen() {
     }
   }, [accessToken, activeTab]);
 
-  // ✅ 플로깅 기록 클릭 핸들러 - 상세 조회 후 기록 페이지로 이동
-  // MyPloggingScreen.js
-
-  // ✅ 플로깅 기록 클릭 핸들러 - 상세 조회 후 기록 페이지로 이동
-// MyPloggingScreen.js
-
   // ✅ 플로깅 기록 클릭 핸들러 - API 호출 없이 기존 데이터를 직접 전달
   const handlePloggingRecordPress = (record) => {
-    console.log('🔍 [MyPloggingScreen] 플로깅 기록 클릭 (데이터 직접 전달):', record);
+    console.log('👆 [MyPloggingScreen] 플로깅 기록 클릭 (데이터 직접 전달):', record);
     
     // 🔥 API 호출 없이, 클릭된 'record' 객체를 사용해 바로 데이터 구성
     const transformedData = {
@@ -147,9 +201,11 @@ export default function MyPloggingScreen() {
       distance: formatDistance(record.distance),
       difficulty: record.difficulty || "보통",
       
-      // 이미지 정보 (record 객체에서 가져옴)
-      mapImage: record.imageUrl,
-      routeImage: record.imageUrl,
+      // 🔥 이미지 정보 구분해서 전달
+      // - mapImage: 플로깅한 실제 경로 이미지 (기록된 경로 섹션에 표시)
+      // - routeImage: 산책로 대표 이미지 (상단 캐러셀에 표시)
+      mapImage: record.imageUrl, // 플로깅 맵 이미지 (실제 경로)
+      routeImage: record.displayImageUrl || record.trailImageUrl, // 산책로 대표 이미지
 
       // 메타데이터 (record 객체에서 가져옴)
       trailId: record.trailId,
@@ -170,39 +226,6 @@ export default function MyPloggingScreen() {
     navigation.navigate("PloggingRecordScreen", {
       result: transformedData
     });
-  };
-
-  // ✅ 쓰레기 타입 결정 함수
-  const determineTrashType = (trash) => {
-    const typeMapping = {
-      paper: "종이류",
-      can: "캔류",
-      plastic: "플라스틱",
-      vinyl: "비닐류",
-      glass: "유리병",
-      styro: "스티로폼",
-      battery: "배터리"
-    };
-    
-    // API 응답의 각 쓰레기 타입 필드를 확인
-    for (const [key, koreanName] of Object.entries(typeMapping)) {
-      if (trash[key] && trash[key] > 0) {
-        return `${koreanName} ${trash[key]}개`;
-      }
-    }
-    
-    return "일반 쓰레기";
-  };
-
-  // ✅ 쓰레기 양 결정 함수
-  const determineTrashAmount = (trash) => {
-    const total = (trash.paper || 0) + (trash.can || 0) + (trash.plastic || 0) + 
-                  (trash.vinyl || 0) + (trash.glass || 0) + (trash.styro || 0) + (trash.battery || 0);
-    
-    if (total > 10) return "많음";
-    if (total > 5) return "보통";
-    if (total > 0) return "적음";
-    return "없음";
   };
 
   return (
@@ -305,16 +328,17 @@ export default function MyPloggingScreen() {
                       {/* ✅ 추가 정보 표시 */}
                       {record.trashCount > 0 && (
                         <Text style={styles.recordTrashInfo}>
-                          🗑️ 수집한 쓰레기: {record.trashCount}개
+                          수집한 쓰레기: {record.trashCount}개
                         </Text>
                       )}
                     </View>
                     
                     <View style={styles.recordImageContainer}>
+                      {/* 🔥 산책로 이미지 우선 표시, 없으면 디폴트 "이미지 없음" */}
                       <ImageWithFallback
                         source={
-                          record.imageUrl
-                            ? { uri: record.imageUrl }
+                          record.displayImageUrl
+                            ? { uri: record.displayImageUrl }
                             : null
                         }
                         style={styles.recordMapImage}
@@ -387,7 +411,6 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: screenHeight * 0.06,
-
     paddingHorizontal: 20,
     paddingVertical: 15,
     backgroundColor: "#FFFFFF",
@@ -412,15 +435,22 @@ const styles = StyleSheet.create({
     marginRight: 20,
   },
   
-  // 🔥 Fallback 이미지 스타일 추가
+  // 🔥 개선된 Fallback 이미지 스타일
   fallbackImageContainer: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#E9ECEF',
     borderStyle: 'dashed',
     borderRadius: 8,
+  },
+  
+  fallbackImageText: {
+    fontSize: 10,
+    color: '#6C757D',
+    marginTop: 2,
+    textAlign: 'center',
   },
   
   profileInfo: {
